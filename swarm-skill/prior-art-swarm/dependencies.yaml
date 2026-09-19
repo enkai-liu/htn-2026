@@ -1,0 +1,23 @@
+# dependencies.yaml — prior-art-swarm startup dependency check
+#
+# The Leader reads this file in SKILL.md Workflow Step 0 (pre-flight). Each entry is checked and the
+# result is reported to the user, who decides go/no-go. Tool availability found here also decides
+# which source slices can be staffed in Step 1.
+#
+# Populated from the Stage 2 auto-matching scan of the authoring workspace: no local skill matched
+# any role (every role runs on its Inline Persona alone), so `skills: []` means "checked, none needed".
+
+skills: []
+
+tools:
+  - name: web_search
+    required: true
+    purpose: "Lets the scouts search the open web (project galleries, code hosts, discussion sites, company directories) for prior work. Without any search capability no scout can be staffed and the run can only abstain."
+
+  - name: elastic-agent-builder-mcp
+    required: false
+    purpose: "Connects scouts to an indexed corpus through Elastic Agent Builder MCP tools (hybrid search, facet counts, neighbourhood cliché and whitespace terms). Without it the facet-rarity axis abstains, the coach has no whitespace terms to aim at, and crowding is labelled uncalibrated."
+
+  - name: web_fetch
+    required: false
+    purpose: "Lets the verifier open each cited page for the independent citation check. Without it citations are reported as unchecked and claims rest on the quote check alone."

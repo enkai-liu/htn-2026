@@ -1,7 +1,7 @@
 ---
 name: prior-art-swarm
 description: |
-  Eight-role prior-art investigation (parallel scouts, resolver, critic vs advocate debate, model jury, verifier veto, synthesizer, coach) that scores how original an idea is from verified evidence and coaches it toward open ground.
+  Eight-role prior-art investigation (scouts, resolver, critic-advocate debate, model jury, verifier veto, synthesizer, coach) that scores an idea's originality from verified evidence and coaches it toward open ground.
   Use when someone wants to know whether an idea, product, feature or research direction has already been done, and how to make it more distinctive.
   Do NOT use for legal patentability or freedom-to-operate opinions, plagiarism checks on finished text, or general market sizing.
 version: "1.0.0"
