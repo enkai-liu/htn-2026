@@ -1,6 +1,6 @@
 "use client";
 import clsx from "clsx";
-import { FileText, Lightbulb, Map as MapIcon, MessagesSquare, Search, Users, type LucideIcon } from "lucide-react";
+import { FileText, Lightbulb, Map as MapIcon, MessagesSquare, Users, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { useSelectedLayoutSegment } from "next/navigation";
 import type { Phase } from "@/lib/types";
@@ -8,7 +8,6 @@ import { useRun, type RunSegment } from "./RunProvider";
 
 const TABS: { segment: RunSegment; label: string; icon: LucideIcon }[] = [
   { segment: "", label: "Map", icon: MapIcon },
-  { segment: "evidence", label: "Evidence", icon: Search },
   { segment: "debate", label: "Debate", icon: MessagesSquare },
   { segment: "coach", label: "Coach", icon: Lightbulb },
   { segment: "report", label: "Report", icon: FileText },
@@ -18,7 +17,7 @@ const TABS: { segment: RunSegment; label: string; icon: LucideIcon }[] = [
 /** Where the swarm is working right now: that tab gets a small pulse instead of the page switching under you. */
 function segmentForPhase(phase: Phase | null): RunSegment | null {
   switch (phase) {
-    case "scout": case "resolve": return "evidence";
+    case "scout": case "resolve": return "";
     case "debate": case "verify": case "score": return "debate";
     case "mutate": case "act": return "coach";
     default: return null;
@@ -26,11 +25,11 @@ function segmentForPhase(phase: Phase | null): RunSegment | null {
 }
 
 export function TabBar() {
-  const { run, cards, streaming, hrefFor } = useRun();
+  const { run, streaming, hrefFor } = useRun();
   const { state } = run;
   const active = (useSelectedLayoutSegment() ?? "") as RunSegment;
   const busy = streaming && !state.finished ? segmentForPhase(state.phase) : null;
-  const counts: Partial<Record<RunSegment, number>> = { evidence: cards.length, debate: state.claimOrder.length, coach: state.mutationOrder.length };
+  const counts: Partial<Record<RunSegment, number>> = { debate: state.claimOrder.length, coach: state.mutationOrder.length };
 
   return (
     <nav className="flex flex-none items-stretch justify-center gap-1 sm:gap-3" aria-label="Run pages">

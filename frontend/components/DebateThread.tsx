@@ -11,9 +11,9 @@ import type { ClaimStatus, Evidence } from "@/lib/types";
 import { Chip, Empty, SimulatedTag } from "./ui";
 
 // one colour per juror, from the theme's source hues so it reads on both the light pages and the dark dashboard
-const JUROR_COLORS = ["var(--color-src-devpost)", "var(--color-src-yc)", "var(--color-src-github)", "var(--color-src-arxiv)", "var(--color-src-hn)"];
+export const JUROR_COLORS = ["var(--color-src-devpost)", "var(--color-src-yc)", "var(--color-src-github)", "var(--color-src-arxiv)", "var(--color-src-hn)"];
 
-const STATUS: Record<ClaimStatus, { label: string; tone: "amber" | "teal" | "red" | "mute" | "bone" }> = {
+export const STATUS: Record<ClaimStatus, { label: string; tone: "amber" | "teal" | "red" | "mute" | "bone" }> = {
   proposed: { label: "proposed", tone: "mute" },
   challenged: { label: "challenged", tone: "amber" },
   conceded: { label: "conceded", tone: "bone" },
@@ -22,9 +22,9 @@ const STATUS: Record<ClaimStatus, { label: string; tone: "amber" | "teal" | "red
   rejected: { label: "rejected", tone: "red" },
 };
 
-const KIND_LABEL: Record<string, string> = { exists: "it exists", differs: "it differs", trend: "trend", gap: "gap" };
+export const KIND_LABEL: Record<string, string> = { exists: "it exists", differs: "it differs", trend: "trend", gap: "gap" };
 
-function VerifyChip({ layer, badge }: { layer: "quote" | "gptzero"; badge?: VerifyBadge }) {
+export function VerifyChip({ layer, badge }: { layer: "quote" | "gptzero"; badge?: VerifyBadge }) {
   const name = layer === "quote" ? "quote" : "GPTZero";
   if (!badge) return <Chip tone="mute" title={layer === "quote" ? "Does the quoted text appear verbatim in the fetched page?" : "GPTZero bibliography scan: does the cited source exist?"}>{name} · pending</Chip>;
   const tone = badge.ok === true ? "teal" : badge.ok === false ? "red" : "amber";
@@ -37,7 +37,7 @@ function VerifyChip({ layer, badge }: { layer: "quote" | "gptzero"; badge?: Veri
   );
 }
 
-const ClaimCard = memo(function ClaimCard({ claim, evidence }: { claim: ClaimState; evidence: Evidence[] }) {
+export const ClaimCard = memo(function ClaimCard({ claim, evidence }: { claim: ClaimState; evidence: Evidence[] }) {
   const status = STATUS[claim.status] ?? STATUS.proposed;
   const rejected = claim.status === "rejected";
   return (

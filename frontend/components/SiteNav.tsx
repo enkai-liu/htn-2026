@@ -27,7 +27,6 @@ const LINKS = [
   { href: "/", label: "Investigate" },
   { href: "/runs/mock", label: "Recorded run" },
   { href: "/slop-index", label: "Slop Index" },
-  { href: "/about", label: "How it works" },
 ];
 
 export function SiteNav({ active }: { active?: string }) {

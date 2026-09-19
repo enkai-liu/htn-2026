@@ -38,7 +38,6 @@ Copy `.env.example` to `.env.local`.
 - `/runs/[id]` : the live view.
 - `/slop-index` : the investigation page. Fetches `{API}/api/investigation/slop-index`, falls back to
   `public/slop-index.sample.json` and then shows a **SAMPLE DATA** ribbon, banner and per-card stamps.
-- `/about` : architecture and how each sponsor technology is used.
 
 ## Transports: live vs replay
 
@@ -80,8 +79,11 @@ lib/runReducer.ts     pure fold: AgentEvent -> RunState (idempotent on seq, neve
 lib/graphReducer.ts   pure fold of GraphPatch (removing a node drops its links; early links wait for their endpoints)
 lib/selectors.ts      evidence cards (records collapse into entities), ledger rows, source status, spend
 lib/replay.ts         JSONL replay controller      lib/sse.ts   EventSource client      lib/useRunEvents.ts   the hook
-components/           RunView (layout) · SwarmTimeline · IdeaGraph(+Canvas) · AxisGauges · PitchHighlighter · EvidenceCard
-                      EvidenceLedger · DebateThread · MutationPanel · ReportPanel · ActionBar · CostMeter · ReplayControls · SlopCharts
+components/run/       the multi-page run shell: RunProvider (one stream, many pages) · RunShell · TabBar · MapScreen
+                      DetailCard (islands + their listings) · screens (Debate / Coach / Report / Swarm+Ledger)
+components/           SwarmTimeline · IdeaGraph(+Canvas) · islands/* · AxisGauges · PitchHighlighter
+                      EvidenceDetail (listings + fused fields, shared) · EvidenceLedger · DebateThread · MutationPanel
+                      ReportPanel · ActionBar · CostMeter · ReplayControls · SlopCharts · RunView + EvidenceCard (/classic only)
 tests/reducers.test.ts
 ```
 
@@ -89,7 +91,7 @@ tests/reducers.test.ts
 
 - `run.started.data.mock === true` : persistent banner "Recorded mock run — fictional fixture data".
 - Anything with `simulated: true` (the fire drill) is labelled "SIMULATED — fire drill" in the timeline and on the claim.
-- Imputed values are marked "inferred" (cards, ledger, graph ring).
+- Imputed values are marked "inferred" (detail card, ledger, graph ring).
 - Voice shows GPTZero's `result_message` + `confidence_category`, never a raw probability, and never touches the headline.
 - When `scores.abstain.active`, the reason replaces the headline number.
 - In replay mode, action and re-score buttons show "Replay mode — actions are disabled" and call nothing.

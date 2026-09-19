@@ -8,7 +8,7 @@ export default function NotFound() {
       <main className="flex flex-1 flex-col items-center justify-center px-6 py-24 text-center">
         <p className="label text-amber">Off the chart</p>
         <h1 className="mt-3 font-display text-[56px] leading-none text-bone">Nothing at these coordinates.</h1>
-        <p className="mt-3 max-w-[46ch] text-[14.5px] text-bone-dim">Whitespace, in the least useful sense. Head back and chart an idea instead.</p>
+        
         <div className="mt-6 flex gap-3">
           <Link href="/" className="btn btn-primary h-10 px-5">Investigate an idea</Link>
           <Link href="/runs/mock" className="btn h-10 px-4">Watch a recorded run</Link>

@@ -42,7 +42,7 @@ export function ScoreChip({ scores }: { scores: Scores | null }) {
       {visible && (
         <div className="absolute right-0 top-[calc(100%+8px)] z-40 w-[min(660px,calc(100vw-32px))] animate-rise overflow-hidden rounded-2xl border border-line bg-ink-900 shadow-[0_18px_50px_rgb(0_0_0/0.12)]">
           <div className="h-[150px]"><AxisGauges scores={scores} /></div>
-          <p className="border-t border-line px-3 py-2 text-[12px] text-mute">Voice (GPTZero) is scored separately and never moves this number. See the Report page.</p>
+          <p className="border-t border-line px-3 py-2 text-[12px] text-mute">Voice (GPTZero) is scored separately, on the Report page.</p>
         </div>
       )}
     </div>

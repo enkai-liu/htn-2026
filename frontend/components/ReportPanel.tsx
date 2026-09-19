@@ -4,7 +4,7 @@
 import clsx from "clsx";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { BY_YEAR, CHART } from "@/lib/chartTheme";
-import { safeHref, sourceLabel } from "@/lib/format";
+import { safeHref } from "@/lib/format";
 import type { RunState } from "@/lib/runReducer";
 import { selectSourceStatus, type SourceStatusRow } from "@/lib/selectors";
 import type { Facets, YearCount } from "@/lib/types";
@@ -129,20 +129,19 @@ export function ReportPanel({ state }: { state: RunState }) {
             </ol>
           )}
           <p className="mt-2 font-mono text-[9.5px] leading-snug text-faint">
-            Written from {state.claimOrder.filter((c) => state.claims[c].status === "verified").length} verified claims. Rejected and simulated claims never reach the synthesizer.
+            Written from {state.claimOrder.filter((c) => state.claims[c].status === "verified").length} verified claims.
           </p>
         </section>
       ) : (
         <section>
           <h4 className="label mb-1.5">Verdict</h4>
-          <p className="font-display text-[17px] italic leading-snug text-faint">The synthesizer writes only from claims that survive the debate and the verifier. Nothing to say yet.</p>
+          <p className="font-display text-[17px] italic leading-snug text-faint">Nothing to say yet.</p>
         </section>
       )}
 
       {report && report.by_year?.length > 0 && <ByYear rows={report.by_year} />}
       {state.facets && <FacetList facets={state.facets} />}
       {sources.length > 0 && <Sources rows={sources} />}
-      {sources.length > 0 && <p className="-mt-2 font-mono text-[9.5px] text-faint">{sourceLabel("devpost")} and YC are searched in Elasticsearch (BM25 + Jina vectors, RRF, Jina reranker); GitHub and Hacker News are live APIs.</p>}
     </div>
   );
 }

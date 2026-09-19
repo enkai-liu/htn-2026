@@ -33,7 +33,6 @@ export function SlopIndexView() {
   const placeboYears = data.placebo?.years ?? [];
   const last = [...data.years].sort((a, b) => a.year - b.year).at(-1);
   const lastShare = last ? ((last.ai_high + last.mixed_high) / last.scanned) * 100 : null;
-  const totalScanned = data.years.reduce((a, y) => a + y.scanned, 0);
 
   return (
     <>
@@ -45,10 +44,6 @@ export function SlopIndexView() {
           </div>
           <div className="hazard mb-6 px-4 py-3" role="note">
             <p className="font-mono text-[11px] font-medium uppercase tracking-[0.16em]">Sample data — not results</p>
-            <p className="mt-1 text-[13px] leading-snug text-bone">
-              These numbers are illustrative placeholders so the page can be built and rehearsed: {result.reason ?? "the live investigation results are not available"}.
-              Nothing below is a finding. Real figures replace this file when <code className="font-mono text-[12px] text-amber">GET /api/investigation/slop-index</code> answers.
-            </p>
           </div>
         </>
       )}
@@ -71,9 +66,8 @@ export function SlopIndexView() {
               </div>
               {data.placebo?.ci_low != null && data.placebo?.ci_high != null && <p className="mt-1 font-mono text-[10.5px] text-mute">95% Wilson interval {(data.placebo.ci_low * 100).toFixed(1)}–{(data.placebo.ci_high * 100).toFixed(1)}%</p>}
               <p className="mt-2 text-[13px] leading-relaxed text-bone-dim">
-                Pitches from {placeboYears.length ? placeboYears.join(", ") : "before late 2022"} were written before ChatGPT existed, so any flag there can only be a false alarm.
-                That makes this the detector&apos;s <em>measured</em> false-positive rate on hackathon write-ups, and every later bar should be read against it
-                {lastShare != null && fpr ? <> ({last!.year}: {lastShare.toFixed(0)}%, about {Math.round(lastShare / (fpr * 100))}× the placebo rate)</> : null}.
+                Flags on pitches written before ChatGPT ({placeboYears.length ? placeboYears.join(", ") : "pre-2022"}) can only be false alarms
+                {lastShare != null && fpr ? <>. {last!.year} sits at {lastShare.toFixed(0)}%, about {Math.round(lastShare / (fpr * 100))}× this rate</> : null}.
               </p>
             </div>
           </section>
@@ -107,9 +101,8 @@ export function SlopIndexView() {
 
                 <p className="mt-3 text-[13px] leading-relaxed text-bone-dim">
                   {tie.cliffs_delta > 0
-                    ? "Flagged pitches sit closer to their nearest neighbours than human-read pitches from the same year: they are measurably more like what already exists."
-                    : "Flagged pitches are not closer to their nearest neighbours than human-read ones: no evidence here that they are less original."}
-                  {" "}This is association, not cause, and it is the reason Whitespace keeps Voice separate from the originality headline.
+                    ? "Flagged pitches sit closer to what already exists. Association, not cause."
+                    : "No evidence here that flagged pitches are less original."}
                 </p>
               </div>
             ) : <p className="p-4 text-[13px] text-mute">The tie-in test has not been run yet.</p>}
@@ -129,27 +122,9 @@ export function SlopIndexView() {
         <div className="p-4 sm:p-5"><SlopTable data={data} /></div>
       </section>
 
-      <section className="mt-4 grid gap-4 md:grid-cols-2">
-        <div className="plate p-5">
-          <h2 className="font-display text-[24px] leading-tight text-bone">Method</h2>
-          <ul className="mt-3 flex list-none flex-col gap-2 text-[13px] leading-relaxed text-bone-dim">
-            <li><strong className="text-bone">Year-stratified.</strong> The same number of pitches per year{totalScanned ? ` (${totalScanned.toLocaleString("en-US")} in total here)` : ""}, so a big year cannot drown a small one.</li>
-            <li><strong className="text-bone">Length-controlled.</strong> English pitches of at least 600 characters, truncated to 1,800 at a sentence boundary: detectors behave differently on short text, so every pitch gets the same window.</li>
-            <li><strong className="text-bone">High confidence only.</strong> A pitch counts as flagged only when GPTZero classes it AI or mixed with <code className="font-mono text-[12px] text-amber">confidence_category = high</code>. No raw probabilities are reported anywhere.</li>
-            <li><strong className="text-bone">Intervals, not points.</strong> Every share carries a 95% Wilson interval; the whiskers are the honest width of what {data.years[0]?.scanned ?? "the"} pitches per year can tell you.</li>
-            <li><strong className="text-bone">A placebo.</strong> Pre-ChatGPT years measure the detector&apos;s false-positive rate on this exact genre of writing.</li>
-          </ul>
-        </div>
-        <div className="plate p-5">
-          <h2 className="font-display text-[24px] leading-tight text-bone">What this page will never do</h2>
-          <ul className="mt-3 flex list-none flex-col gap-2 text-[13px] leading-relaxed text-bone-dim">
-            <li><strong className="text-bone">Name a project.</strong> Aggregates only. No project, team, student or URL appears here or in the published CSV.</li>
-            <li><strong className="text-bone">Call AI-written &ldquo;unoriginal&rdquo;.</strong> An AI-polished write-up can describe a genuinely new project. The tie-in test asks whether the two go together on average; it says nothing about any single pitch.</li>
-            <li><strong className="text-bone">Accuse.</strong> A detector flag is a statistical read with a measured error rate, shown above. It is not evidence about an individual.</li>
-          </ul>
-          <p className="mt-3 font-mono text-[10px] leading-snug text-faint">{data.detector ?? "Detector: GPTZero"} · {data.corpus ?? "Corpus: public Devpost pitches"}</p>
-        </div>
-      </section>
+      <p className="mt-4 font-mono text-[10px] leading-snug text-faint">
+        {data.detector ?? "Detector: GPTZero"} · {data.corpus ?? "Corpus: public Devpost pitches"} · year-stratified, length-controlled, high-confidence flags only, 95% Wilson intervals · aggregates only, no project is named
+      </p>
     </>
   );
 }

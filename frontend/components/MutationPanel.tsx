@@ -108,9 +108,6 @@ export function MutationPanel({ state, selectedId, onFocus, onRescore, busyMid }
 
   return (
     <div className="flex flex-col gap-2 p-3">
-      <p className="text-[11.5px] leading-snug text-mute">
-        Each suggestion changes <em className="text-bone-dim">one</em> facet, then re-runs retrieval. The delta is measured, not guessed, and the mutation&apos;s island drifts outward on the map as its nearest prior art gets less similar.
-      </p>
       {state.mutationOrder.map((mid) => (
         <MutationCard
           key={mid} m={state.mutations[mid]} base={base} selected={selectedId === `mut:${mid}`}
@@ -124,7 +121,6 @@ export function MutationPanel({ state, selectedId, onFocus, onRescore, busyMid }
           {cliches.length > 0 && <TermList kind="cliche" title="Cliché terms" blurb="Over-represented among your neighbours (Elasticsearch significant_text)." terms={cliches} />}
         </div>
       )}
-      {state.mutationOrder.length > 0 && !state.report && <p className="font-mono text-[9.5px] text-faint">Whitespace and cliché term lists arrive with the final report.</p>}
     </div>
   );
 }

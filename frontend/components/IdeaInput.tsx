@@ -39,7 +39,7 @@ export function IdeaInput() {
     if (!searchReady || busy) return;
     setError(null);
     if (REPLAY_ONLY) {
-      setError("This deployment is replay-only: the live swarm needs the backend, which runs at our demo table.");
+      setError("This deployment is replay-only.");
       return;
     }
     setBusy(true);
@@ -87,9 +87,6 @@ export function IdeaInput() {
             <span className={voiceReady ? "text-teal" : "text-amber"}>
               {chars.toLocaleString("en-US")} <span className="text-mute">/ {VOICE_MIN_CHARS} characters</span>
             </span>
-            <span className="max-w-[46ch] text-right leading-snug text-mute">
-              GPTZero needs ≥250 characters for a reliable read; the search works on anything.
-            </span>
           </div>
         </div>
 
@@ -131,7 +128,7 @@ export function IdeaInput() {
               <Link href="/runs/mock" className="text-amber underline decoration-dotted underline-offset-4 hover:text-bone">
                 Watch a recorded run instead
               </Link>
-              : it shows the full investigation with no backend.
+              .
             </span>
           </div>
         )}

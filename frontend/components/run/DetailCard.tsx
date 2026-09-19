@@ -1,10 +1,11 @@
 "use client";
 // The floating card beside the map: what you clicked, in one glance, with a way through to the full page.
-import { ArrowUpRight, LoaderCircle, X } from "lucide-react";
+import { ArrowUpRight, ChevronDown, LoaderCircle, X } from "lucide-react";
 import Link from "next/link";
 import { FACET_KEYS } from "@/lib/islandLayout";
 import { fmtSim, safeHref, shortModel } from "@/lib/format";
 import type { GraphNode } from "@/lib/types";
+import { EvidenceDetail, listingLabel } from "../EvidenceDetail";
 import { Chip, InferredTag, SourceMark } from "../ui";
 import { useRun } from "./RunProvider";
 
@@ -64,8 +65,7 @@ export function DetailCard({ node }: { node: GraphNode }) {
     title = sample ? shortModel(sample.model) : node.label;
     body = (
       <>
-        <p className="text-[12.5px] text-mute">What a model proposes when given only the problem and the audience. The closer these sit, the more predictable the idea.</p>
-        {sample && <p className="mt-2 text-[13.5px] leading-relaxed text-bone">{sample.text}</p>}
+        {sample && <p className="text-[13.5px] leading-relaxed text-bone">{sample.text}</p>}
         <SimilarityBar value={node.similarity} />
       </>
     );
@@ -90,10 +90,21 @@ export function DetailCard({ node }: { node: GraphNode }) {
           </div>
         )}
         {!!card?.possibleSameAs.length && <p className="mt-2 text-[12.5px] text-amber">Possibly the same as {card.possibleSameAs.join(", ")}: left open for lack of evidence.</p>}
-        <div className="mt-4 flex items-center gap-3 text-[12.5px]">
-          <Link href={hrefFor("evidence")} className="btn btn-sm !h-[32px] !px-4 !text-[12.5px]">Open in Evidence</Link>
-          {href && <a href={href} target="_blank" rel="noreferrer noopener" className="inline-flex items-center gap-0.5 text-mute hover:text-bone">Source <ArrowUpRight size={13} /></a>}
-        </div>
+        {href && (
+          <div className="mt-3 text-[12.5px]">
+            <a href={href} target="_blank" rel="noreferrer noopener" className="inline-flex items-center gap-0.5 text-mute hover:text-bone">Source <ArrowUpRight size={13} /></a>
+          </div>
+        )}
+        {/* the receipts: the listings this entity was fused from, and which fields came from where */}
+        {card && !!card.records.length && (
+          <details className="group mt-3 border-t border-line pt-3">
+            <summary className="flex cursor-pointer list-none items-center gap-1 text-[12.5px] text-mute transition-colors hover:text-bone">
+              <ChevronDown size={13} className="flex-none transition-transform group-open:rotate-180" />
+              {listingLabel(card)}
+            </summary>
+            <div className="mt-2.5"><EvidenceDetail card={card} /></div>
+          </details>
+        )}
       </>
     );
   }

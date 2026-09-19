@@ -693,7 +693,7 @@ export default function IdeaGraphCanvas({ graph, facets, mutations, priorSamples
             <span key={b} className="chip" data-tone={b === "conflict" ? "red" : b === "winner" || b === "imputed" ? "amber" : "mute"}>{b === "imputed" ? "inferred field" : b.replace("_", " ")}</span>
           ))}
         </div>
-        {n.kind === "entity" && <div className="mt-1.5 font-mono text-[9px] text-faint">click to open its evidence</div>}
+        {n.kind === "entity" && <div className="mt-1.5 font-mono text-[9px] text-faint">click for its listings and fused fields</div>}
       </div>
     );
   }, [hover, facets, mutations, priorSamples, size.w, size.h]);

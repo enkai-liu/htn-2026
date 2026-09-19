@@ -31,7 +31,7 @@ export function IdeaGraph(props: IdeaGraphCanvasProps) {
     <div
       className="relative h-full min-h-[240px] w-full overflow-hidden"
       role="img"
-      aria-label={empty ? "Chart of the idea-space: empty so far" : `Chart of the idea-space: your idea at the centre, ${stats.counts.entity} prior-art entities placed by similarity, ${stats.counts.prior} LLM-prior samples, ${stats.counts.mutation} mutations. The same information is listed in the Evidence and Coach panels.`}
+      aria-label={empty ? "Chart of the idea-space: empty so far" : `Chart of the idea-space: your idea at the centre, ${stats.counts.entity} prior-art entities placed by similarity, ${stats.counts.prior} LLM-prior samples, ${stats.counts.mutation} mutations. Select any island for the listings behind it; mutations are also listed in the Coach panel.`}
     >
       <Canvas {...props} />
 
