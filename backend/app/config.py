@@ -1,0 +1,76 @@
+"""Single settings object for backend, ingest, investigation and scripts. Reads the repo-root .env."""
+from __future__ import annotations
+
+from functools import lru_cache
+from pathlib import Path
+from typing import Literal
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+BACKEND_DIR = REPO_ROOT / "backend"
+FIXTURES_DIR = BACKEND_DIR / "fixtures"
+RUNS_DIR = BACKEND_DIR / "runs"
+DATA_DIR = REPO_ROOT / "data"
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=REPO_ROOT / ".env", env_file_encoding="utf-8", extra="ignore")
+
+    # Elastic
+    es_url: str = ""
+    es_api_key: str = ""
+    kibana_url: str = ""
+    es_embed_inference_id: str = ".jina-embeddings-v3"
+    es_rerank_inference_id: str = ".jina-reranker-v3"
+    es_index: str = "prior-art-v1"
+    es_quarantine_index: str = "prior-art-quarantine"
+    es_watches_index: str = "idea-watches-v1"
+    es_alerts_index: str = "idea-alerts-v1"
+
+    # LLM providers (OpenAI-compatible); router order is baseten -> openrouter
+    baseten_api_key: str = ""
+    baseten_base_url: str = "https://inference.baseten.co/v1"
+    openrouter_api_key: str = ""
+    openrouter_base_url: str = "https://openrouter.ai/api/v1"
+    llm_rpm_limit: int = 100
+    llm_timeout_s: float = 25.0
+
+    # GPTZero
+    gptzero_api_key: str = ""
+    gptzero_base_url: str = "https://api.gptzero.me"
+    gptzero_mode: Literal["replay", "live"] = "replay"
+    gptzero_interactive_word_cap: int = 120_000
+    gptzero_investigation_word_cap: int = 230_000
+
+    # Live sources
+    github_token: str = ""
+    exa_api_key: str = ""
+    browserbase_api_key: str = ""
+    browserbase_project_id: str = ""
+
+    # Actions
+    slack_webhook_url: str = ""
+
+    # App
+    orchestrator: Literal["asyncio", "jiuwen"] = "asyncio"
+    backend_port: int = 8000
+    cors_origins: str = "http://localhost:3000"
+
+    # Per-run budget (the conductor degrades visibly when exceeded)
+    budget_max_calls: int = 70
+    budget_max_tokens: int = 150_000
+    budget_max_seconds: float = 90.0
+
+    @property
+    def has_elastic(self) -> bool:
+        return bool(self.es_url and self.es_api_key)
+
+    @property
+    def has_llm(self) -> bool:
+        return bool(self.baseten_api_key or self.openrouter_api_key)
+
+
+@lru_cache
+def get_settings() -> Settings:
+    return Settings()
