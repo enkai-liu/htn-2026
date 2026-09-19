@@ -39,7 +39,7 @@ FIRST TASKS:
 
 ---
 
-## What is built (all pushed to `origin main`, 302 backend tests + 19 frontend tests passing)
+## What is built (all pushed to `origin main`, 305 backend tests + 22 frontend tests passing as of Sat 12:20)
 
 | Area | State | Where |
 |---|---|---|
@@ -61,9 +61,10 @@ FIRST TASKS:
 ## Verify the state
 
 ```bash
-cd backend && .venv/bin/pytest -q -p no:warnings            # expect 302 passed, 3 skipped
+cd backend && .venv/bin/pytest -q -p no:warnings            # expect 305 passed, 3 skipped
 cd backend && .venv-jiuwen/bin/pytest -q -p no:warnings tests/test_pipeline_offline.py   # expect 7 passed (openjiuwen host)
-cd frontend && pnpm test && pnpm typecheck && pnpm lint      # expect 19 passed, clean
+cd frontend && pnpm test && pnpm typecheck && pnpm lint      # expect 22 passed, clean
+bash scripts/validate_swarm_skill.sh                         # official Swarm Skill validator: [PASS] 0 warning(s), 0 error(s)
 backend/.venv/bin/python elastic/apply.py --dry-run          # 17-step plan, sends nothing
 bash scripts/smoke_all.sh                                    # SKIPs without keys, exit 0
 ```
@@ -75,7 +76,7 @@ Dev servers: `.claude/launch.json` defines `frontend` (:3000) and `backend` (:80
 2. **Swarm Skill — DONE Sat 12:15.** `swarm-skill/prior-art-swarm/` is complete (SKILL.md, workflow.md, bind.md, dependencies.yaml, 8 role files, README, `scripts/workflow.py`) and the **official validator passes with 0 errors and 0 warnings**: `bash scripts/validate_swarm_skill.sh` (fetches the validator pinned to a commit + SHA-256 into git-ignored `data/`; exit 0 = PASS). Output is committed in `docs/sponsors/huawei.md`. bind.md numbers mirror the constants at the top of `scripts/workflow.py`: change both together. Not done: the skill has never been executed inside a JiuwenSwarm workspace.
 3. **Frontend contract notes already fixed on the backend side** (eid on `evidence.found`, quotes on `claim.proposed`, `agent.finished` after retries); the mock fixture was regenerated — run `pnpm sync-replay` after any future fixture change.
 4. `docs/PLAN.md` GPTZero budget: a 1,800-char write-up is ~290 words, so the full 8×150 scan (~350k words) exceeds the 230k cap → ask the booth for a bump or `scan --per-year 95`.
-5. Not started: Browserbase evidence-browser agent (`backend/app/sources/browserbase.py`, `roles/scouts/browser.py`), alerts poller (`idea-alerts-v1` → SSE toast), fire-drill trigger endpoint, MCP tool use by scouts (design-full §1 "G4"), Truss surprisal (P2), `docs/sponsors/*.md`, Devpost write-up, replay-only Vercel deploy + GoDaddy domain.
+5. Not started: Browserbase evidence-browser agent (`backend/app/sources/browserbase.py`, `roles/scouts/browser.py`), alerts poller (`idea-alerts-v1` → SSE toast), fire-drill trigger endpoint, MCP tool use by scouts (design-full §1 "G4"), Truss surprisal (P2), `docs/sponsors/*.md` (huawei.md done), Devpost write-up (draft in `docs/devpost.md`; every TODO needs a real measurement), replay-only Vercel deploy + GoDaddy domain.
 
 ## Once keys exist (user fills `.env` from `.env.example`)
 
