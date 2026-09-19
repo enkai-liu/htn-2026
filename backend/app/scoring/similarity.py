@@ -29,6 +29,19 @@ def lexical_cosine(a: str, b: str) -> float:
     return dot / (math.sqrt(sum(v * v for v in ca.values())) * math.sqrt(sum(v * v for v in cb.values())))
 
 
+def clamp01(x: float) -> float:
+    return min(max(float(x), 0.0), 1.0)
+
+
+def from_es_rerank(score: float) -> float:
+    """Undo Elasticsearch's positivity transform on text_similarity_reranker hits so they match a direct rerank call.
+
+    ES rewrites a raw relevance score s as max(s, 0) + min(exp(s), 1): 1 + s when s >= 0, exp(s) when s < 0. Left as is,
+    reranked hits land in (0, 2] while the live scouts (direct inference calls) land around [-0.2, 0.8]."""
+    score = float(score)
+    return score - 1.0 if score >= 1.0 else (math.log(score) if score > 0 else -1.0)
+
+
 async def rerank(query: str, texts: list[str]) -> tuple[list[float], bool]:
     """Returns (scores aligned with `texts`, calibrated). calibrated=False means the lexical fallback was used."""
     if not texts:
@@ -43,7 +56,7 @@ async def rerank(query: str, texts: list[str]) -> tuple[list[float], bool]:
                                                 query=query, input=[t[:1500] or " " for t in texts])
             scores = [0.0] * len(texts)
             for item in resp["rerank"]:
-                scores[item["index"]] = float(item["relevance_score"])
+                scores[item["index"]] = clamp01(item["relevance_score"])
             return scores, True
         except Exception:
             pass  # fall through: degrade rather than fail the run; the caller surfaces `uncalibrated`

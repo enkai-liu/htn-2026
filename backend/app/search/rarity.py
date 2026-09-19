@@ -1,6 +1,6 @@
 """Search-side primitives for AXIS 2 (facet rarity) - docs/design-full.md section 2.6.
 
-    rarity_f = 1 - log(1 + df_f) / log(1 + 2000)             df_f  = docs matching ALL words of one facet
+    rarity_f = 1 - log(1 + df_f) / log(1 + 2000)             df_f  = docs matching most words of one facet (FACET_MATCH)
     pair     = 1 - log(1 + df(purpose AND mechanism)) / log(1 + 200)
     cliche   = |idea_terms ∩ significant_text(neighbours)| / |idea_terms|
     O2       = 100 * (0.5 * mean_f rarity_f + 0.3 * pair + 0.2 * (1 - cliche))      (assembled in scoring/axes.py)
@@ -19,6 +19,12 @@ from app.search.es import excluded_flags_clause, get_async_es, require_elastic
 
 FACET_DF_CAP = 2000
 PAIR_DF_CAP = 200
+# minimum_should_match for a facet phrase: 1-2 terms must all match, 3-6 terms need half, longer phrases any 3.
+# Requiring ALL words made every LLM-written facet phrase unique (df=0, even for 'AI chatbot for student mental health'),
+# so every idea scored as maximally rare; long phrases (the planner writes 10-20 words for a detailed pitch) stayed
+# unique even at 50%. Measured on the 8.5k corpus: cliches (short or long phrasing) -> mean rarity 0.36-0.43,
+# a crowded plant-care idea -> 0.45-0.49, a novel idea (acoustic varroa-mite detection) -> 0.95.
+FACET_MATCH = "2<-50% 6<3"
 
 
 # --------------------------------------------------------------------------------------
@@ -90,12 +96,12 @@ def build_neighbourhood_body(ids: Sequence[str]) -> dict[str, Any]:
 
 
 def build_facet_count_body(*facets: str, sources: Iterable[str] | None = None) -> dict[str, Any]:
-    """`_count` body: documents whose pitch contains ALL words of EVERY facet (match operator AND)."""
+    """`_count` body: documents whose pitch matches EVERY facet, each facet by FACET_MATCH of its words."""
     facets = tuple(f.strip() for f in facets if f and f.strip())
     if not facets:
         raise ValueError("at least one non-empty facet is required")
     bool_q: dict[str, Any] = {
-        "must": [{"match": {"pitch": {"query": f, "operator": "and"}}} for f in facets],
+        "must": [{"match": {"pitch": {"query": f, "minimum_should_match": FACET_MATCH}}} for f in facets],
         "must_not": [excluded_flags_clause()],
     }
     if sources:
@@ -146,10 +152,10 @@ async def _count(body: dict[str, Any], *, es: Any = None, index: str | None = No
 
 
 async def facet_df(facet_text: str, *, sources: Iterable[str] | None = None, es: Any = None, index: str | None = None) -> int:
-    """Document frequency of one facet: pitches containing ALL of its words."""
+    """Document frequency of one facet: pitches matching most of its words (FACET_MATCH)."""
     return await _count(build_facet_count_body(facet_text, sources=sources), es=es, index=index)
 
 
 async def pair_df(a: str, b: str, *, sources: Iterable[str] | None = None, es: Any = None, index: str | None = None) -> int:
-    """Document frequency of a facet combination: pitches containing all words of `a` AND all words of `b`."""
+    """Document frequency of a facet combination: pitches matching `a` AND `b` (each by FACET_MATCH)."""
     return await _count(build_facet_count_body(a, b, sources=sources), es=es, index=index)

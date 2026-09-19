@@ -76,14 +76,14 @@ class FakeES:
         return self._search
 
 
-async def test_facet_and_pair_df_use_count_with_operator_and():
+async def test_facet_and_pair_df_use_count_with_graded_match():
     fake = FakeES(count=42)
     assert await rarity.facet_df("sign language", es=fake, index="i") == 42
     assert await rarity.pair_df("sign language", "smart glasses", sources=["devpost"], es=fake, index="i") == 42
     (_, _, single), (_, _, pair) = fake.calls
-    assert single["query"]["bool"]["must"] == [{"match": {"pitch": {"query": "sign language", "operator": "and"}}}]
+    assert single["query"]["bool"]["must"] == [{"match": {"pitch": {"query": "sign language", "minimum_should_match": rarity.FACET_MATCH}}}]
     assert [m["match"]["pitch"]["query"] for m in pair["query"]["bool"]["must"]] == ["sign language", "smart glasses"]
-    assert all(m["match"]["pitch"]["operator"] == "and" for m in pair["query"]["bool"]["must"])
+    assert all(m["match"]["pitch"]["minimum_should_match"] == "2<-50% 6<3" for m in pair["query"]["bool"]["must"])
     assert pair["query"]["bool"]["filter"] == [{"terms": {"source": ["devpost"]}}]
     assert {"terms": {"quality_flags": ["too_short", "non_english"]}} in single["query"]["bool"]["must_not"]
     with pytest.raises(ValueError):

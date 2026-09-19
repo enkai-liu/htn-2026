@@ -78,7 +78,7 @@ def load_cdf(path: Path | None = None) -> CrowdingCDF:
     path = path or CALIBRATION_FILE
     if path.exists():
         try:
-            data = json.loads(path.read_text())
+            data = json.loads(path.read_text(encoding="utf-8"))
             meta = {k: v for k, v in data.items() if k not in ("values", "is_placeholder", "version", "n")}
             return CrowdingCDF(data["values"], is_placeholder=bool(data.get("is_placeholder", False)), meta=meta)
         except Exception as exc:  # a corrupt file must not take scoring down

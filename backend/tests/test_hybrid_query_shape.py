@@ -42,7 +42,7 @@ def test_inference_id_comes_from_settings_not_from_code(monkeypatch):
     monkeypatch.setattr(hybrid, "get_settings", lambda: Settings(_env_file=None, es_rerank_inference_id=".jina-reranker-v2-base-multilingual"))
     b = hybrid.build_hybrid_body(Q, IDEA)
     assert b["retriever"]["text_similarity_reranker"]["inference_id"] == ".jina-reranker-v2-base-multilingual"
-    source = (REPO_ROOT / "backend" / "app" / "search" / "hybrid.py").read_text()
+    source = (REPO_ROOT / "backend" / "app" / "search" / "hybrid.py").read_text(encoding="utf-8")
     assert ".jina-" not in source
 
 
@@ -75,7 +75,7 @@ def test_windows_grow_with_size_and_idea_text_is_capped():
 def test_python_builder_matches_the_committed_query_template():
     import jinja2
 
-    tpl = jinja2.Template((REPO_ROOT / "elastic" / "queries" / "hybrid.json.j2").read_text())
+    tpl = jinja2.Template((REPO_ROOT / "elastic" / "queries" / "hybrid.json.j2").read_text(encoding="utf-8"))
     idea = 'An "AI" <study buddy> & more\nsecond line'
     rendered = json.loads(tpl.render(q=Q, idea_full=idea, exclude_ids=["devpost:a"], rerank_id="my-reranker", size=25,
                                      source_fields=hybrid.SOURCE_FIELDS))
@@ -83,7 +83,7 @@ def test_python_builder_matches_the_committed_query_template():
 
 
 HIT = {
-    "_id": "devpost:devspot", "_score": 0.8123, "_index": "prior-art-v1",
+    "_id": "devpost:devspot", "_score": 1.8123, "_index": "prior-art-v1",
     "_source": {
         "rid": "devpost:devspot", "source": "devpost", "title": "DevSpot", "tagline": "Validate ideas", "pitch": "DevSpot. Validate ideas.",
         "url": "https://devpost.com/software/devspot", "year": 2024, "date": "2024-03-17", "date_precision": "inferred",
@@ -113,6 +113,15 @@ def test_hit_to_record():
     assert loose.retrieval["rerank_score"] is None and loose.retrieval["score"] == 0.03
 
 
+def test_es_rerank_scores_are_mapped_back_to_the_raw_scale():
+    """ES rewrites a reranker score s as 1 + s (s >= 0) or exp(s) (s < 0); records must carry the raw scale, clamped to 0-1."""
+    def score(es_score):
+        return hybrid.hit_to_record({"_id": "x:1", "_score": es_score, "_source": {}}, query=Q, rank=1, reranked=True).retrieval["rerank_score"]
+    assert score(1.4785) == 0.4785
+    assert score(0.9) == 0.0 and score(1.0) == 0.0  # exp(s) for negative s: irrelevant neighbours
+    assert score(2.5) == 1.0
+
+
 class FakeES:
     """Async client double: fails while `fail(body)` is true, otherwise returns one hit."""
 
@@ -139,7 +148,7 @@ async def test_reranker_failure_retries_once_without_rerank_and_flags_uncalibrat
     recs = await hybrid.search(Q, IDEA, es=fake, index="i")
     assert [list(b["retriever"])[0] for b in fake.bodies] == ["text_similarity_reranker", "rrf"]
     r = recs[0].retrieval
-    assert r["uncalibrated"] is True and r["rerank_score"] is None and r["score"] == 0.8123
+    assert r["uncalibrated"] is True and r["rerank_score"] is None and r["score"] == 1.8123
     assert "inference endpoint unavailable" in r["degraded_reason"]
 
 
@@ -163,7 +172,7 @@ async def test_search_union_keeps_the_best_copy_per_project(monkeypatch):
         h = {"_id": rid, "_score": score, "_source": {"rid": rid, "source": "devpost", "title": rid, "url": "u", "dedupe_key": dedupe}}
         return hybrid.hit_to_record(h, query="q", rank=1, reranked=True)
 
-    batches = {"full": [rec("devpost:a", 0.4), rec("devpost:b", 0.9, "k1")], "twist": [rec("devpost:a", 0.7), rec("devpost:b2", 0.5, "k1")]}
+    batches = {"full": [rec("devpost:a", 1.4), rec("devpost:b", 1.9, "k1")], "twist": [rec("devpost:a", 1.7), rec("devpost:b2", 1.5, "k1")]}
 
     async def fake_search(q, idea_full, **kw):
         return batches[q]

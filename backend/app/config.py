@@ -59,7 +59,7 @@ class Settings(BaseSettings):
     # Per-run budget (the conductor degrades visibly when exceeded)
     budget_max_calls: int = 70
     budget_max_tokens: int = 150_000
-    budget_max_seconds: float = 90.0
+    budget_max_seconds: float = 180.0
 
     # Live-run admission: POST /api/runs is 429 while this many runs are still executing, and a finished run stays
     # in memory (re-scores, actions, late SSE clients) for this long before it is evicted and served from its JSONL.

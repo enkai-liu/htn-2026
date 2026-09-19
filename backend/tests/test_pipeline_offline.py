@@ -64,7 +64,7 @@ class FakeRouter:
             obj = schema(responses=[{"cid": "c1", "type": "REBUTTAL", "text": "Same purpose; keyword search is a different mechanism."}],
                          differences=[{"text": "No prior work re-scores suggestions against evidence.", "facet": "twist"}])
         elif name == "Ballot":
-            mech = {"zai-org/GLM-5.3-Flash": 0.1, "deepseek-ai/DeepSeek-V4.1-Flash": 0.9}.get(model, 0.2)  # a split jury
+            mech = {"zai-org/GLM-5.3-Flash": 0.1, "deepseek-ai/DeepSeek-V4-Flash-0731": 0.9}.get(model, 0.2)  # a split jury
             obj = schema(overlaps=[{"entity": 0, "purpose": 0.9, "mechanism": mech, "why": "test"}])
         elif name == "Proposals":
             obj = schema(ideas=["A search engine over old hackathon projects.", "A chatbot that rates ideas.", "A sponsor prize matcher."])

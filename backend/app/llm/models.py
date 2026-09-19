@@ -17,7 +17,9 @@ ROLE_MODELS: dict[str, str] = {
     "conductor": GLM_FLASH,
     "scout": DS_FLASH,
     "resolver": DS_FLASH,
-    "critic": DS_PRO,
+    # DS_PRO ignores json_schema on Baseten (returns a different shape even with strict=true); Kimi honours it and is
+    # still a different family from the advocate (GLM).
+    "critic": KIMI,
     "advocate": GLM,
     "synthesizer": GLM,
     "mutator": KIMI,
@@ -25,7 +27,8 @@ ROLE_MODELS: dict[str, str] = {
 }
 
 # Jury and LLM-predictability sample across families; `n` is capped at 1 on Baseten so these are separate requests.
-JURY_MODELS: list[str] = [GLM_FLASH, DS_FLASH_41, GPT_OSS]
+# DS_FLASH_41 ignores json_schema on Baseten like DS_PRO, so it was dropped from every jury; DS_FLASH keeps DeepSeek on it.
+JURY_MODELS: list[str] = [GLM_FLASH, DS_FLASH, GPT_OSS]
 PRIOR_MODELS: list[str] = [GLM_FLASH, DS_FLASH, GPT_OSS, KIMI]
 
 # OpenRouter fallback. gpt-oss-120b has the same slug on both providers; everything else maps to it until the

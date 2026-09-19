@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 class Budget:
     max_calls: int = 70
     max_tokens: int = 150_000
-    max_seconds: float = 90.0
+    max_seconds: float = 180.0
     calls: int = 0
     tokens: int = 0
     cost_usd: float = 0.0

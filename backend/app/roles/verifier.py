@@ -6,6 +6,8 @@ Also runs the Voice axis (GPTZero on the pitch) - a separate channel that never 
 """
 from __future__ import annotations
 
+import asyncio
+
 from app.config import get_settings
 from app.orchestration.host import Ctx, result
 from app.orchestration.registry import register
@@ -15,6 +17,13 @@ from app.signals.biblio import resolve_status
 from app.signals.quote_check import quote_in_text
 
 MIN_VOICE_CHARS = 250
+# GPTZero checks citations serially: one scan took 3 s for 1 citation and 76 s for 7, past the client timeout, so a
+# single combined document never finished inside the verifier's slot and no claim was ever resolved. One small
+# document per claim, scanned in parallel, under a hard cap: whatever is not back by then keeps layer 1 only.
+BIBLIO_BUDGET_S = 40.0
+# GPTZero slows down sharply with concurrent scans (1 alone: 3-19 s; 3 at once: 32-46 s), so only the first claims
+# (the critic lists the closest prior work first) get layer 2; the rest keep the local quote check.
+BIBLIO_MAX_CLAIMS = 6
 
 
 def _quote_in_text(quote: str, text: str) -> tuple[bool, str]:
@@ -98,17 +107,27 @@ class Verifier(BaseRole):
         """Layer 2: GPTZero bibliography scan, recorded on each Evidence. Any failure here degrades to layer 1 only."""
         if not claims or get_settings().gptzero_mode != "live":  # replay fixtures must never decide a real claim's fate
             return
-        try:
-            from app.signals import biblio
+        from app.signals import biblio
 
-            evidence = [ctx.board.evidence[c.evidence[0]] for c in claims]
-            scan = await biblio.bibliography_scan(biblio.build_document(claims, evidence))
-            verdicts = biblio.map_results(scan, claims, evidence)
-        except Exception as exc:
-            await ctx.emit("error", {"message": f"GPTZero bibliography scan unavailable, relying on the quote check: {type(exc).__name__}: {exc}"[:220], "recoverable": True})
-            return
-        if getattr(scan, "replayed", False):
-            return
+        async def scan_one(c) -> dict:
+            ev = [ctx.board.evidence[c.evidence[0]]]
+            scan = await biblio.bibliography_scan(biblio.build_document([c], ev))
+            return {} if getattr(scan, "replayed", False) else biblio.map_results(scan, [c], ev)
+
+        tasks = [asyncio.ensure_future(scan_one(c)) for c in claims[:BIBLIO_MAX_CLAIMS]]
+        done, pending = await asyncio.wait(tasks, timeout=BIBLIO_BUDGET_S)
+        for t in pending:
+            t.cancel()
+        verdicts: dict = {}
+        failures = [t.exception() for t in done if t.exception() is not None]
+        for t in done:
+            if t.exception() is None:
+                verdicts.update(t.result())
+        if pending or failures:
+            n = len(pending) + len(failures)
+            reason = f"not back within {BIBLIO_BUDGET_S:.0f}s" if not failures else f"{type(failures[0]).__name__}: {failures[0]}"
+            await ctx.emit("error", {"message": f"Citation check (GPTZero): {n} of {len(tasks)} claims {reason}; the quote check "
+                                                f"decides {'it' if n == 1 else 'those'}"[:220], "recoverable": True})
         for c in claims:
             v = verdicts.get(c.cid)
             if v is None:

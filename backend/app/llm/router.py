@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import re
 import time
 from dataclasses import dataclass
@@ -25,6 +26,8 @@ from app.core.budget import Budget
 
 from . import cost
 from .models import model_for, openrouter_model
+
+log = logging.getLogger(__name__)
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -140,13 +143,17 @@ class LLMRouter:
                 attempt += 1
                 if attempt < 2:
                     await asyncio.sleep(RETRY_BACKOFF_S * attempt)
+            # Falling through to the next provider is legitimate, but it must never be silent: a request-shape bug on
+            # one provider otherwise looks like "everything works" while every call is served by the fallback.
+            if failures:
+                log.warning("%s: %s gave up on %s (%s); trying the next provider", role, name, slug, failures[-1][:200])
         raise LLMUnavailable(f"all providers failed for {wanted}: " + "; ".join(failures))
 
     async def structured(self, *, role: str, system: str, user: str, schema: type[T], model: str | None = None,
                          temperature: float = 0.2, max_tokens: int = 2000, session: str | None = None,
                          budget: Budget | None = None) -> tuple[T, LLMResult]:
         """JSON-schema constrained call -> validated pydantic object. Repairs, then re-asks once with the error."""
-        fmt = {"type": "json_schema", "json_schema": {"name": schema.__name__, "schema": schema.model_json_schema(), "strict": False}}
+        fmt = {"type": "json_schema", "json_schema": {"name": schema.__name__, "schema": schema.model_json_schema(), "strict": True}}
         messages = [{"role": "system", "content": system + "\nReply with a single JSON object and nothing else."},
                     {"role": "user", "content": user}]
         problem = ""

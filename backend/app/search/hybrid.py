@@ -22,6 +22,7 @@ from typing import Any, Iterable, Sequence, get_args
 
 from app.config import get_settings
 from app.schemas.records import GPTZeroScan, Source, SourceRecord, Status
+from app.scoring.similarity import clamp01, from_es_rerank
 from app.search.es import excluded_flags_clause, get_async_es, require_elastic
 
 SOURCE_FIELDS = [
@@ -35,6 +36,9 @@ RRF_WINDOW = 100
 RRF_RANK_CONSTANT = 20
 RERANK_WINDOW = 40
 IDEA_TEXT_CAP = 2000  # chars of the idea sent to the reranker as inference_text
+# Per-request cap for interactive searches (normal: 0.7-2 s). The client default (30 s x 3 attempts) let one stalled
+# request eat a scout's whole 45 s slot; failing fast lets the degradation ladder below do its job.
+SEARCH_TIMEOUT_S = 8.0
 
 _SOURCES = set(get_args(Source))
 _STATUSES = set(get_args(Status))
@@ -125,7 +129,8 @@ def hit_to_record(hit: dict[str, Any], *, query: str, rank: int, reranked: bool,
         "query": query,
         "leg": leg,
         "rank": rank,
-        "rerank_score": score if reranked else None,
+        # Same 0-1 scale as a direct rerank call (the live scouts): ES shifts reranker scores to keep them positive.
+        "rerank_score": round(clamp01(from_es_rerank(score)), 4) if (reranked and score is not None) else None,
         "score": score,
         "dedupe_key": src.get("dedupe_key"),
         "first_seen_at": src.get("first_seen_at"),
@@ -171,6 +176,8 @@ async def search(
     retrieval={query, leg:"hybrid", rank, rerank_score, ...}. Falls down the degradation ladder on errors."""
     settings = get_settings() if es is not None else require_elastic()  # an injected client (tests) needs no creds
     client = es if es is not None else get_async_es()
+    if hasattr(client, "options"):
+        client = client.options(request_timeout=SEARCH_TIMEOUT_S, max_retries=1)
     index = index or settings.es_index
     idea_full = idea_full or q
     sources = list(sources) if sources else None
