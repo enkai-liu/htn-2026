@@ -12,6 +12,8 @@ from app.orchestration.host import Ctx, envelope, error, result, task
 from app.orchestration.registry import register
 from app.roles.base import HOUSE_RULES, BaseRole
 from app.schemas import FACET_KEYS, Facets, GraphLink, GraphNode, GraphPatch, SourceStatus
+from app.sources import idea_url
+from app.sources.http import SourceError
 
 SCOUT_PURPOSE = {
     "scout.devpost": "260k hackathon projects (Elasticsearch: BM25 + Jina vectors, RRF, Jina rerank)",
@@ -38,6 +40,7 @@ class Conductor(BaseRole):
         board = ctx.board
         if not self.llm.available:
             return error("No LLM provider is configured. Set BASETEN_API_KEY (or OPENROUTER_API_KEY) in .env, or open /runs/mock for a recorded run.")
+        await self._read_link(ctx)
         try:
             plan = await self._plan(ctx)
         except LLMUnavailable as exc:
@@ -65,12 +68,37 @@ class Conductor(BaseRole):
             return error((final.get("payload") or {}).get("message", "report failed"))
         return result(report=final["payload"]["report"], summary="run complete")
 
+    # -- the author's own link ---------------------------------------------------------------------------
+    async def _read_link(self, ctx: Ctx) -> None:
+        """Read the optional Devpost/GitHub link before planning: it describes the idea better than the pitch box,
+        and its URL keys are what stop the scouts handing the author their own project back as prior art.
+
+        A link that will not load degrades the run (one visible event) instead of ending it: the pitch is still
+        an idea worth investigating.
+        """
+        raw = ctx.board.url
+        if not raw:
+            return
+        await ctx.emit("tool.call", {"tool": "fetch.idea_link", "args_summary": raw[:120]})
+        try:
+            page = await idea_url.read(raw)
+        except SourceError as exc:
+            await ctx.emit("error", {"message": f"could not read {raw[:80]}: {exc}", "recoverable": True})
+            return
+        except Exception as exc:  # a malformed page is the page's problem, not the run's
+            await ctx.emit("error", {"message": f"could not read {raw[:80]}: {type(exc).__name__}", "recoverable": True})
+            return
+        ctx.board.set("self_page", self.id, page)
+        await ctx.emit("tool.result", {"tool": "fetch.idea_link", "summary": page.summary(), "n_hits": 1})
+
     # -- plan --------------------------------------------------------------------------------------------
     async def _plan(self, ctx: Ctx) -> Plan:
         system = (HOUSE_RULES + "Role: planner. Decompose the idea into facets: purpose (the goal, for whom), mechanism (how it works), "
                   "audience, data (what it consumes), twist (what the author thinks is new), domain (2-3 words), keywords. "
                   "Facet values are short noun phrases in plain words. Then write the search queries.")
-        plan, res = await self.llm.structured(role=self.id, system=system, user=f"IDEA: {ctx.board.idea_text}", schema=Plan,
+        page = ctx.board.self_page
+        user = f"IDEA: {ctx.board.idea_text}" + (f"\n\n{page.context()}" if page else "")
+        plan, res = await self.llm.structured(role=self.id, system=system, user=user, schema=Plan,
                                               session=self.session(ctx), budget=ctx.budget)
         ctx.board.set("facets", self.id, plan.facets)
         await ctx.emit("facets.extracted", {"facets": plan.facets.model_dump()}, **res.meta())

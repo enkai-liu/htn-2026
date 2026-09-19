@@ -5,12 +5,16 @@ only the resolver writes entities, only the verifier sets verification results, 
 """
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from app.schemas import Claim, CoachMessage, CoachPitch, Entity, Evidence, Facets, Mutation, Scores, SourceRecord, SourceStatus, Voice
 
+if TYPE_CHECKING:  # annotation only: nothing in core should pull the HTML parser in at import time
+    from app.sources.idea_url import IdeaPage
+
 WRITE_PERMISSIONS: dict[str, tuple[str, ...]] = {
     "facets": ("conductor",),
+    "self_page": ("conductor",),
     "records": ("scout.",),  # prefix match: any scout
     "sources": ("scout.", "conductor"),
     "entities": ("resolver",),
@@ -36,6 +40,7 @@ class Blackboard:
         self.idea_text = idea_text
         self.url = url
         self.facets: Facets | None = None
+        self.self_page: IdeaPage | None = None  # the author's own link, read once: context to plan with, and the one hit that is never prior art
         self.records: dict[str, SourceRecord] = {}
         self.sources: dict[str, SourceStatus] = {}
         self.entities: dict[str, Entity] = {}

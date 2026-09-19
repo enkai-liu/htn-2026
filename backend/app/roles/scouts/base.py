@@ -5,6 +5,7 @@ from app.roles.base import BaseRole, eid_for
 from app.schemas import GraphLink, GraphNode, GraphPatch, SourceRecord, SourceStatus
 from app.scoring.similarity import rerank, tokens
 from app.sources.http import SourceError
+from app.sources.idea_url import is_self
 
 
 class ScoutRole(BaseRole):
@@ -45,6 +46,15 @@ class ScoutRole(BaseRole):
         if failed and not found:
             ctx.board.put("sources", self.id, self.source, SourceStatus(source=self.source, status="failed", error=failed))
             return error(failed, source=self.source)
+
+        # The author's own project is not prior art for itself. Dropped here, at the one place every source's hits
+        # pass through, and said out loud: a silently missing hit looks like a retrieval bug.
+        mine = [r for r in found.values() if is_self(r, ctx.board.self_page)]
+        for r in mine:
+            found.pop(r.rid, None)
+        if mine:
+            await ctx.emit("tool.result", {"tool": self.tool, "n_hits": 0, "summary":
+                           f"excluded {len(mine)} hit(s) that are the author's own link: " + ", ".join(r.title[:40] for r in mine)}, phase=phase)
 
         new = [r for rid, r in found.items() if rid not in ctx.board.records]
         if new and not self.already_scored:

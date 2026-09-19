@@ -19,6 +19,7 @@ from app.roles.base import HOUSE_RULES, BaseRole, clipped
 from app.schemas import CoachCite, CoachMessage, CoachPitch, GraphLink, GraphNode, GraphPatch, Mutation, SourceRecord
 from app.scoring import axes
 from app.scoring.similarity import lexical_cosine, rerank
+from app.sources.idea_url import is_self
 
 
 class Swap(BaseModel):
@@ -174,6 +175,9 @@ class Mutator(BaseRole):
                 from app.search.hybrid import search as hybrid_search
 
                 hits = await hybrid_search(q or pitch, pitch, size=10)
+                # A re-score must exclude the author's own project too, or every coached version is measured
+                # against itself and the coach cites the author back to themselves as their own nearest neighbour.
+                hits = [h for h in hits if not is_self(h, board.self_page)]
                 sims = [float(h.retrieval.get("rerank_score") or 0) for h in hits]
             except Exception as exc:
                 await ctx.emit("error", {"message": f"corpus re-search degraded: {type(exc).__name__}: {exc}"[:200], "recoverable": True})

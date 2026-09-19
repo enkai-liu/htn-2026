@@ -99,7 +99,7 @@ export function IdeaInput() {
             inputMode="url"
             value={url}
             onChange={(e) => setUrl(e.target.value.slice(0, 500))}
-            placeholder="Optional: a Devpost or GitHub link for this idea"
+            placeholder="Optional: your Devpost or GitHub link - read for context, and left out of the results"
             className="w-full bg-transparent font-mono text-[12px] text-bone outline-none placeholder:text-faint"
           />
         </div>

@@ -37,6 +37,35 @@ def _retryable(exc: BaseException) -> bool:
     return isinstance(exc, (httpx.TimeoutException, httpx.TransportError))
 
 
+TEXT_TYPES = ("text/", "application/xhtml+xml", "application/json")
+
+
+async def get_page(url: str, *, headers: dict | None = None, max_bytes: int = 2_000_000,
+                   extra_types: tuple[str, ...] = ()) -> tuple[str, str]:
+    """Fetch a page as text, returning (text, final URL after redirects).
+
+    The caller hands us a URL a user typed, so the body is capped and non-text responses are refused rather than
+    decoded; the final URL comes back because only the caller knows whether the redirect target is still allowed.
+    `extra_types` admits a text format that is not spelled like one -- GitHub serves a raw README as
+    `application/vnd.github.raw`.
+    """
+    try:
+        async for attempt in AsyncRetrying(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=0.5, max=3),
+                                           retry=retry_if_exception(_retryable), reraise=True):
+            with attempt:
+                resp = await client().get(url, headers=headers, follow_redirects=True)
+                resp.raise_for_status()
+                ctype = (resp.headers.get("content-type") or "").split(";")[0].strip()
+                if ctype and not ctype.startswith(TEXT_TYPES + extra_types):
+                    raise SourceError(f"{ctype} is not a page we can read")
+                return resp.text[:max_bytes], str(resp.url)
+    except httpx.HTTPStatusError as exc:
+        raise SourceError(f"HTTP {exc.response.status_code} from {httpx.URL(url).host}") from exc
+    except (httpx.TimeoutException, httpx.TransportError) as exc:
+        raise SourceError(f"{type(exc).__name__} from {httpx.URL(url).host} after 3 attempts") from exc
+    raise SourceError("unreachable")
+
+
 async def get_json(url: str, *, params: dict | None = None, headers: dict | None = None) -> dict:
     try:
         async for attempt in AsyncRetrying(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=0.5, max=3),
