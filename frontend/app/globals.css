@@ -1,39 +1,48 @@
 @import "tailwindcss";
 
-/* Whitespace: a star atlas of idea-space.
-   Ink-blue night, parchment type, one amber star (your idea), teal for open water (whitespace),
-   vermilion for anything that failed or was struck. Hairlines, tick marks and range rings, not cards and gradients. */
+/* Whitespace: paper-white and quiet. One warm accent (your idea), teal for open water (whitespace),
+   vermilion for anything that failed or was struck. The legacy token names (ink = surfaces, bone = text) are kept
+   so every existing utility re-skins itself; `.theme-dark` restores the original night-atlas values for the
+   classic dashboard and the 2D chart fallback. New code should prefer the semantic aliases below. */
 
-@theme {
-  --color-ink-950: #04060b;
-  --color-ink-900: #070b14;
-  --color-ink-850: #0a101c;
-  --color-ink-800: #0e1626;
-  --color-ink-700: #152036;
-  --color-ink-600: #1e2d4a;
-  --color-ink-500: #2b3d61;
-  --color-line: rgb(150 176 230 / 0.13);
-  --color-line-strong: rgb(150 176 230 / 0.26);
+/* static: emit every token even if no utility uses it, because inline styles and the .theme-dark scope read them */
+@theme static {
+  --color-ink-950: #f6f5f1;
+  --color-ink-900: #ffffff;
+  --color-ink-850: #fbfaf8;
+  --color-ink-800: #f2f0eb;
+  --color-ink-700: #e9e6df;
+  --color-ink-600: #d8d5cc;
+  --color-ink-500: #bfbbb1;
+  --color-line: rgb(20 22 28 / 0.09);
+  --color-line-strong: rgb(20 22 28 / 0.17);
 
-  --color-bone: #ece5d3;
-  --color-bone-dim: #b4b09f;
-  --color-mute: #7c8498;
-  --color-faint: #4d566b;
+  --color-bone: #16181d;
+  --color-bone-dim: #4a4f5a;
+  --color-mute: #6b717c;
+  --color-faint: #8d929c;
 
-  --color-amber: #f4b942;
-  --color-amber-dim: #a97f2b;
-  --color-teal: #4fd6c0;
-  --color-teal-dim: #2c8677;
-  --color-vermilion: #ff5d4d;
-  --color-vermilion-dim: #9c352c;
+  --color-amber: #b45309;
+  --color-amber-dim: #d9a441;
+  --color-teal: #0f766e;
+  --color-teal-dim: #5eaaa2;
+  --color-vermilion: #c0281f;
+  --color-vermilion-dim: #e08a84;
   --color-cloud: #8891a5;
 
-  --color-src-devpost: #78b4ff;
-  --color-src-yc: #ff9466;
-  --color-src-github: #c4bdf0;
-  --color-src-hn: #e87fa6;
-  --color-src-arxiv: #9ad17f;
-  --color-src-web: #9cc9d9;
+  --color-src-devpost: #2563eb;
+  --color-src-yc: #ea580c;
+  --color-src-github: #7c3aed;
+  --color-src-hn: #be185d;
+  --color-src-arxiv: #15803d;
+  --color-src-web: #0e7490;
+
+  --color-canvas: var(--color-ink-950);
+  --color-surface: var(--color-ink-900);
+  --color-text: var(--color-bone);
+  --color-text-dim: var(--color-bone-dim);
+  --color-accent: var(--color-amber);
+  --color-accent-fill: #f4b942;
 
   --font-display: var(--font-instrument-serif), "Iowan Old Style", "Palatino Linotype", Georgia, serif;
   --font-sans: var(--font-instrument-sans), ui-sans-serif, system-ui, sans-serif;
@@ -78,7 +87,13 @@
 }
 
 :root {
-  color-scheme: dark;
+  color-scheme: light;
+  /* low-alpha tint used by chips, buttons and hairline fills */
+  --tint: 20 22 28;
+  --chart-surface: #ffffff;
+  --role-conductor: #b45309; --role-resolver: #7a6a3f; --role-critic: #c0281f; --role-advocate: #0f766e;
+  --role-judge: #6d28d9; --role-verifier: #1d4ed8; --role-synthesizer: #374151; --role-mutator: #0e7490;
+  --role-actuator: #a16207; --role-fire-drill: #b45309; --role-user: #16181d; --role-default: #6b717c;
 }
 
 html, body {
@@ -96,40 +111,33 @@ body {
   text-rendering: optimizeLegibility;
 }
 
-/* Night sky: three sparse star layers + a faint graticule, fixed behind everything. */
-body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: -2;
-  pointer-events: none;
-  background-image:
-    radial-gradient(1px 1px at 12% 18%, rgb(236 229 211 / 0.75) 50%, transparent 51%),
-    radial-gradient(1px 1px at 71% 9%, rgb(236 229 211 / 0.5) 50%, transparent 51%),
-    radial-gradient(1.4px 1.4px at 38% 72%, rgb(236 229 211 / 0.6) 50%, transparent 51%),
-    radial-gradient(1px 1px at 88% 64%, rgb(160 190 255 / 0.65) 50%, transparent 51%),
-    radial-gradient(1px 1px at 55% 41%, rgb(236 229 211 / 0.35) 50%, transparent 51%),
-    radial-gradient(1.2px 1.2px at 23% 89%, rgb(160 190 255 / 0.5) 50%, transparent 51%),
-    radial-gradient(1px 1px at 94% 27%, rgb(236 229 211 / 0.45) 50%, transparent 51%),
-    radial-gradient(1px 1px at 6% 52%, rgb(236 229 211 / 0.4) 50%, transparent 51%);
-  background-size: 640px 520px, 480px 610px, 720px 680px, 560px 450px, 390px 370px, 810px 590px, 450px 730px, 530px 490px;
-}
-body::after {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
+/* The original night atlas, scoped: the classic dashboard and the 2D chart fallback live inside this. */
+.theme-dark {
+  color-scheme: dark;
+  --color-ink-950: #04060b; --color-ink-900: #070b14; --color-ink-850: #0a101c; --color-ink-800: #0e1626;
+  --color-ink-700: #152036; --color-ink-600: #1e2d4a; --color-ink-500: #2b3d61;
+  --color-line: rgb(150 176 230 / 0.13); --color-line-strong: rgb(150 176 230 / 0.26);
+  --color-bone: #ece5d3; --color-bone-dim: #b4b09f; --color-mute: #7c8498; --color-faint: #4d566b;
+  --color-amber: #f4b942; --color-amber-dim: #a97f2b; --color-teal: #4fd6c0; --color-teal-dim: #2c8677;
+  --color-vermilion: #ff5d4d; --color-vermilion-dim: #9c352c;
+  --color-src-devpost: #78b4ff; --color-src-yc: #ff9466; --color-src-github: #c4bdf0;
+  --color-src-hn: #e87fa6; --color-src-arxiv: #9ad17f; --color-src-web: #9cc9d9;
+  --tint: 150 176 230;
+  --chart-surface: #0a101c;
+  --role-conductor: #f4b942; --role-resolver: #d9c9a3; --role-critic: #ff8a7a; --role-advocate: #4fd6c0;
+  --role-judge: #c4bdf0; --role-verifier: #78b4ff; --role-synthesizer: #ece5d3; --role-mutator: #7fe0d0;
+  --role-actuator: #e0a94a; --role-fire-drill: #f4b942; --role-user: #ece5d3; --role-default: #b4b09f;
+  color: var(--color-bone);
   background:
     radial-gradient(ellipse 90% 70% at 50% -10%, rgb(40 66 120 / 0.22), transparent 60%),
-    radial-gradient(ellipse 60% 50% at 100% 100%, rgb(79 214 192 / 0.05), transparent 60%),
     repeating-linear-gradient(0deg, rgb(150 176 230 / 0.035) 0 1px, transparent 1px 96px),
-    repeating-linear-gradient(90deg, rgb(150 176 230 / 0.035) 0 1px, transparent 1px 96px);
+    repeating-linear-gradient(90deg, rgb(150 176 230 / 0.035) 0 1px, transparent 1px 96px),
+    #04060b;
 }
 
 ::selection {
-  background: rgb(244 185 66 / 0.35);
-  color: #fff;
+  background: rgb(244 185 66 / 0.4);
+  color: inherit;
 }
 
 * {
@@ -137,23 +145,28 @@ body::after {
   scrollbar-color: var(--color-ink-600) transparent;
 }
 *::-webkit-scrollbar { width: 8px; height: 8px; }
-*::-webkit-scrollbar-thumb { background: var(--color-ink-600); border-radius: 0; }
+*::-webkit-scrollbar-thumb { background: var(--color-ink-600); border-radius: 8px; }
 *::-webkit-scrollbar-track { background: transparent; }
 
 :focus-visible {
-  outline: 1px solid var(--color-amber);
+  outline: 2px solid var(--color-accent-fill);
   outline-offset: 2px;
 }
 
 @layer components {
-  /* A chart plate: hairline frame with registration ticks in two corners. */
+  /* A quiet card. Inside .theme-dark it is the original chart plate with registration ticks. */
   .plate {
     position: relative;
-    background: linear-gradient(180deg, rgb(12 19 34 / 0.92), rgb(8 12 22 / 0.94));
+    background: var(--color-ink-900);
     border: 1px solid var(--color-line);
+    border-radius: 16px;
   }
-  .plate::before,
-  .plate::after {
+  .theme-dark .plate {
+    background: linear-gradient(180deg, rgb(12 19 34 / 0.92), rgb(8 12 22 / 0.94));
+    border-radius: 0;
+  }
+  .theme-dark .plate::before,
+  .theme-dark .plate::after {
     content: "";
     position: absolute;
     width: 9px;
@@ -163,8 +176,8 @@ body::after {
     border-style: solid;
     opacity: 0.9;
   }
-  .plate::before { top: -1px; left: -1px; border-width: 1px 0 0 1px; }
-  .plate::after { bottom: -1px; right: -1px; border-width: 0 1px 1px 0; }
+  .theme-dark .plate::before { top: -1px; left: -1px; border-width: 1px 0 0 1px; }
+  .theme-dark .plate::after { bottom: -1px; right: -1px; border-width: 0 1px 1px 0; }
 
   .plate-head {
     display: flex;
@@ -186,7 +199,7 @@ body::after {
   .label {
     font-family: var(--font-mono);
     font-size: 10px;
-    letter-spacing: 0.18em;
+    letter-spacing: 0.16em;
     text-transform: uppercase;
     color: var(--color-mute);
   }
@@ -196,26 +209,28 @@ body::after {
     align-items: center;
     gap: 0.3rem;
     height: 18px;
-    padding: 0 6px;
+    padding: 0 7px;
     border: 1px solid var(--color-line-strong);
+    border-radius: 999px;
     font-family: var(--font-mono);
     font-size: 10px;
-    letter-spacing: 0.06em;
+    letter-spacing: 0.04em;
     line-height: 1;
     white-space: nowrap;
     color: var(--color-bone-dim);
-    background: rgb(150 176 230 / 0.04);
+    background: rgb(var(--tint) / 0.04);
   }
-  .chip[data-tone="amber"] { color: var(--color-amber); border-color: rgb(244 185 66 / 0.45); background: rgb(244 185 66 / 0.07); }
-  .chip[data-tone="teal"] { color: var(--color-teal); border-color: rgb(79 214 192 / 0.45); background: rgb(79 214 192 / 0.07); }
-  .chip[data-tone="red"] { color: var(--color-vermilion); border-color: rgb(255 93 77 / 0.5); background: rgb(255 93 77 / 0.08); }
+  .theme-dark .chip { border-radius: 0; padding: 0 6px; }
+  .chip[data-tone="amber"] { color: var(--color-amber); border-color: color-mix(in srgb, var(--color-amber) 45%, transparent); background: color-mix(in srgb, var(--color-amber) 8%, transparent); }
+  .chip[data-tone="teal"] { color: var(--color-teal); border-color: color-mix(in srgb, var(--color-teal) 45%, transparent); background: color-mix(in srgb, var(--color-teal) 8%, transparent); }
+  .chip[data-tone="red"] { color: var(--color-vermilion); border-color: color-mix(in srgb, var(--color-vermilion) 50%, transparent); background: color-mix(in srgb, var(--color-vermilion) 8%, transparent); }
   .chip[data-tone="mute"] { color: var(--color-mute); border-color: var(--color-line); }
-  .chip[data-tone="bone"] { color: var(--color-bone); border-color: rgb(236 229 211 / 0.35); }
+  .chip[data-tone="bone"] { color: var(--color-bone); border-color: color-mix(in srgb, var(--color-bone) 35%, transparent); }
 
   /* hazard tape for anything simulated */
   .hazard {
-    background-image: repeating-linear-gradient(-45deg, rgb(244 185 66 / 0.16) 0 6px, transparent 6px 12px);
-    border: 1px dashed rgb(244 185 66 / 0.6);
+    background-image: repeating-linear-gradient(-45deg, rgb(244 185 66 / 0.22) 0 6px, transparent 6px 12px);
+    border: 1px dashed color-mix(in srgb, var(--color-amber) 60%, transparent);
     color: var(--color-amber);
   }
 
@@ -224,27 +239,42 @@ body::after {
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
-    height: 34px;
-    padding: 0 14px;
+    height: 36px;
+    padding: 0 16px;
     border: 1px solid var(--color-line-strong);
-    font-family: var(--font-mono);
-    font-size: 11px;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
+    border-radius: 999px;
+    font-family: var(--font-sans);
+    font-size: 13px;
+    font-weight: 500;
     color: var(--color-bone);
-    background: rgb(150 176 230 / 0.04);
+    background: var(--color-ink-900);
     transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.15s;
     cursor: pointer;
   }
-  .btn:hover:not(:disabled) { border-color: var(--color-bone-dim); background: rgb(150 176 230 / 0.09); }
+  .theme-dark .btn {
+    height: 34px;
+    padding: 0 14px;
+    border-radius: 0;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 400;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    background: rgb(var(--tint) / 0.04);
+  }
+  .btn:hover:not(:disabled) { border-color: var(--color-bone-dim); background: rgb(var(--tint) / 0.05); }
+  .theme-dark .btn:hover:not(:disabled) { background: rgb(var(--tint) / 0.09); }
   .btn:active:not(:disabled) { transform: translateY(1px); }
   .btn:disabled { opacity: 0.45; cursor: not-allowed; }
-  .btn-primary { background: var(--color-amber); border-color: var(--color-amber); color: #130d02; font-weight: 500; }
-  .btn-primary:hover:not(:disabled) { background: #ffd074; border-color: #ffd074; }
-  .btn-teal { border-color: rgb(79 214 192 / 0.5); color: var(--color-teal); background: rgb(79 214 192 / 0.06); }
-  .btn-teal:hover:not(:disabled) { background: rgb(79 214 192 / 0.14); border-color: var(--color-teal); }
-  .btn-sm { height: 26px; padding: 0 9px; font-size: 10px; }
-  .btn-icon { width: 28px; height: 26px; padding: 0; }
+  .btn-primary { background: var(--color-bone); border-color: var(--color-bone); color: var(--color-ink-900); }
+  .btn-primary:hover:not(:disabled) { background: #2b2f38; border-color: #2b2f38; }
+  .theme-dark .btn-primary { background: var(--color-amber); border-color: var(--color-amber); color: #130d02; font-weight: 500; }
+  .theme-dark .btn-primary:hover:not(:disabled) { background: #ffd074; border-color: #ffd074; }
+  .btn-teal { border-color: color-mix(in srgb, var(--color-teal) 50%, transparent); color: var(--color-teal); background: color-mix(in srgb, var(--color-teal) 6%, transparent); }
+  .btn-teal:hover:not(:disabled) { background: color-mix(in srgb, var(--color-teal) 14%, transparent); border-color: var(--color-teal); }
+  .btn-sm, .theme-dark .btn-sm { height: 26px; padding: 0 10px; font-size: 11px; }
+  .theme-dark .btn-sm { padding: 0 9px; font-size: 10px; }
+  .btn-icon, .theme-dark .btn-icon { width: 28px; height: 26px; padding: 0; }
 
   .prose-atlas p { margin: 0 0 0.7em; }
   .prose-atlas strong { color: var(--color-bone); font-weight: 600; }
@@ -254,6 +284,30 @@ body::after {
   .prose-atlas sup a { color: var(--color-amber); font-family: var(--font-mono); font-size: 0.85em; text-decoration: none; padding: 0 1px; }
   .prose-atlas sup a:hover { text-decoration: underline; }
 }
+
+/* labels floating over the islands map: positioned every frame by the scene, so no transitions on transform */
+.island-label {
+  position: absolute;
+  left: 0;
+  top: 0;
+  max-width: 190px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--color-bone-dim);
+  background: rgb(255 255 255 / 0.82);
+  box-shadow: 0 0 0 1px var(--color-line);
+  pointer-events: none;
+  will-change: transform;
+  transition: opacity 0.25s;
+}
+.island-label[data-on="1"] { color: var(--color-ink-900); background: var(--color-bone); box-shadow: none; z-index: 2; }
+.island-label[data-kind="idea"] { color: #6b3a05; background: #fbe3b0; box-shadow: none; font-weight: 600; }
+.island-label[data-kind="mutation"] { color: var(--color-teal); }
 
 /* scale-bar ticks used by the gauges */
 .ticks {

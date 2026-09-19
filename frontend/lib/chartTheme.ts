@@ -1,15 +1,15 @@
-// Chart colours and chrome. The categorical hues are the validated dark steps of the dataviz reference palette,
-// checked with its validator against OUR chart surface (#0a101c), adjacent pairs (stacks / neighbouring bars):
-//   "#3987e5,#d95926,#199e70,#c98500"  -> lightness band, chroma floor, CVD >= 8.4, normal-vision >= 19.8, contrast >= 3:1: PASS
-//   "#3987e5,#c98500"                  -> PASS
-// Order is part of the safety guarantee: keep the stack order below, and never recolour by rank.
+// Chart colours and chrome. The chrome follows the CSS theme (light pages, dark classic dashboard): SVG presentation
+// attributes accept var(). The categorical hues are the dataviz reference palette's validated steps; they were checked
+// with its validator against the dark surface (#0a101c: CVD >= 8.4, contrast >= 3:1) and sit at 3.0-3.9:1 on white,
+// which clears the 3:1 bar for graphical marks. Order is part of the safety guarantee: keep the stack order below,
+// and never recolour by rank.
 export const CHART = {
-  surface: "#0a101c",
-  grid: "rgba(150,176,230,0.12)",
-  axis: "rgba(150,176,230,0.28)",
-  text: "#b4b09f",
-  textMuted: "#7c8498",
-  textStrong: "#ece5d3",
+  surface: "var(--chart-surface)",
+  grid: "var(--color-line)",
+  axis: "var(--color-line-strong)",
+  text: "var(--color-bone-dim)",
+  textMuted: "var(--color-mute)",
+  textStrong: "var(--color-bone)",
   series: ["#3987e5", "#d95926", "#199e70", "#c98500"] as const,
 } as const;
 

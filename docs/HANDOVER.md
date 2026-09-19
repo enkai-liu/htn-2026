@@ -55,7 +55,7 @@ FIRST TASKS:
 | Ingest + search | tiered loaders (twangodev, alvanlii, YC), Devpost write-up parser, polite fetcher, EIS throughput measurer; hybrid search with degradation ladder, facet/pair rarity, whitespace finder, calibration CDF | `ingest/`, `backend/app/search/` |
 | GPTZero + investigation | client with word ledger/cache/replay, bibliography-scan mapping, quote check, Slop Index pipeline (sample → scan → analyze → export) | `backend/app/signals/`, `investigation/` |
 | Scripts | smokes for Elastic/Baseten/GPTZero (`--live` needed to spend GPTZero words), secret scan, benchmark ideas (Spearman), golden-run recorder, Baseten bake-off | `scripts/`, `baseten/bakeoff.py` |
-| Frontend | Next.js 16 app: landing, live run view (swarm timeline, radial idea-space graph, gauges, Voice, evidence/debate/coach/report tabs, cost meter, replay controls), Slop Index page (sample data labelled), About. Static replay works with no backend | `frontend/` |
+| Frontend | Next.js 16 app, redesigned Sat evening: light minimal theme; landing (ambient islands hero); a run is six pages behind a bottom tab bar, `/runs/<id>` Map (3D floating-islands map in plain three.js: your idea at the centre, distance = 1 - similarity, one wedge per source, pop-in / merge / re-score drift, click for a detail card), `/evidence`, `/debate`, `/coach` (mutations + the three actions), `/report` (+ Voice as its own section), `/swarm` (roster, timeline, cost per model). One `RunProvider` in `app/runs/[id]/(tabs)/layout.tsx` streams the run once for all tabs; every in-run link must go through `hrefFor()` or `?replay=`/`?speed=` is lost and the run restarts. The old one-page dark dashboard is kept as the demo fallback at `/runs/<id>/classic`; `?map=2d` swaps the islands for the old 2D chart. Slop Index page (sample data labelled), About. Static replay works with no backend | `frontend/` (`components/run/`, `components/islands/`, `lib/islandLayout.ts`) |
 
 **Elastic is LIVE (set up Sat ~16:00).** `.env` holds every key. A serverless 9.6.0 project on GCP `us-east4`
 (general-purpose Elasticsearch, NOT the new "Vector Database" project type) has all 17 artifacts applied and
@@ -68,7 +68,7 @@ live and the `semantic_prior_art` fallback is not needed. **Still not run agains
 ```bash
 cd backend && .venv/bin/pytest -q -p no:warnings            # expect 305 passed, 3 skipped
 cd backend && .venv-jiuwen/bin/pytest -q -p no:warnings tests/test_pipeline_offline.py   # expect 7 passed (openjiuwen host)
-cd frontend && pnpm test && pnpm typecheck && pnpm lint      # expect 22 passed, clean
+cd frontend && pnpm test && pnpm typecheck && pnpm lint      # expect 30 passed, clean
 bash scripts/validate_swarm_skill.sh                         # official Swarm Skill validator: [PASS] 0 warning(s), 0 error(s)
 backend/.venv/bin/python elastic/apply.py --dry-run          # 17-step plan, sends nothing
 bash scripts/smoke_all.sh                                    # SKIPs without keys, exit 0

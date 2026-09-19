@@ -1,0 +1,165 @@
+"use client";
+// One run, many pages. The (tabs) layout renders this once, so the stream (or replay), the selection and the map's
+// memory survive moving between tabs: in the App Router a layout keeps its state across sibling navigation, a page
+// does not. Everything the old single-page RunView held in local state lives here instead.
+import { useSearchParams } from "next/navigation";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
+import { ApiError, rescoreMutation, runAction } from "@/lib/api";
+import type { ActionState } from "@/lib/runReducer";
+import { selectEvidenceCards, selectLedger, selectSourceStatus, type EvidenceCardModel } from "@/lib/selectors";
+import { useRunEvents, type RunEvents } from "@/lib/useRunEvents";
+import { ToastProvider, useToast } from "../ui";
+import { RunShell } from "./RunShell";
+
+export type RunSegment = "" | "evidence" | "debate" | "coach" | "report" | "swarm";
+
+/** Camera pose of the islands map, remembered while another tab is showing. */
+export interface CameraMemo { position: [number, number, number]; target: [number, number, number]; zoom: number; userMoved: boolean }
+
+export interface RunContextValue {
+  runId: string;
+  run: RunEvents;
+  isReplay: boolean;
+  streaming: boolean;
+  selectedId: string | null;
+  select: (id: string | null) => void;
+  evidenceView: "cards" | "ledger";
+  setEvidenceView: (v: "cards" | "ledger") => void;
+  busyAction: string | null;
+  busyMid: string | null;
+  onAct: (a: ActionState) => Promise<void>;
+  onRescore: (mid: string) => Promise<void>;
+  cards: EvidenceCardModel[];
+  ledger: ReturnType<typeof selectLedger>;
+  sourceStatus: ReturnType<typeof selectSourceStatus>;
+  /** islands that have already popped in, so returning to the Map tab does not replay the animation */
+  seenIslands: RefObject<Set<string>>;
+  cameraMemo: RefObject<CameraMemo | null>;
+  /** Every link inside a run goes through this: dropping ?replay= / ?speed= would remount the provider and restart the run. */
+  hrefFor: (segment: RunSegment) => { pathname: string; query: Record<string, string> };
+  /** query params a page may read without its own Suspense boundary */
+  mapMode: "3d" | "2d";
+}
+
+const RunContext = createContext<RunContextValue | null>(null);
+
+export function useRun(): RunContextValue {
+  const v = useContext(RunContext);
+  if (!v) throw new Error("useRun must be used inside <RunProvider>");
+  return v;
+}
+
+function RunProviderInner({ runId, replay, speed, mapMode, children }: { runId: string; replay: string | null; speed: string | null; mapMode: "3d" | "2d"; children: ReactNode }) {
+  const run = useRunEvents(runId, { replay, speed });
+  const { state, status, transport, controls, epoch } = run;
+  const toast = useToast();
+  const isReplay = transport === "replay";
+
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [evidenceView, setEvidenceView] = useState<"cards" | "ledger">("cards");
+  const [busyAction, setBusyAction] = useState<string | null>(null);
+  const [busyMid, setBusyMid] = useState<string | null>(null);
+  const seenIslands = useRef<Set<string>>(new Set());
+  const cameraMemo = useRef<CameraMemo | null>(null);
+
+  // a restart or a seek backwards re-folds the run from zero: the islands should pop in again
+  useEffect(() => { seenIslands.current.clear(); }, [epoch]);
+
+  const cards = useMemo(() => selectEvidenceCards(state), [state]);
+  const ledger = useMemo(() => selectLedger(state), [state]);
+  const sourceStatus = useMemo(() => selectSourceStatus(state), [state]);
+  const streaming = status === "live" || status === "replaying" || status === "reconnecting";
+
+  const replayNotice = useCallback(() => toast({ title: "Replay mode: actions are disabled", body: "This is a recording, so nothing is sent to the backend. Start a live investigation to arm a watch, draft a pitch or write back.", tone: "amber" }), [toast]);
+
+  const resync = run.resync;
+  const onAct = useCallback(async (a: ActionState) => {
+    if (isReplay) { replayNotice(); return; }
+    setBusyAction(a.action);
+    try {
+      const res = await runAction(runId, a.action as Parameters<typeof runAction>[1]);
+      if (!res.ok) toast({ title: `${a.action.replace(/_/g, " ")}: not completed`, body: typeof res.detail === "string" ? res.detail : undefined, tone: "red" });
+      resync();
+    } catch (err) {
+      toast({ title: "Action failed", body: err instanceof ApiError ? err.message : "Could not reach the backend.", tone: "red" });
+    } finally {
+      setBusyAction(null);
+    }
+  }, [isReplay, replayNotice, resync, runId, toast]);
+
+  const onRescore = useCallback(async (mid: string) => {
+    if (isReplay) { replayNotice(); return; }
+    setBusyMid(mid);
+    setSelectedId(`mut:${mid}`);
+    try {
+      await rescoreMutation(runId, mid);
+      resync();
+    } catch (err) {
+      toast({ title: "Re-score failed", body: err instanceof ApiError ? err.message : "Could not reach the backend.", tone: "red" });
+    } finally {
+      setBusyMid(null);
+    }
+  }, [isReplay, replayNotice, resync, runId, toast]);
+
+  // action.done -> toast
+  const lastDone = state.lastActionDone;
+  useEffect(() => {
+    if (!lastDone) return;
+    toast({ title: `${lastDone.action.replace(/_/g, " ")}: ${lastDone.ok ? "done" : "failed"}`, body: lastDone.detail, tone: lastDone.ok ? "teal" : "red" });
+  }, [lastDone, toast]);
+
+  // keyboard: space play/pause, → step, E end, R restart (replay only).
+  // Focus rests on a tab link after every navigation, so links must not swallow the shortcuts; a focused button
+  // only keeps Space (its own activation key).
+  useEffect(() => {
+    if (!controls) return;
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      if (el && (el.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName))) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key === " ") {
+        if (el && ["BUTTON", "SUMMARY"].includes(el.tagName)) return;
+        e.preventDefault();
+        controls.toggle();
+      } else if (e.key === "ArrowRight") controls.step();
+      else if (e.key.toLowerCase() === "e") controls.skipToEnd();
+      else if (e.key.toLowerCase() === "r") controls.restart();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [controls]);
+
+  const hrefFor = useCallback((segment: RunSegment) => {
+    const query: Record<string, string> = {};
+    if (replay) query.replay = replay;
+    if (speed) query.speed = speed;
+    if (mapMode === "2d") query.map = "2d";
+    return { pathname: `/runs/${encodeURIComponent(runId)}${segment ? `/${segment}` : ""}`, query };
+  }, [mapMode, replay, runId, speed]);
+
+  const value = useMemo<RunContextValue>(() => ({
+    runId, run, isReplay, streaming, selectedId, select: setSelectedId, evidenceView, setEvidenceView,
+    busyAction, busyMid, onAct, onRescore, cards, ledger, sourceStatus, seenIslands, cameraMemo, hrefFor, mapMode,
+  }), [runId, run, isReplay, streaming, selectedId, evidenceView, busyAction, busyMid, onAct, onRescore, cards, ledger, sourceStatus, hrefFor, mapMode]);
+
+  return (
+    <RunContext.Provider value={value}>
+      <RunShell>{children}</RunShell>
+    </RunContext.Provider>
+  );
+}
+
+export function RunProvider({ runId, children }: { runId: string; children: ReactNode }) {
+  const params = useSearchParams();
+  const replay = params.get("replay");
+  const speed = params.get("speed");
+  const mapMode = params.get("map") === "2d" ? "2d" : "3d";
+  return (
+    <ToastProvider>
+      {/* keyed by everything that identifies a stream: a different run (or replay, or speed) remounts with fresh state */}
+      <RunProviderInner key={`${runId}|${replay ?? ""}|${speed ?? ""}`} runId={runId} replay={replay} speed={speed} mapMode={mapMode}>
+        {children}
+      </RunProviderInner>
+    </ToastProvider>
+  );
+}

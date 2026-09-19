@@ -52,7 +52,7 @@ function YearTooltip({ active, payload, label }: { active?: boolean; payload?: r
   const row = payload?.[0]?.payload;
   if (!active || !row) return null;
   return (
-    <div className="border border-line-strong bg-ink-800/95 px-2.5 py-1.5 font-mono text-[10.5px] shadow-[0_8px_24px_rgb(0_0_0/0.5)]">
+    <div className="border border-line-strong bg-ink-800/95 px-2.5 py-1.5 font-mono text-[10.5px] shadow-[0_8px_24px_rgb(0_0_0/0.16)]">
       <div className="text-bone">{label}</div>
       <div className="mt-0.5 flex items-center gap-1.5 text-bone-dim"><span className="size-2" style={{ background: BY_YEAR.other.color }} />{row.count} similar projects</div>
       <div className="flex items-center gap-1.5 text-bone-dim"><span className="size-2" style={{ background: BY_YEAR.winners.color }} />{row.winners} prize winners</div>

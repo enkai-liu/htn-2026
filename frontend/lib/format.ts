@@ -65,7 +65,18 @@ export const SOURCE_LABEL: Record<string, string> = {
   web: "Web",
 };
 
+/** Hex values for the WebGL islands (light theme). DOM code uses `sourceColor`, which follows the CSS theme. */
 export const SOURCE_COLOR: Record<string, string> = {
+  devpost: "#2563eb",
+  yc: "#ea580c",
+  github: "#7c3aed",
+  hn: "#be185d",
+  arxiv: "#15803d",
+  web: "#0e7490",
+};
+
+/** Hex values for the 2D canvas chart, which always paints on the dark atlas surface. */
+export const SOURCE_COLOR_DARK: Record<string, string> = {
   devpost: "#78b4ff",
   yc: "#ff9466",
   github: "#c4bdf0",
@@ -74,5 +85,8 @@ export const SOURCE_COLOR: Record<string, string> = {
   web: "#9cc9d9",
 };
 
-export const sourceColor = (s: string | null | undefined) => (s && SOURCE_COLOR[s]) || "#b4b09f";
+/** A CSS colour for inline styles: resolves per theme (`.theme-dark` swaps the variables). Not usable on a canvas. */
+export const sourceColor = (s: string | null | undefined) => (s && SOURCE_COLOR[s] ? `var(--color-src-${s})` : "var(--color-bone-dim)");
+export const sourceHex = (s: string | null | undefined) => (s && SOURCE_COLOR[s]) || "#8d929c";
+export const sourceHexDark = (s: string | null | undefined) => (s && SOURCE_COLOR_DARK[s]) || "#b4b09f";
 export const sourceLabel = (s: string | null | undefined) => (s && SOURCE_LABEL[s]) || s || "source";

@@ -4,25 +4,25 @@ import { SiteNav } from "@/components/SiteNav";
 
 export const metadata: Metadata = {
   title: "How it works",
-  description: "The architecture of Whitespace: a swarm of agents over Elasticsearch, Baseten, GPTZero, openJiuwen and Browserbase, streamed to the browser as one event contract.",
+  description: "The architecture of Whitespace: a swarm of agents over Elasticsearch, Baseten, GPTZero and openJiuwen, streamed to the browser as one event contract.",
 };
 
 const ROLES: { name: string; job: string; color: string }[] = [
-  { name: "conductor", job: "extracts facets, staffs the team, holds the budget, replans on failure", color: "#f4b942" },
-  { name: "scout.*", job: "one per source: Devpost, YC, GitHub, Hacker News (arXiv when it fits)", color: "#78b4ff" },
-  { name: "resolver", job: "schema match, entity match, field fusion, conflicts, imputation", color: "#d9c9a3" },
-  { name: "critic", job: "argues it exists, with quotes; may send scouts back out", color: "#ff8a7a" },
-  { name: "advocate", job: "different model family; must concede, distinguish or challenge", color: "#4fd6c0" },
-  { name: "judge", job: "cross-family jury; a split triggers a targeted re-query", color: "#c4bdf0" },
-  { name: "verifier", job: "quote check + GPTZero citation check; holds a veto", color: "#78b4ff" },
-  { name: "synthesizer", job: "input restricted in code to verified claims", color: "#ece5d3" },
-  { name: "mutator", job: "swaps one facet toward whitespace, re-scores it", color: "#7fe0d0" },
-  { name: "actuator", job: "arms a watch, drafts a pitch, writes back: on your click", color: "#e0a94a" },
+  { name: "conductor", job: "extracts facets, staffs the team, holds the budget, replans on failure", color: "var(--role-conductor)" },
+  { name: "scout.*", job: "one per source: Devpost, YC, GitHub, Hacker News (arXiv when it fits)", color: "var(--color-src-devpost)" },
+  { name: "resolver", job: "schema match, entity match, field fusion, conflicts, imputation", color: "var(--role-resolver)" },
+  { name: "critic", job: "argues it exists, with quotes; may send scouts back out", color: "var(--role-critic)" },
+  { name: "advocate", job: "different model family; must concede, distinguish or challenge", color: "var(--role-advocate)" },
+  { name: "judge", job: "cross-family jury; a split triggers a targeted re-query", color: "var(--role-judge)" },
+  { name: "verifier", job: "quote check + GPTZero citation check; holds a veto", color: "var(--role-verifier)" },
+  { name: "synthesizer", job: "input restricted in code to verified claims", color: "var(--role-synthesizer)" },
+  { name: "mutator", job: "swaps one facet toward whitespace, re-scores it", color: "var(--role-mutator)" },
+  { name: "actuator", job: "arms a watch, drafts a pitch, writes back: on your click", color: "var(--role-actuator)" },
 ];
 
-const SPONSORS: { name: string; role: string; points: string[]; color: string }[] = [
+const SPONSORS: { name: string; role: string; points: string[]; color: string; planned?: boolean }[] = [
   {
-    name: "Elasticsearch", role: "the context layer for every agent", color: "#78b4ff",
+    name: "Elasticsearch", role: "the context layer for every agent", color: "var(--color-src-devpost)",
     points: [
       "Hybrid retrieval: BM25 + Jina v3 vectors (semantic_text), fused with RRF, then the Jina reranker",
       "significant_text for cliché terms; aggregations for the whitespace finder and per-year crowding",
@@ -31,7 +31,7 @@ const SPONSORS: { name: string; role: string; points: string[]; color: string }[
     ],
   },
   {
-    name: "Baseten", role: "inference as a measuring instrument", color: "#ff9466",
+    name: "Baseten", role: "inference as a measuring instrument", color: "var(--color-src-yc)",
     points: [
       "A right-sized model per role (the cost meter on every run shows which)",
       "A jury of different model families; their disagreement widens the band and triggers re-queries",
@@ -39,7 +39,7 @@ const SPONSORS: { name: string; role: string; points: string[]; color: string }[
     ],
   },
   {
-    name: "GPTZero", role: "voice, slop share, and a veto", color: "#4fd6c0",
+    name: "GPTZero", role: "voice, slop share, and a veto", color: "var(--color-teal)",
     points: [
       "Voice: a sentence-level read of your pitch, shown in GPTZero's own words, never as a raw probability",
       "Neighbourhood slop share, and the Slop Index investigation with a placebo false-positive rate",
@@ -47,27 +47,31 @@ const SPONSORS: { name: string; role: string; points: string[]; color: string }[
     ],
   },
   {
-    name: "openJiuwen agent-core", role: "the agent runtime", color: "#c4bdf0",
+    name: "openJiuwen agent-core", role: "the agent runtime", color: "var(--color-src-github)",
     points: [
       "Roles are host-agnostic and run on openJiuwen's team runtime (peer-to-peer messages, pub/sub, streaming)",
       "An asyncio host implements the same interface as a fallback; each run states which one ran it",
     ],
   },
   {
-    name: "Browserbase", role: "the evidence browser", color: "#e87fa6",
+    name: "Browserbase", role: "the evidence browser", color: "var(--color-src-hn)", planned: true,
     points: [
-      "Renders the live product sites of top prior-art entities that plain HTTP cannot read",
-      "Feeds conflicts such as “the listing says live, the site is dead”; a bot challenge is recorded as blocked, never evaded",
+      "Designed, not built: nothing in a run calls Browserbase today",
+      "Intended job: render the live product sites of top prior-art entities that plain HTTP cannot read, feeding conflicts such as “the listing says live, the site is dead”",
+      "A bot challenge would be recorded as blocked, never evaded",
     ],
   },
 ];
 
-function Box({ title, sub, children, accent }: { title: string; sub?: string; children?: React.ReactNode; accent?: string }) {
+function Box({ title, sub, children, accent, badge }: { title: string; sub?: string; children?: React.ReactNode; accent?: string; badge?: string }) {
   return (
     <div className="plate px-4 py-3" style={accent ? { borderColor: `color-mix(in srgb, ${accent} 45%, transparent)` } : undefined}>
       <div className="flex flex-wrap items-baseline gap-x-2">
         <span className="font-display text-[21px] leading-tight text-bone">{title}</span>
         {sub && <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-mute">{sub}</span>}
+        {badge && (
+          <span className="border border-line px-1.5 py-[1px] font-mono text-[9px] uppercase tracking-[0.14em] text-mute">{badge}</span>
+        )}
       </div>
       {children}
     </div>
@@ -105,7 +109,7 @@ export default function AboutPage() {
         <section className="mt-10 animate-rise" style={{ animationDelay: "0.2s" }} aria-label="Architecture diagram">
           <Box title="The browser" sub="Next.js · this site">
             <p className="mt-1 text-[13px] leading-relaxed text-bone-dim">
-              Star chart, swarm timeline, debate, coach, report. A pure reducer folds the event stream into state, so a live run and a recording render identically.
+              Islands map, evidence, debate, coach, report, swarm: one page each. A pure reducer folds the event stream into state, so a live run and a recording render identically.
             </p>
           </Box>
           <Wire label="POST /api/runs  ·  SSE /api/runs/{id}/events  (one AgentEvent per message; the same JSONL is the replay file)" />
@@ -115,7 +119,7 @@ export default function AboutPage() {
             </p>
           </Box>
           <Wire label="Role.handle(msg, ctx): send · publish · emit · board · budget" />
-          <Box title="The swarm" sub="openJiuwen agent-core · asyncio fallback" accent="#c4bdf0">
+          <Box title="The swarm" sub="openJiuwen agent-core · asyncio fallback" accent="var(--color-src-github)">
             <ul className="mt-2 grid gap-x-5 gap-y-1.5 sm:grid-cols-2">
               {ROLES.map((r) => (
                 <li key={r.name} className="flex items-baseline gap-2 text-[12.5px] leading-snug">
@@ -125,10 +129,10 @@ export default function AboutPage() {
               ))}
             </ul>
           </Box>
-          <Wire label="search · MCP tools · model calls · detection · page renders" />
+          <Wire label="search · MCP tools · model calls · detection" />
           <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
             {SPONSORS.map((s) => (
-              <Box key={s.name} title={s.name} sub={s.role} accent={s.color}>
+              <Box key={s.name} title={s.name} sub={s.role} accent={s.color} badge={s.planned ? "Planned · not built" : undefined}>
                 <ul className="mt-2 flex flex-col gap-1.5">
                   {s.points.map((p) => (
                     <li key={p} className="flex gap-2 text-[12.5px] leading-snug text-bone-dim">

@@ -39,7 +39,7 @@ export const metadata: Metadata = {
   description: "A swarm of AI agents charts the prior art around your idea, verifies every claim against its source, and coaches you toward the empty regions of the map.",
 };
 
-export const viewport: Viewport = { themeColor: "#04060b", colorScheme: "dark" };
+export const viewport: Viewport = { themeColor: "#f6f5f1", colorScheme: "light" };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (

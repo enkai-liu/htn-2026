@@ -29,7 +29,7 @@ function MutationCard({ m, base, selected, onFocus, onRescore, busy }: {
   m: MutationState; base: Record<string, number | null>; selected: boolean; onFocus: () => void; onRescore: () => void; busy: boolean;
 }) {
   return (
-    <article className={clsx("animate-rise border px-3 py-2.5 transition-colors", selected ? "border-teal shadow-[0_0_24px_rgb(79_214_192/0.12)]" : "border-line")}>
+    <article className={clsx("animate-rise border px-3 py-2.5 transition-colors", selected ? "border-teal shadow-[0_0_0_3px_color-mix(in_srgb,var(--color-teal)_14%,transparent)]" : "border-line")}>
       <div className="flex items-center gap-2">
         <Chip tone="teal">swap the {m.facet}</Chip>
         <span className="font-mono text-[10px] text-faint">{m.mid}</span>
@@ -109,7 +109,7 @@ export function MutationPanel({ state, selectedId, onFocus, onRescore, busyMid }
   return (
     <div className="flex flex-col gap-2 p-3">
       <p className="text-[11.5px] leading-snug text-mute">
-        Each suggestion changes <em className="text-bone-dim">one</em> facet, then re-runs retrieval. The delta is measured, not guessed, and the mutation&apos;s star drifts outward on the chart as its nearest prior art gets less similar.
+        Each suggestion changes <em className="text-bone-dim">one</em> facet, then re-runs retrieval. The delta is measured, not guessed, and the mutation&apos;s island drifts outward on the map as its nearest prior art gets less similar.
       </p>
       {state.mutationOrder.map((mid) => (
         <MutationCard

@@ -55,7 +55,6 @@ export function IdeaInput() {
   return (
     <form onSubmit={submit} className="plate animate-rise p-0" style={{ animationDelay: "0.25s" }}>
       <div className="plate-head">
-        <span className="idx">00</span>
         <span className="ttl">Your pitch</span>
         <span className="ml-auto flex items-center gap-1.5 normal-case tracking-normal">
           {EXAMPLES.map((ex) => (

@@ -4,6 +4,7 @@
 //   runId === "mock"  or  ?replay=<name>   -> static replay from /public/replay/<name>.jsonl (no backend needed)
 //   anything else                           -> live SSE from the backend
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
+import { emptyLayout, foldLayout, type LayoutState } from "./islandLayout";
 import { DEFAULT_SPEED, loadReplay, parseSpeed, ReplayController, safeReplayName, type ReplaySnapshot } from "./replay";
 import { initialRunState, runReducer, type RunState } from "./runReducer";
 import { connectRunEvents, type SseConnection } from "./sse";
@@ -25,6 +26,10 @@ export interface RunControls {
 
 export interface RunEvents {
   state: RunState;
+  /** where every island of the map sits: folded with the events, so it is identical for a stream, a seek or a remount */
+  layout: LayoutState;
+  /** bumps whenever the fold restarts from zero (replay restart / seek back): the map forgets which islands it has shown */
+  epoch: number;
   status: RunStatus;
   transport: Transport;
   /** replay name when transport === "replay" */
@@ -39,10 +44,24 @@ export interface RunEvents {
 
 type Action = { type: "events"; events: AgentEvent[] } | { type: "replace"; events: AgentEvent[] };
 
-function reducer(state: RunState, action: Action): RunState {
-  let s = action.type === "replace" ? initialRunState : state;
-  for (const ev of action.events) s = runReducer(s, ev);
-  return s;
+interface Folded { run: RunState; layout: LayoutState; epoch: number }
+const initialFolded: Folded = { run: initialRunState, layout: emptyLayout, epoch: 0 };
+
+function mutationFacets(run: RunState): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const mid of run.mutationOrder) out[mid] = run.mutations[mid].facet;
+  return out;
+}
+
+function reducer(state: Folded, action: Action): Folded {
+  let { run, layout } = action.type === "replace" ? initialFolded : state;
+  for (const ev of action.events) {
+    const next = runReducer(run, ev);
+    if (next.graph !== run.graph) layout = foldLayout(layout, next.graph, { mutationFacet: mutationFacets(next) });
+    run = next;
+  }
+  if (run === state.run && layout === state.layout) return state;
+  return { run, layout, epoch: state.epoch + (action.type === "replace" ? 1 : 0) };
 }
 
 export interface RunEventsOptions { replay?: string | null; speed?: string | null }
@@ -57,7 +76,8 @@ export function useRunEvents(runId: string, opts: RunEventsOptions = {}): RunEve
   const initialSpeed = useMemo(() => parseSpeed(opts.speed, DEFAULT_SPEED), [opts.speed]);
   const explicitSpeed = opts.speed != null && opts.speed !== "";
 
-  const [state, dispatch] = useReducer(reducer, initialRunState);
+  const [folded, dispatch] = useReducer(reducer, initialFolded);
+  const state = folded.run;
   const [snapshot, setSnapshot] = useState<ReplaySnapshot | null>(null);
   const [conn, setConn] = useState<"loading" | "connecting" | "open" | "reconnecting" | "closed" | "error">(transport === "replay" ? "loading" : "connecting");
   const [error, setError] = useState<string | null>(null);
@@ -145,5 +165,5 @@ export function useRunEvents(runId: string, opts: RunEventsOptions = {}): RunEve
   else if (conn === "reconnecting") status = "reconnecting";
   else status = "connecting";
 
-  return { state, status, transport, replayName, controls, replay: transport === "replay" ? snapshot : null, error, resync };
+  return { state, layout: folded.layout, epoch: folded.epoch, status, transport, replayName, controls, replay: transport === "replay" ? snapshot : null, error, resync };
 }

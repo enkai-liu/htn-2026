@@ -52,7 +52,7 @@ function SlopTooltip({ active, payload }: { active?: boolean; payload?: readonly
   const row = payload?.[0]?.payload;
   if (!active || !row) return null;
   return (
-    <div className="w-[230px] border border-line-strong bg-ink-800/[0.97] px-3 py-2 font-mono text-[10.5px] shadow-[0_10px_30px_rgb(0_0_0/0.6)]">
+    <div className="w-[230px] border border-line-strong bg-ink-800/[0.97] px-3 py-2 font-mono text-[10.5px] shadow-[0_10px_30px_rgb(0_0_0/0.16)]">
       <div className="flex items-baseline justify-between text-bone"><span className="text-[12px]">{row.year}</span><span className="text-mute">n = {row.scanned}</span></div>
       <div className="mt-1 text-bone">{row.share.toFixed(1)}% flagged <span className="text-mute">(95% CI {row.ci[0].toFixed(1)}–{row.ci[1].toFixed(1)}%)</span></div>
       <ul className="mt-1.5 flex flex-col gap-0.5 border-t border-line pt-1.5">

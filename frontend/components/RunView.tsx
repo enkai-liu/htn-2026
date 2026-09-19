@@ -300,9 +300,12 @@ export function RunView({ runId }: { runId: string }) {
   const replay = params.get("replay");
   const speed = params.get("speed");
   return (
-    <ToastProvider>
-      {/* keyed by everything that identifies a stream: a different run (or replay, or speed) remounts with fresh state */}
-      <RunViewInner key={`${runId}|${replay ?? ""}|${speed ?? ""}`} runId={runId} replay={replay} speed={speed} />
-    </ToastProvider>
+    // the classic dashboard keeps the original night-atlas look: the rest of the app is light now
+    <div className="theme-dark min-h-dvh">
+      <ToastProvider>
+        {/* keyed by everything that identifies a stream: a different run (or replay, or speed) remounts with fresh state */}
+        <RunViewInner key={`${runId}|${replay ?? ""}|${speed ?? ""}`} runId={runId} replay={replay} speed={speed} />
+      </ToastProvider>
+    </div>
   );
 }

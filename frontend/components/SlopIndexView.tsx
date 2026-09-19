@@ -40,7 +40,7 @@ export function SlopIndexView() {
       {isSample && (
         <>
           {/* corner ribbon: visible on every scroll position whenever the fallback file is in use */}
-          <div className="pointer-events-none fixed bottom-[38px] right-[-62px] z-40 w-[240px] -rotate-45 bg-amber py-1.5 text-center font-mono text-[11px] font-medium uppercase tracking-[0.22em] text-ink-950 shadow-[0_6px_24px_rgb(0_0_0/0.5)]" aria-hidden>
+          <div className="pointer-events-none fixed bottom-[38px] right-[-62px] z-40 w-[240px] -rotate-45 bg-amber py-1.5 text-center font-mono text-[11px] font-medium uppercase tracking-[0.22em] text-white shadow-[0_6px_24px_rgb(0_0_0/0.18)]" aria-hidden>
             Sample data
           </div>
           <div className="hazard mb-6 px-4 py-3" role="note">

@@ -10,6 +10,9 @@ import { JURY_SPLIT_STD, type ClaimState, type JuryVote, type Requery, type RunS
 import type { ClaimStatus, Evidence } from "@/lib/types";
 import { Chip, Empty, SimulatedTag } from "./ui";
 
+// one colour per juror, from the theme's source hues so it reads on both the light pages and the dark dashboard
+const JUROR_COLORS = ["var(--color-src-devpost)", "var(--color-src-yc)", "var(--color-src-github)", "var(--color-src-arxiv)", "var(--color-src-hn)"];
+
 const STATUS: Record<ClaimStatus, { label: string; tone: "amber" | "teal" | "red" | "mute" | "bone" }> = {
   proposed: { label: "proposed", tone: "mute" },
   challenged: { label: "challenged", tone: "amber" },
@@ -103,7 +106,7 @@ function JuryStrip({ vote }: { vote: JuryVote }) {
           <span
             key={i}
             className="absolute top-[3px] size-[13px] -translate-x-1/2 rounded-full border-2 border-ink-900"
-            style={{ left: `${Math.max(0, Math.min(1, v.score)) * 100}%`, background: ["#78b4ff", "#ff9466", "#c4bdf0", "#9ad17f", "#e87fa6"][i % 5] }}
+            style={{ left: `${Math.max(0, Math.min(1, v.score)) * 100}%`, background: JUROR_COLORS[i % JUROR_COLORS.length] }}
             title={`${v.model}: ${v.score.toFixed(2)}: ${v.why}`}
           />
         ))}
@@ -113,7 +116,7 @@ function JuryStrip({ vote }: { vote: JuryVote }) {
       <ul className="mt-1.5 flex flex-col gap-0.5">
         {vote.votes.map((v, i) => (
           <li key={i} className="flex items-baseline gap-1.5 text-[11px] leading-snug">
-            <span className="size-[6px] flex-none translate-y-[-1px] rounded-full" style={{ background: ["#78b4ff", "#ff9466", "#c4bdf0", "#9ad17f", "#e87fa6"][i % 5] }} />
+            <span className="size-[6px] flex-none translate-y-[-1px] rounded-full" style={{ background: JUROR_COLORS[i % JUROR_COLORS.length] }} />
             <span className="w-[116px] flex-none truncate font-mono text-[9.5px] text-mute" title={v.model}>{shortModel(v.model)}</span>
             <span className="w-[28px] flex-none font-mono text-[10px] text-bone">{v.score.toFixed(2)}</span>
             <span className="min-w-0 truncate text-bone-dim" title={v.why}>{v.why}</span>

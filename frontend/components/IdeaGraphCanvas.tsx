@@ -8,7 +8,7 @@
 // and the node drifts outward leaving a trail back to where it started.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ForceGraph2D, { type ForceGraphMethods, type LinkObject, type NodeObject } from "react-force-graph-2d";
-import { fmtSim, sourceColor, sourceLabel, truncate } from "@/lib/format";
+import { fmtSim, sourceHexDark as sourceColor, sourceLabel, truncate } from "@/lib/format";
 import type { GraphState } from "@/lib/graphReducer";
 import type { MutationState, PriorSample } from "@/lib/runReducer";
 import type { Facets, GraphNode, LinkKind } from "@/lib/types";
