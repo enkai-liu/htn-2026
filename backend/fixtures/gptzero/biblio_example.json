@@ -1,0 +1,308 @@
+{
+  "_fixture": "synthetic, shaped like the documented GPTZero response",
+  "_inputs": {
+    "note": "the claims and evidence this document was built from (ours, not part of the API)",
+    "claims": [
+      {
+        "cid": "c1",
+        "kind": "exists",
+        "by": "critic",
+        "evidence": [
+          "e1"
+        ],
+        "text": "DevSpot already validates hackathon ideas against Devpost"
+      },
+      {
+        "cid": "c2",
+        "kind": "exists",
+        "by": "critic",
+        "evidence": [
+          "e2"
+        ],
+        "text": "HackAnalyzer scores the originality of a Devpost project with a keyword search"
+      },
+      {
+        "cid": "c3",
+        "kind": "exists",
+        "by": "critic",
+        "evidence": [
+          "e3"
+        ],
+        "text": "IdeaForge AI raised a seed round for an identical originality checker"
+      },
+      {
+        "cid": "c4",
+        "kind": "exists",
+        "by": "critic",
+        "evidence": [
+          "e4"
+        ],
+        "text": "PitchProbe already coaches founders toward more original ideas"
+      }
+    ],
+    "evidence": [
+      {
+        "evid": "e1",
+        "eid": "ent1",
+        "rid": "devpost:devspot",
+        "quote": "validates the uniqueness of your hackathon idea against Devpost",
+        "url": "https://devpost.com/software/devspot",
+        "citation": "[1] DevSpot team. \"DevSpot.\" Devpost. 2024. https://devpost.com/software/devspot"
+      },
+      {
+        "evid": "e2",
+        "eid": "ent2",
+        "rid": "devpost:hackanalyzer",
+        "quote": "generates an originality score from a Devpost keyword search",
+        "url": "https://devpost.com/software/hackanalyzer",
+        "citation": "[2] HackAnalyzer team. \"HackAnalyzer.\" Devpost. 2023. https://devpost.com/software/hackanalyzer"
+      },
+      {
+        "evid": "e3",
+        "eid": "ent3",
+        "rid": "web:ideaforge-ai",
+        "quote": "IdeaForge AI closes seed round for its originality checker",
+        "url": "https://example.invalid/ideaforge-ai-seed-round",
+        "citation": "[3] IdeaForge AI. \"IdeaForge AI closes seed round.\" TechWire. 2026. https://example.invalid/ideaforge-ai-seed-round"
+      },
+      {
+        "evid": "e4",
+        "eid": "ent4",
+        "rid": "hn:40000001",
+        "quote": "PitchProbe reviews the wording of your pitch deck",
+        "url": "https://example.org/hn/40000001",
+        "citation": "[4] \"Show HN: PitchProbe.\" Hacker News. 2025. https://example.org/hn/40000001"
+      }
+    ]
+  },
+  "id": "00000000-b1b1-4000-8000-000000000001",
+  "version": 1,
+  "inputText": "1. DevSpot already validates hackathon ideas against Devpost [1].\n2. HackAnalyzer scores the originality of a Devpost project with a keyword search [2].\n3. IdeaForge AI raised a seed round for an identical originality checker [3].\n4. PitchProbe already coaches founders toward more original ideas [4].\n\nReferences\n[1] DevSpot team. \"DevSpot.\" Devpost. 2024. https://devpost.com/software/devspot\n[2] HackAnalyzer team. \"HackAnalyzer.\" Devpost. 2023. https://devpost.com/software/hackanalyzer\n[3] IdeaForge AI. \"IdeaForge AI closes seed round.\" TechWire. 2026. https://example.invalid/ideaforge-ai-seed-round\n[4] \"Show HN: PitchProbe.\" Hacker News. 2025. https://example.org/hn/40000001",
+  "bibliographic_citations": [
+    {
+      "id": 0,
+      "text": "[1] DevSpot team. \"DevSpot.\" Devpost. 2024. https://devpost.com/software/devspot",
+      "indices": {
+        "start": 314,
+        "end": 394
+      },
+      "citation_type": "webpage",
+      "citation_object": null,
+      "citation_exists": {
+        "status": "exist",
+        "score": 0.93,
+        "justification": "A page with this title and URL was found.",
+        "hallucination_label": null,
+        "hallucination_explanation": null
+      },
+      "ai_scan": {
+        "predicted_class": "human",
+        "score": 0.06
+      },
+      "claim_reference": {
+        "has_reference": true
+      }
+    },
+    {
+      "id": 1,
+      "text": "[2] HackAnalyzer team. \"HackAnalyzer.\" Devpost. 2023. https://devpost.com/software/hackanalyzer",
+      "indices": {
+        "start": 395,
+        "end": 490
+      },
+      "citation_type": "webpage",
+      "citation_object": null,
+      "citation_exists": {
+        "status": "unknown",
+        "score": null,
+        "justification": "Not enough bibliographic information to verify a non-academic web page.",
+        "hallucination_label": null,
+        "hallucination_explanation": null
+      },
+      "ai_scan": null,
+      "claim_reference": {
+        "has_reference": true
+      }
+    },
+    {
+      "id": 2,
+      "text": "[3] IdeaForge AI. \"IdeaForge AI closes seed round.\" TechWire. 2026. https://example.invalid/ideaforge-ai-seed-round",
+      "indices": {
+        "start": 491,
+        "end": 606
+      },
+      "citation_type": "webpage",
+      "citation_object": null,
+      "citation_exists": {
+        "status": "fake",
+        "score": 0.97,
+        "justification": "No source with this title, publisher or URL could be found.",
+        "hallucination_label": "fabricated_source",
+        "hallucination_explanation": "The cited article and its domain do not exist."
+      },
+      "ai_scan": null,
+      "claim_reference": {
+        "has_reference": true
+      }
+    },
+    {
+      "id": 3,
+      "text": "[4] \"Show HN: PitchProbe.\" Hacker News. 2025. https://example.org/hn/40000001",
+      "indices": {
+        "start": 607,
+        "end": 684
+      },
+      "citation_type": "webpage",
+      "citation_object": null,
+      "citation_exists": {
+        "status": "exist_with_issues",
+        "score": 0.71,
+        "justification": "A matching page was found but the title differs.",
+        "hallucination_label": null,
+        "hallucination_explanation": null
+      },
+      "ai_scan": null,
+      "claim_reference": {
+        "has_reference": true
+      }
+    }
+  ],
+  "claims": [
+    {
+      "id": 0,
+      "text": "1. DevSpot already validates hackathon ideas against Devpost [1].",
+      "indices": {
+        "start": 0,
+        "end": 65
+      },
+      "claim_type": "cited",
+      "bibliographic_citation_ids": [
+        0
+      ],
+      "agree_with_citation": {
+        "stance": "support",
+        "justification": "The cited page describes checking hackathon ideas against Devpost projects."
+      },
+      "is_cited_in_bibliography": {
+        "is_cited": true,
+        "check_worthy": true,
+        "score": 0.9,
+        "justification": null
+      }
+    },
+    {
+      "id": 1,
+      "text": "2. HackAnalyzer scores the originality of a Devpost project with a keyword search [2].",
+      "indices": {
+        "start": 66,
+        "end": 152
+      },
+      "claim_type": "cited",
+      "bibliographic_citation_ids": [
+        1
+      ],
+      "agree_with_citation": {
+        "stance": "stance_unknown",
+        "justification": null
+      },
+      "is_cited_in_bibliography": {
+        "is_cited": true,
+        "check_worthy": true,
+        "score": 0.9,
+        "justification": null
+      }
+    },
+    {
+      "id": 2,
+      "text": "3. IdeaForge AI raised a seed round for an identical originality checker [3].",
+      "indices": {
+        "start": 153,
+        "end": 230
+      },
+      "claim_type": "cited",
+      "bibliographic_citation_ids": [
+        2
+      ],
+      "agree_with_citation": {
+        "stance": "stance_unknown",
+        "justification": null
+      },
+      "is_cited_in_bibliography": {
+        "is_cited": true,
+        "check_worthy": true,
+        "score": 0.9,
+        "justification": null
+      }
+    },
+    {
+      "id": 3,
+      "text": "4. PitchProbe already coaches founders toward more original ideas [4].",
+      "indices": {
+        "start": 231,
+        "end": 301
+      },
+      "claim_type": "cited",
+      "bibliographic_citation_ids": [
+        3
+      ],
+      "agree_with_citation": {
+        "stance": "partial contradict",
+        "justification": "The cited page describes pitch-deck wording review, not originality coaching."
+      },
+      "is_cited_in_bibliography": {
+        "is_cited": true,
+        "check_worthy": true,
+        "score": 0.9,
+        "justification": null
+      }
+    }
+  ],
+  "sources": [
+    {
+      "id": 0,
+      "claim_id": 0,
+      "citation_id": 0,
+      "url": "https://devpost.com/software/devspot",
+      "title": "DevSpot",
+      "authors": [],
+      "date": "2024",
+      "content": null,
+      "relevant_chunk": "DevSpot validates the uniqueness of your hackathon idea against Devpost.",
+      "stance": "support",
+      "justification": "The page states the project checks idea uniqueness against Devpost.",
+      "sourcerer_name": "web_search",
+      "citation_object": {
+        "title": "DevSpot",
+        "authors": [],
+        "publisher": "Devpost",
+        "publication_date": "2024",
+        "url": "https://devpost.com/software/devspot",
+        "doi": null,
+        "access_date": null
+      },
+      "citations": {
+        "apa": "DevSpot. (2024). Devpost. https://devpost.com/software/devspot",
+        "mla": null,
+        "chicago": null,
+        "ieee": null,
+        "bibtex": null
+      },
+      "citation_match": {
+        "citation_match": true,
+        "citation_does_not_match": false,
+        "confidence": 0.93,
+        "score": 0.93,
+        "llm_match_score": 0.95,
+        "title_match_score": 1.0,
+        "authors_match_score": null,
+        "publisher_match_score": 1.0,
+        "publication_date_match_score": 1.0,
+        "url_match_score": 1.0,
+        "doi_match_score": null,
+        "hallucination_label": null,
+        "hallucination_explanation": null,
+        "justification": "Title, publisher, year and URL match."
+      }
+    }
+  ]
+}

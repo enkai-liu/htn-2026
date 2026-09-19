@@ -1,0 +1,123 @@
+{
+  "_fixture": "synthetic, shaped like the documented GPTZero response",
+  "version": "2025-11-28-base",
+  "neatVersion": "3.14b",
+  "scanId": "00000000-5c4f-4000-8000-000000000002",
+  "meta": {
+    "pagesCount": 1
+  },
+  "documents": [
+    {
+      "predicted_class": "ai",
+      "confidence_category": "high",
+      "confidence_score": 0.97,
+      "class_probabilities": {
+        "human": 0.0041,
+        "ai": 0.9875,
+        "mixed": 0.0084
+      },
+      "subclass": {
+        "ai": {
+          "predicted_class": "pure_ai",
+          "confidence_category": "high",
+          "confidence_score": 0.91,
+          "class_probabilities": {
+            "pure_ai": 0.9644,
+            "ai_paraphrased": 0.0356
+          }
+        }
+      },
+      "document_classification": "AI_ONLY",
+      "result_message": "Our detector is highly confident that the text is written by AI.",
+      "result_sub_message": null,
+      "overall_burstiness": 0,
+      "language": "en",
+      "document_id": "00000000-d0c5-4000-8000-000000000002",
+      "pageNumber": 0,
+      "confidence_thresholds_raw": {
+        "confidence_thresholds": {
+          "ai": {
+            "reject": 0.33,
+            "low": 0.6,
+            "medium": 0.8
+          },
+          "human": {
+            "reject": 0.33,
+            "low": 0.6,
+            "medium": 0.8
+          },
+          "mixed": {
+            "reject": 0.33,
+            "low": 0.6,
+            "medium": 0.8
+          }
+        }
+      },
+      "excluded_spans": [],
+      "paragraphs": [
+        {
+          "start_sentence_index": 0,
+          "num_sentences": 4
+        }
+      ],
+      "sentences": [
+        {
+          "sentence": "In today's fast-paced digital landscape, students face unprecedented challenges in managing their academic workload.",
+          "generated_prob": 0.9712,
+          "perplexity": 7,
+          "highlight_sentence_for_ai": true,
+          "class_probabilities": {
+            "human": 0.0213,
+            "ai": 0.9712,
+            "paraphrased": 0.0075
+          },
+          "should_mask": false,
+          "masking_reason": null,
+          "special_highlight_type": null
+        },
+        {
+          "sentence": "Our innovative platform leverages cutting-edge artificial intelligence to revolutionize the way learners engage with course material.",
+          "generated_prob": 0.9712,
+          "perplexity": 7,
+          "highlight_sentence_for_ai": true,
+          "class_probabilities": {
+            "human": 0.0213,
+            "ai": 0.9712,
+            "paraphrased": 0.0075
+          },
+          "should_mask": false,
+          "masking_reason": null,
+          "special_highlight_type": null
+        },
+        {
+          "sentence": "By seamlessly integrating personalized study plans, real-time feedback, and adaptive quizzes, we empower users to unlock their full potential.",
+          "generated_prob": 0.9712,
+          "perplexity": 7,
+          "highlight_sentence_for_ai": true,
+          "class_probabilities": {
+            "human": 0.0213,
+            "ai": 0.9712,
+            "paraphrased": 0.0075
+          },
+          "should_mask": false,
+          "masking_reason": null,
+          "special_highlight_type": null
+        },
+        {
+          "sentence": "Ultimately, our solution not only enhances productivity but also fosters a lifelong love of learning.",
+          "generated_prob": 0.9712,
+          "perplexity": 7,
+          "highlight_sentence_for_ai": true,
+          "class_probabilities": {
+            "human": 0.0213,
+            "ai": 0.9712,
+            "paraphrased": 0.0075
+          },
+          "should_mask": false,
+          "masking_reason": null,
+          "special_highlight_type": null
+        }
+      ]
+    }
+  ]
+}

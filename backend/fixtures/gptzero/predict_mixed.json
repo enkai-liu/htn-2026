@@ -1,0 +1,148 @@
+{
+  "_fixture": "synthetic, shaped like the documented GPTZero response",
+  "version": "2025-11-28-base",
+  "neatVersion": "3.14b",
+  "scanId": "00000000-5c4f-4000-8000-000000000003",
+  "meta": {
+    "pagesCount": 1
+  },
+  "documents": [
+    {
+      "predicted_class": "mixed",
+      "confidence_category": "high",
+      "confidence_score": 0.9,
+      "class_probabilities": {
+        "human": 0.0214,
+        "ai": 0.0368,
+        "mixed": 0.9418
+      },
+      "subclass": {
+        "mixed": {
+          "predicted_class": "concatenated",
+          "confidence_category": "high",
+          "confidence_score": 0.88,
+          "class_probabilities": {
+            "concatenated": 0.9312,
+            "polished": 0.0688
+          }
+        }
+      },
+      "document_classification": "MIXED",
+      "result_message": "Our detector is highly confident that the text may include parts written by AI.",
+      "result_sub_message": null,
+      "overall_burstiness": 0,
+      "language": "en",
+      "document_id": "00000000-d0c5-4000-8000-000000000003",
+      "pageNumber": 0,
+      "confidence_thresholds_raw": {
+        "confidence_thresholds": {
+          "ai": {
+            "reject": 0.33,
+            "low": 0.6,
+            "medium": 0.8
+          },
+          "human": {
+            "reject": 0.33,
+            "low": 0.6,
+            "medium": 0.8
+          },
+          "mixed": {
+            "reject": 0.33,
+            "low": 0.6,
+            "medium": 0.8
+          }
+        }
+      },
+      "excluded_spans": [
+        {
+          "start": 463,
+          "end": 540,
+          "text": "[1] City of Waterloo. \"Open Data Portal.\" 2026. https://example.org/open-data",
+          "reason": "references"
+        }
+      ],
+      "paragraphs": [
+        {
+          "start_sentence_index": 0,
+          "num_sentences": 2
+        },
+        {
+          "start_sentence_index": 2,
+          "num_sentences": 3
+        }
+      ],
+      "sentences": [
+        {
+          "sentence": "Climate anxiety is a growing concern among young people, affecting their mental health and overall well-being.",
+          "generated_prob": 0.9712,
+          "perplexity": 7,
+          "highlight_sentence_for_ai": true,
+          "class_probabilities": {
+            "human": 0.0213,
+            "ai": 0.9712,
+            "paraphrased": 0.0075
+          },
+          "should_mask": false,
+          "masking_reason": null,
+          "special_highlight_type": null
+        },
+        {
+          "sentence": "Our application provides a comprehensive, user-friendly solution that empowers individuals to take meaningful action.",
+          "generated_prob": 0.9712,
+          "perplexity": 7,
+          "highlight_sentence_for_ai": true,
+          "class_probabilities": {
+            "human": 0.0213,
+            "ai": 0.9712,
+            "paraphrased": 0.0075
+          },
+          "should_mask": false,
+          "masking_reason": null,
+          "special_highlight_type": null
+        },
+        {
+          "sentence": "ok so the actual story: my roommate kept doomscrolling wildfire maps and we wanted to give her one small thing to do each day.",
+          "generated_prob": 0.0331,
+          "perplexity": 96,
+          "highlight_sentence_for_ai": false,
+          "class_probabilities": {
+            "human": 0.9584,
+            "ai": 0.0331,
+            "paraphrased": 0.0085
+          },
+          "should_mask": false,
+          "masking_reason": null,
+          "special_highlight_type": null
+        },
+        {
+          "sentence": "We scraped the city's open data portal for volunteer shifts and text you exactly one, no feed, no streaks.",
+          "generated_prob": 0.0331,
+          "perplexity": 96,
+          "highlight_sentence_for_ai": false,
+          "class_probabilities": {
+            "human": 0.9584,
+            "ai": 0.0331,
+            "paraphrased": 0.0085
+          },
+          "should_mask": false,
+          "masking_reason": null,
+          "special_highlight_type": null
+        },
+        {
+          "sentence": "[1] City of Waterloo. \"Open Data Portal.\" 2026. https://example.org/open-data",
+          "generated_prob": 0.9712,
+          "perplexity": 7,
+          "highlight_sentence_for_ai": true,
+          "class_probabilities": {
+            "human": 0.0213,
+            "ai": 0.9712,
+            "paraphrased": 0.0075
+          },
+          "should_mask": true,
+          "masking_reason": "references",
+          "special_highlight_type": null
+        }
+      ]
+    }
+  ]
+}

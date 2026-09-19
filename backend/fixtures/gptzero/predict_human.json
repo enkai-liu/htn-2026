@@ -1,0 +1,112 @@
+{
+  "_fixture": "synthetic, shaped like the documented GPTZero response",
+  "version": "2025-11-28-base",
+  "neatVersion": "3.14b",
+  "scanId": "00000000-5c4f-4000-8000-000000000001",
+  "meta": {
+    "pagesCount": 1
+  },
+  "documents": [
+    {
+      "predicted_class": "human",
+      "confidence_category": "high",
+      "confidence_score": 0.94,
+      "class_probabilities": {
+        "human": 0.9731,
+        "ai": 0.0102,
+        "mixed": 0.0167
+      },
+      "document_classification": "HUMAN_ONLY",
+      "result_message": "Our detector is highly confident that the text is written entirely by a human.",
+      "result_sub_message": null,
+      "overall_burstiness": 0,
+      "language": "en",
+      "document_id": "00000000-d0c5-4000-8000-000000000001",
+      "pageNumber": 0,
+      "confidence_thresholds_raw": {
+        "confidence_thresholds": {
+          "ai": {
+            "reject": 0.33,
+            "low": 0.6,
+            "medium": 0.8
+          },
+          "human": {
+            "reject": 0.33,
+            "low": 0.6,
+            "medium": 0.8
+          },
+          "mixed": {
+            "reject": 0.33,
+            "low": 0.6,
+            "medium": 0.8
+          }
+        }
+      },
+      "excluded_spans": [],
+      "paragraphs": [
+        {
+          "start_sentence_index": 0,
+          "num_sentences": 4
+        }
+      ],
+      "sentences": [
+        {
+          "sentence": "We built this at 3am after the projector in our lecture hall died for the third time that week.",
+          "generated_prob": 0.0331,
+          "perplexity": 96,
+          "highlight_sentence_for_ai": false,
+          "class_probabilities": {
+            "human": 0.9584,
+            "ai": 0.0331,
+            "paraphrased": 0.0085
+          },
+          "should_mask": false,
+          "masking_reason": null,
+          "special_highlight_type": null
+        },
+        {
+          "sentence": "It is held together with a Raspberry Pi, two zip ties and a servo we pulled out of an old RC car.",
+          "generated_prob": 0.0331,
+          "perplexity": 96,
+          "highlight_sentence_for_ai": false,
+          "class_probabilities": {
+            "human": 0.9584,
+            "ai": 0.0331,
+            "paraphrased": 0.0085
+          },
+          "should_mask": false,
+          "masking_reason": null,
+          "special_highlight_type": null
+        },
+        {
+          "sentence": "The hardest part was the hinge: our first two prints snapped, so the final one is mostly epoxy.",
+          "generated_prob": 0.0331,
+          "perplexity": 96,
+          "highlight_sentence_for_ai": false,
+          "class_probabilities": {
+            "human": 0.9584,
+            "ai": 0.0331,
+            "paraphrased": 0.0085
+          },
+          "should_mask": false,
+          "masking_reason": null,
+          "special_highlight_type": null
+        },
+        {
+          "sentence": "Honestly it squeaks, but it works, and the janitor asked us if he could keep it.",
+          "generated_prob": 0.0331,
+          "perplexity": 96,
+          "highlight_sentence_for_ai": false,
+          "class_probabilities": {
+            "human": 0.9584,
+            "ai": 0.0331,
+            "paraphrased": 0.0085
+          },
+          "should_mask": false,
+          "masking_reason": null,
+          "special_highlight_type": null
+        }
+      ]
+    }
+  ]
+}
