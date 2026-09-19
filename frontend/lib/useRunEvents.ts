@@ -10,7 +10,7 @@ import { connectRunEvents, type SseConnection } from "./sse";
 import type { AgentEvent } from "./types";
 
 export type Transport = "replay" | "live";
-export type RunStatus = "loading" | "replaying" | "paused" | "connecting" | "live" | "reconnecting" | "finished" | "error";
+export type RunStatus = "loading" | "replaying" | "paused" | "connecting" | "live" | "reconnecting" | "finished" | "failed" | "error";
 
 export interface RunControls {
   play: () => void;
@@ -136,6 +136,8 @@ export function useRunEvents(runId: string, opts: RunEventsOptions = {}): RunEve
     else if (snapshot.done) status = "finished";
     else status = snapshot.playing ? "replaying" : "paused";
   } else if (state.finished) status = "finished";
+  // the backend only emits a non-recoverable error when the run has ended without a report
+  else if (state.errors.some((e) => !e.recoverable)) status = "failed";
   else if (conn === "open") status = "live";
   else if (conn === "reconnecting") status = "reconnecting";
   else status = "connecting";

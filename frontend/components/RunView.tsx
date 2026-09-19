@@ -53,6 +53,7 @@ const STATUS_PILL: Record<RunStatus, { label: string; color: string; pulse?: boo
   replaying: { label: "Replay", color: "var(--color-amber)", pulse: true },
   paused: { label: "Replay · paused", color: "var(--color-amber)" },
   finished: { label: "Finished", color: "var(--color-teal)" },
+  failed: { label: "Run failed", color: "var(--color-vermilion)" },
   error: { label: "Offline", color: "var(--color-vermilion)" },
 };
 

@@ -17,6 +17,8 @@ GET  /api/health
 - Each SSE message is `id: <seq>`, `event: <type>`, `data: <AgentEvent JSON>`. `Last-Event-ID` resumes a dropped stream.
 - Every run is appended to `backend/runs/{run_id}.jsonl`, one AgentEvent per line. **That file is the replay format**, so any real run can become a golden demo run (`scripts/record_golden.py`).
 - `run_id = "mock"` always works with no API keys: it replays `backend/fixtures/mock_run.jsonl`.
+- **Browser trap:** our event type `error` has the same name as `EventSource`'s own error event, so a server message `event: error` also invokes `es.onerror`. A connection failure is a plain `Event`; a server message carries `data`. Tell them apart (`isServerMessage` in `frontend/lib/sse.ts`) or every recoverable degradation is counted as a dropped connection.
+- Observed in Chrome and in the Claude desktop Browser pane: a run page loaded while its tab is hidden (`document.visibilityState === "hidden"`, no animation frames) sits on the server-rendered "Connecting" pill and never opens the stream; the moment the tab is shown it hydrates, connects and receives the full backlog. When debugging "stuck on Connecting", check tab visibility before the code.
 
 ## Envelope
 

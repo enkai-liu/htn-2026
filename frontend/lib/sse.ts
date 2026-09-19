@@ -24,6 +24,11 @@ export interface SseConnection { close: () => void }
 const MAX_FAILURES_BEFORE_OPEN = 3;
 const MAX_FAILURES_AFTER_OPEN = 8;
 
+/** True for a message the server sent (it carries `data`), false for the browser's own connection-error Event. */
+export function isServerMessage(e: Event): boolean {
+  return typeof (e as MessageEvent).data === "string";
+}
+
 export function runEventsUrl(runId: string, speed?: number | null): string {
   const qs = speed != null ? `?speed=${encodeURIComponent(String(speed))}` : "";
   return `${API_BASE}/api/runs/${encodeURIComponent(runId)}/events${qs}`;
@@ -66,8 +71,11 @@ export function connectRunEvents(runId: string, handlers: SseHandlers, opts: { s
   es.onmessage = deliver;
   for (const type of EVENT_TYPES) es.addEventListener(type, deliver as EventListener);
 
-  es.onerror = () => {
+  es.onerror = (e) => {
     if (closed) return;
+    // Our AgentEvent type `error` shares its name with EventSource's own error event, so a server message named
+    // `error` is dispatched here as well as to its listener. Only a plain Event is a connection failure.
+    if (isServerMessage(e)) return;
     if (handlers.isFinished?.()) { close(); return; } // server closed the stream after run.finished
     failures += 1;
     const limit = everOpened ? MAX_FAILURES_AFTER_OPEN : MAX_FAILURES_BEFORE_OPEN;
