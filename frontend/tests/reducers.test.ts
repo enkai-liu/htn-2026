@@ -124,6 +124,16 @@ describe("runReducer on the mock run", () => {
     expect(s.lastSeq).toBe(1);
     expect(runReducer(s, { nonsense: true } as unknown as AgentEvent)).toBe(s);
   });
+
+  it("shows recoverable errors as amber degradations and keeps red for fatal ones", () => {
+    const err = (seq: number, recoverable: boolean) =>
+      ({ seq, run_id: "x", ts: seq, agent: "verifier", phase: "verify", type: "error", data: { message: `e${seq}`, recoverable } }) as AgentEvent;
+    const s = foldEvents([err(1, true), err(2, false)]);
+    const [soft, fatal] = s.timeline.filter((r) => r.type === "error");
+    expect([soft.tone, soft.tag, soft.emphasis]).toEqual(["warn", "degraded", undefined]);
+    expect([fatal.tone, fatal.tag, fatal.emphasis]).toEqual(["danger", "error", "failure"]);
+    expect(s.errors.map((e) => e.recoverable)).toEqual([true, false]);
+  });
 });
 
 describe("selectors", () => {

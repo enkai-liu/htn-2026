@@ -756,7 +756,10 @@ function fold(state: RunState, ev: AgentEvent, t: number): RunState {
     case "error": {
       const data = d as ErrorData;
       set({ errors: [...next.errors, { seq: ev.seq, t, message: data.message ?? "unknown error", recoverable: data.recoverable !== false }] });
-      row({ title: data.message ?? "error", tag: data.recoverable === false ? "error" : "recoverable error", tone: "danger", emphasis: "failure" });
+      // Recoverable = a designed degradation (a layer timed out, a juror dropped): the run carries on and confidence
+      // accounts for it, so it reads as amber like other degradations. Red is kept for errors that end the run.
+      if (data.recoverable === false) row({ title: data.message ?? "error", tag: "error", tone: "danger", emphasis: "failure" });
+      else row({ title: data.message ?? "degraded", tag: "degraded", tone: "warn" });
       touch(ev.agent);
       break;
     }
