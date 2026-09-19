@@ -64,8 +64,11 @@ export function useRunEvents(runId: string, opts: RunEventsOptions = {}): RunEve
   const [liveEpoch, setLiveEpoch] = useState(0);
 
   const controllerRef = useRef<ReplayController | null>(null);
-  const finishedRef = useRef(false);
-  useEffect(() => { finishedRef.current = state.finished; }, [state.finished]);
+  // Terminal = the server has said its last word (a report, or a non-recoverable error). The backend closes the
+  // stream when it evicts the run, and that close is then the normal end rather than a dropped connection.
+  const failed = state.errors.some((e) => !e.recoverable);
+  const terminalRef = useRef(false);
+  useEffect(() => { terminalRef.current = state.finished || failed; }, [state.finished, failed]);
 
   // --- static replay -------------------------------------------------------------------------------------------
   useEffect(() => {
@@ -105,7 +108,7 @@ export function useRunEvents(runId: string, opts: RunEventsOptions = {}): RunEve
       onEvent: (ev) => dispatch({ type: "events", events: [ev] }),
       onState: (s) => setConn(s),
       onFatal: (message) => { setConn("error"); setError(message); },
-      isFinished: () => finishedRef.current,
+      isFinished: () => terminalRef.current,
     }, { speed: explicitSpeed ? initialSpeed : null });
     return () => connection.close();
     // liveEpoch is a manual "reconnect now" trigger (resync); speed is fixed for the lifetime of the hook
@@ -137,7 +140,7 @@ export function useRunEvents(runId: string, opts: RunEventsOptions = {}): RunEve
     else status = snapshot.playing ? "replaying" : "paused";
   } else if (state.finished) status = "finished";
   // the backend only emits a non-recoverable error when the run has ended without a report
-  else if (state.errors.some((e) => !e.recoverable)) status = "failed";
+  else if (failed) status = "failed";
   else if (conn === "open") status = "live";
   else if (conn === "reconnecting") status = "reconnecting";
   else status = "connecting";

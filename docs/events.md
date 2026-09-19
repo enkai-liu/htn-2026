@@ -5,7 +5,7 @@ The one interface every lane builds against. Source of truth: `backend/app/schem
 ## Transport
 
 ```
-POST /api/runs                 {idea_text, url?}           -> {run_id}
+POST /api/runs                 {idea_text, url?}           -> {run_id}   (429 while MAX_LIVE_RUNS are executing)
 GET  /api/runs/{run_id}/events  text/event-stream           one AgentEvent per SSE message
 GET  /api/runs/{run_id}         final Report JSON (404 until run.finished)
 POST /api/runs/{run_id}/mutations/{mid}/rescore             -> emits mutation.scored + graph.patch
@@ -16,6 +16,7 @@ GET  /api/health
 
 - Each SSE message is `id: <seq>`, `event: <type>`, `data: <AgentEvent JSON>`. `Last-Event-ID` resumes a dropped stream.
 - Every run is appended to `backend/runs/{run_id}.jsonl`, one AgentEvent per line. **That file is the replay format**, so any real run can become a golden demo run (`scripts/record_golden.py`).
+- A run stays live for `RUN_RETENTION_S` after it ends (re-scores and actions keep streaming to the same client), then the server closes its stream and forgets it. From then on `/api/runs/{id}/events` and `/api/runs/{id}` serve the JSONL as a recording; `rescore` and `actions` answer 409. Clients treat end-of-stream after `run.finished` or a non-recoverable `error` as the normal end, not a dropped connection.
 - `run_id = "mock"` always works with no API keys: it replays `backend/fixtures/mock_run.jsonl`.
 - **Browser trap:** our event type `error` has the same name as `EventSource`'s own error event, so a server message `event: error` also invokes `es.onerror`. A connection failure is a plain `Event`; a server message carries `data`. Tell them apart (`isServerMessage` in `frontend/lib/sse.ts`) or every recoverable degradation is counted as a dropped connection.
 - Observed in Chrome and in the Claude desktop Browser pane: a run page loaded while its tab is hidden (`document.visibilityState === "hidden"`, no animation frames) sits on the server-rendered "Connecting" pill and never opens the stream; the moment the tab is shown it hydrates, connects and receives the full backlog. When debugging "stuck on Connecting", check tab visibility before the code.

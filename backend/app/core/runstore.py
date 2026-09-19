@@ -1,4 +1,9 @@
-"""In-memory registry of live runs. Each run owns a bus, a blackboard, a budget and a host."""
+"""In-memory registry of live runs. Each run owns a bus, a blackboard, a budget and a host.
+
+A run is admitted only while fewer than `max_live_runs` are executing. After it ends it stays for `run_retention_s`
+(re-scores, actions and late SSE clients keep working), then the bus is closed and the entry dropped; from then on
+the API serves it from `backend/runs/{run_id}.jsonl` like any recording.
+"""
 from __future__ import annotations
 
 import asyncio
@@ -26,6 +31,15 @@ class Run:
     task: asyncio.Task | None = None
     report: Report | None = None
     created: float = field(default_factory=time.time)
+    evict: asyncio.TimerHandle | None = None
+
+    @property
+    def active(self) -> bool:
+        return self.task is not None and not self.task.done()
+
+
+class RunLimitExceeded(RuntimeError):
+    pass
 
 
 _RUNS: dict[str, Run] = {}
@@ -33,6 +47,10 @@ _RUNS: dict[str, Run] = {}
 
 def get_run(run_id: str) -> Run | None:
     return _RUNS.get(run_id)
+
+
+def live_runs() -> list[Run]:
+    return [r for r in _RUNS.values() if r.active]
 
 
 def _make_host(run_id: str, bus: EventBus, board: Blackboard, budget: Budget) -> tuple[Any, str | None]:
@@ -53,6 +71,8 @@ def create_run(idea_text: str, url: str | None = None) -> Run:
     import app.roles  # noqa: F401  (registers role factories)
 
     s = get_settings()
+    if len(live_runs()) >= s.max_live_runs:
+        raise RunLimitExceeded(f"{s.max_live_runs} runs are already in progress; try again in a minute")
     run_id = "r" + uuid.uuid4().hex[:8]
     bus = EventBus(run_id)
     board = Blackboard(idea_text, url)
@@ -62,6 +82,16 @@ def create_run(idea_text: str, url: str | None = None) -> Run:
     _RUNS[run_id] = run
     run.task = asyncio.create_task(_drive(run, warning))
     return run
+
+
+async def evict(run_id: str) -> None:
+    """Close the bus (SSE clients see end-of-stream) and forget the run. Its JSONL on disk remains the replay."""
+    run = _RUNS.pop(run_id, None)
+    if run is None:
+        return
+    if run.evict is not None:
+        run.evict.cancel()
+    await run.bus.close()
 
 
 async def _drive(run: Run, warning: str | None) -> None:
@@ -80,4 +110,8 @@ async def _drive(run: Run, warning: str | None) -> None:
             await bus.emit("conductor", "done", "error", {"message": payload.get("message") or "run ended without a report", "recoverable": False})
     except Exception as exc:
         await bus.emit("conductor", "done", "error", {"message": f"{type(exc).__name__}: {exc}", "recoverable": False})
-    # The bus stays open after run.finished so re-scores and actions can keep streaming to the same client.
+    finally:
+        # The bus stays open for the retention window so re-scores and actions keep streaming to the same client.
+        # A TimerHandle (not a Task) so nothing is left pending if the loop shuts down first.
+        loop = asyncio.get_running_loop()
+        run.evict = loop.call_later(get_settings().run_retention_s, lambda: loop.create_task(evict(run.run_id)))

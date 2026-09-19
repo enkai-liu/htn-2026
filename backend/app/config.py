@@ -55,12 +55,16 @@ class Settings(BaseSettings):
     # App
     orchestrator: Literal["asyncio", "jiuwen"] = "asyncio"
     backend_port: int = 8000
-    cors_origins: str = "http://localhost:3000"
 
     # Per-run budget (the conductor degrades visibly when exceeded)
     budget_max_calls: int = 70
     budget_max_tokens: int = 150_000
     budget_max_seconds: float = 90.0
+
+    # Live-run admission: POST /api/runs is 429 while this many runs are still executing, and a finished run stays
+    # in memory (re-scores, actions, late SSE clients) for this long before it is evicted and served from its JSONL.
+    max_live_runs: int = 4
+    run_retention_s: float = 600.0
 
     @property
     def has_elastic(self) -> bool:

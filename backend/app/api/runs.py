@@ -46,7 +46,10 @@ async def _stream_recorded(path: Path, speed: float, after: int) -> AsyncIterato
 
 @router.post("/runs")
 async def create_run(req: RunRequest) -> dict:
-    run = runstore.create_run(req.idea_text.strip(), req.url)
+    try:
+        run = runstore.create_run(req.idea_text.strip(), req.url)
+    except runstore.RunLimitExceeded as exc:
+        raise HTTPException(429, str(exc)) from exc
     return {"run_id": run.run_id}
 
 

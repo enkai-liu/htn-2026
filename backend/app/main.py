@@ -1,14 +1,26 @@
 from __future__ import annotations
 
 import json
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import runs
 from app.config import REPO_ROOT, get_settings
+from app.search.es import close_async_es
+from app.sources.http import close_client
 
-app = FastAPI(title="Whitespace", version="0.1.0")
+
+@asynccontextmanager
+async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    yield
+    await close_async_es()  # the cached AsyncElasticsearch and the live-source httpx pool own sockets; nothing else closes them
+    await close_client()
+
+
+app = FastAPI(title="Whitespace", version="0.1.0", lifespan=lifespan)
 # Demo API with no cookies or auth: open CORS keeps the replay site and localhost both working.
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"], expose_headers=["*"])
 app.include_router(runs.router)
