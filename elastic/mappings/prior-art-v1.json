@@ -1,0 +1,62 @@
+{
+  "settings": {
+    "index": {
+      "default_pipeline": "{{PIPELINE}}",
+      "refresh_interval": "30s"
+    }
+  },
+  "mappings": {
+    "dynamic": "strict",
+    "_meta": {
+      "owner": "whitespace",
+      "note": "pitch = title + tagline + 'What it does' (<=1500 chars, built client-side). It feeds BM25, the reranker, significant_text and (copied into semantic_pitch) the Jina embedding. Rendered by elastic/apply.py: inference id comes from settings, never hardcode it here."
+    },
+    "properties": {
+      "rid": { "type": "keyword" },
+      "source": { "type": "keyword" },
+      "url": { "type": "keyword" },
+      "title": { "type": "text", "fields": { "kw": { "type": "keyword", "ignore_above": 256 } } },
+      "tagline": { "type": "text" },
+      "description": { "type": "text", "analyzer": "english" },
+      "pitch": { "type": "text", "analyzer": "english" },
+      "semantic_pitch": {
+        "type": "semantic_text",
+        "inference_id": "{{EMBED_ID}}",
+        "chunking_settings": { "strategy": "sentence", "max_chunk_size": 250, "sentence_overlap": 1 }
+      },
+      "has_semantic": { "type": "boolean" },
+      "sections": { "type": "object", "enabled": false },
+      "year": { "type": "short" },
+      "date": { "type": "date" },
+      "date_precision": { "type": "keyword" },
+      "hackathon": { "type": "keyword" },
+      "hackathon_id": { "type": "keyword" },
+      "tags": { "type": "keyword" },
+      "tech": { "type": "keyword" },
+      "links": { "type": "keyword" },
+      "is_winner": { "type": "boolean" },
+      "prize": { "type": "text" },
+      "status": { "type": "keyword" },
+      "traction": { "type": "flattened" },
+      "field_provenance": { "type": "flattened" },
+      "lang": { "type": "keyword" },
+      "dedupe_key": { "type": "keyword" },
+      "quality_flags": { "type": "keyword" },
+      "gptzero": {
+        "properties": {
+          "predicted_class": { "type": "keyword" },
+          "confidence_category": { "type": "keyword" },
+          "subclass": { "type": "keyword" },
+          "ai_sentence_share": { "type": "float" },
+          "result_message": { "type": "text" },
+          "model_version": { "type": "keyword" },
+          "scanned_at": { "type": "date" }
+        }
+      },
+      "nn_sim": { "type": "float" },
+      "first_seen_at": { "type": "date" },
+      "ingested_at": { "type": "date" },
+      "ingest_error": { "type": "text" }
+    }
+  }
+}

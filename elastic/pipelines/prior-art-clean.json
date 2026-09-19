@@ -1,0 +1,56 @@
+{
+  "description": "Whitespace: clean messy scraped write-ups. html_strip -> trim -> normalised title(+tagline) fingerprint (dedupe_key) -> lang_ident_model_1 (falls back to the client's guess, then 'und') -> quality_flags -> ingested_at. Any processor failure reroutes the document to the quarantine index with ingest_error.",
+  "processors": [
+    { "html_strip": { "field": "description", "ignore_missing": true } },
+    { "html_strip": { "field": "pitch", "ignore_missing": true } },
+    { "html_strip": { "field": "semantic_pitch", "ignore_missing": true } },
+    { "html_strip": { "field": "tagline", "ignore_missing": true } },
+    { "trim": { "field": "title", "ignore_missing": true } },
+    { "trim": { "field": "pitch", "ignore_missing": true } },
+
+    { "set": { "field": "tmp_title_norm", "value": "{{{title}}}" } },
+    { "lowercase": { "field": "tmp_title_norm" } },
+    { "gsub": { "field": "tmp_title_norm", "pattern": "[^a-z0-9]+", "replacement": "" } },
+    { "set": { "field": "tmp_tagline_norm", "value": "{{{tagline}}}", "if": "ctx.tagline != null" } },
+    { "lowercase": { "field": "tmp_tagline_norm", "ignore_missing": true } },
+    { "gsub": { "field": "tmp_tagline_norm", "pattern": "[^a-z0-9]+", "replacement": "", "ignore_missing": true } },
+    {
+      "fingerprint": {
+        "fields": ["tmp_title_norm", "tmp_tagline_norm"],
+        "target_field": "dedupe_key",
+        "method": "SHA-1",
+        "ignore_missing": true
+      }
+    },
+    { "remove": { "field": ["tmp_title_norm", "tmp_tagline_norm"], "ignore_missing": true } },
+
+    {
+      "inference": {
+        "tag": "lang_ident",
+        "model_id": "lang_ident_model_1",
+        "target_field": "tmp_lang",
+        "field_map": { "pitch": "text" },
+        "inference_config": { "classification": { "num_top_classes": 1 } },
+        "if": "ctx.pitch != null && ctx.pitch.length() >= 40",
+        "on_failure": [
+          { "set": { "field": "lang", "value": "und", "override": false } }
+        ]
+      }
+    },
+    {
+      "script": {
+        "tag": "lang_and_quality_flags",
+        "description": "Trust lang_ident only when it is confident; otherwise keep the client's guess. Then derive quality flags (idempotent on re-index). too_short = pitch < 250 chars; YC one-liners are legitimately short (25% are < 250 chars), so for source=yc the bar is 60 chars.",
+        "source": "if (ctx.tmp_lang != null && ctx.tmp_lang.predicted_value != null) { def p = ctx.tmp_lang.prediction_probability; if (p == null || p >= 0.5) { ctx.lang = ctx.tmp_lang.predicted_value; } } if (ctx.lang == null) { ctx.lang = 'und'; } if (ctx.quality_flags == null) { ctx.quality_flags = new ArrayList(); } else if (!(ctx.quality_flags instanceof List)) { def one = ctx.quality_flags; ctx.quality_flags = new ArrayList(); ctx.quality_flags.add(one); } int n = ctx.pitch == null ? 0 : ctx.pitch.length(); int minLen = 'yc'.equals(ctx.source) ? 60 : 250; if (n < minLen && !ctx.quality_flags.contains('too_short')) { ctx.quality_flags.add('too_short'); } if (ctx.lang != 'en' && ctx.lang != 'und' && !ctx.quality_flags.contains('non_english')) { ctx.quality_flags.add('non_english'); }"
+      }
+    },
+    { "remove": { "field": "tmp_lang", "ignore_missing": true } },
+    { "set": { "field": "ingested_at", "value": "{{{_ingest.timestamp}}}" } }
+  ],
+  "on_failure": [
+    { "set": { "field": "_index", "value": "{{QUARANTINE_INDEX}}" } },
+    { "set": { "field": "ingest_error", "value": "{{{_ingest.on_failure_processor_type}}}[{{{_ingest.on_failure_processor_tag}}}]: {{{_ingest.on_failure_message}}}" } },
+    { "remove": { "field": ["semantic_pitch", "tmp_lang", "tmp_title_norm", "tmp_tagline_norm"], "ignore_missing": true } },
+    { "set": { "field": "quarantined_by", "value": "pipeline" } }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "id": "originality.cliche_tags",
+  "type": "esql",
+  "description": "Which themes/industries dominate the projects that match some keywords? Expands the multi-valued `tags` field (hackathon themes for Devpost projects, industries for YC companies) of every project whose pitch matches ANY of the keywords and returns the 15 most common tags with counts. Use it to describe what the typical project in this space looks like. For the technology stack use originality.cliche_tech instead.",
+  "tags": ["whitespace", "originality", "analytics"],
+  "configuration": {
+    "query": "FROM {{INDEX}} | WHERE MATCH(pitch, ?keywords) | MV_EXPAND tags | STATS n = COUNT(*) BY tags | SORT n DESC | LIMIT 15",
+    "params": {
+      "keywords": { "type": "{{STRING_PARAM_TYPE}}", "description": "Keywords describing the idea space, space separated (any may match)." }
+    }
+  }
+}

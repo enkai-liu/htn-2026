@@ -89,7 +89,7 @@ class Mutator(BaseRole):
             ents = board.top_entities(10)
             sims, calibrated = await rerank(mu.pitch, [e.summary for e in ents])
         before = board.scores.crowding.score if (board.scores and board.scores.crowding.score is not None) else None
-        after = axes.crowding(sims, calibrated=calibrated).score
+        after = axes.crowding(sims, axes.corpus_percentile(), calibrated=calibrated).score
         mu.axes = {"crowding": after} if after is not None else None
         mu.delta = round(after - before, 1) if (after is not None and before is not None) else None
         board.put("mutations", self.id, mu.mid, mu)
@@ -100,10 +100,14 @@ class Mutator(BaseRole):
         if not get_settings().has_elastic:
             return []
         try:
-            from app.search import whitespace
+            from app.schemas import TermStat
+            from app.search.whitespace import find_whitespace
 
-            return list(await whitespace.find(ctx.board.facets.purpose))
-        except Exception:
+            found = await find_whitespace(ctx.board.facets.purpose)
+            rows = sorted(found.get("tech", []) + found.get("tags", []), key=lambda c: -c["global_count"])
+            return [TermStat(term=c["term"], global_count=c["global_count"], neighbourhood_count=c["neighbourhood_count"]) for c in rows[:20]]
+        except Exception as exc:
+            await ctx.emit("error", {"message": f"whitespace finder unavailable: {type(exc).__name__}: {exc}"[:200], "recoverable": True})
             return []
 
 

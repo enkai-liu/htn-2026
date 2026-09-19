@@ -63,7 +63,7 @@ class Actuator(BaseRole):
         text = board.idea_text[:1500]
         doc = {"rid": f"idea:{ctx.run_id}", "source": "web", "url": f"whitespace://runs/{ctx.run_id}", "title": board.facets.purpose[:120],
                "description": board.idea_text, "pitch": text, "semantic_pitch": text, "year": now.year, "date": now.date().isoformat(),
-               "date_precision": "day", "tags": ["whitespace-user-idea"], "status": "unknown", "first_seen_at": now.isoformat()}
+               "date_precision": "day", "tags": ["whitespace-user-idea"], "status": "unknown", "has_semantic": True, "first_seen_at": now.isoformat()}
         await get_async_es().index(index=s.es_index, id=doc["rid"], document=doc)
         return "Idea written back to the corpus; the next person with this idea will find it."
 

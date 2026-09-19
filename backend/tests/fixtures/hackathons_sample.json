@@ -1,0 +1,122 @@
+[
+ {
+  "id": 20679,
+  "title": "HackPSU Spring 2024",
+  "displayed_location": {
+   "icon": "map-marker-alt",
+   "location": "Business Building"
+  },
+  "open_state": "ended",
+  "url": "https://hackpsu-spring-2024.devpost.com/",
+  "submission_period_dates": "Mar 16 - 17, 2024",
+  "themes": [
+   {
+    "id": 23,
+    "name": "Beginner Friendly"
+   },
+   {
+    "id": 19,
+    "name": "Education"
+   },
+   {
+    "id": 22,
+    "name": "Open Ended"
+   }
+  ],
+  "prize_amount": "$<span data-currency-value>1,750</span>",
+  "registrations_count": 148,
+  "organization_name": "HackPSU",
+  "winners_announced": true,
+  "submission_gallery_url": "https://hackpsu-spring-2024.devpost.com/project-gallery"
+ },
+ {
+  "id": 22272,
+  "title": "Google Chrome Built-in AI Challenge",
+  "displayed_location": {
+   "icon": "globe",
+   "location": "Online"
+  },
+  "open_state": "ended",
+  "url": "https://googlechromeai.devpost.com/",
+  "submission_period_dates": "Oct 01 - Dec 04, 2024",
+  "themes": [
+   {
+    "id": 6,
+    "name": "Machine Learning/AI"
+   },
+   {
+    "id": 25,
+    "name": "Web"
+   },
+   {
+    "id": 23,
+    "name": "Beginner Friendly"
+   }
+  ],
+  "prize_amount": "$<span data-currency-value>65,000</span>",
+  "registrations_count": 8638,
+  "organization_name": "Google",
+  "winners_announced": false,
+  "submission_gallery_url": "https://googlechromeai.devpost.com/project-gallery"
+ },
+ {
+  "id": 26945,
+  "title": "Cal Hacks 12.0",
+  "displayed_location": {
+   "icon": "map-marker-alt",
+   "location": "Palace of Fine Arts"
+  },
+  "open_state": "ended",
+  "url": "https://cal-hacks-12-0.devpost.com/",
+  "submission_period_dates": "Oct 24 - 26, 2025",
+  "themes": [
+   {
+    "id": 23,
+    "name": "Beginner Friendly"
+   },
+   {
+    "id": 6,
+    "name": "Machine Learning/AI"
+   },
+   {
+    "id": 22,
+    "name": "Open Ended"
+   }
+  ],
+  "prize_amount": "$<span data-currency-value>58,100</span>",
+  "registrations_count": 2162,
+  "organization_name": "Cal Hacks",
+  "winners_announced": true,
+  "submission_gallery_url": "https://cal-hacks-12-0.devpost.com/project-gallery"
+ },
+ {
+  "id": 22244,
+  "title": "PennApps XXV",
+  "displayed_location": {
+   "icon": "globe",
+   "location": "Online"
+  },
+  "open_state": "ended",
+  "url": "https://pennapps-xxv.devpost.com/",
+  "submission_period_dates": "Sep 20 - 22, 2024",
+  "themes": [
+   {
+    "id": 23,
+    "name": "Beginner Friendly"
+   },
+   {
+    "id": 22,
+    "name": "Open Ended"
+   },
+   {
+    "id": 13,
+    "name": "Social Good"
+   }
+  ],
+  "prize_amount": "$<span data-currency-value>20,645</span>",
+  "registrations_count": 363,
+  "organization_name": "PennApps",
+  "winners_announced": true,
+  "submission_gallery_url": "https://pennapps-xxv.devpost.com/project-gallery"
+ }
+]

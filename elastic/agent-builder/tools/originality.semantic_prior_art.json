@@ -1,0 +1,13 @@
+{
+  "id": "originality.semantic_prior_art",
+  "type": "esql",
+  "description": "Fallback prior-art search: plain semantic search (Jina embeddings via semantic_text) over `semantic_pitch`, no lexical leg and no reranker. Use it when originality.hybrid_prior_art fails or is unavailable, or to find conceptually similar projects that share no keywords with the idea. Pass the idea as `q` and the number of results as `k`. Returns _id, source, title, tagline, url, year, tags, is_winner and the semantic _score.",
+  "tags": ["whitespace", "originality", "retrieval"],
+  "configuration": {
+    "query": "FROM {{INDEX}} METADATA _score, _id | WHERE MATCH(semantic_pitch, ?q) | SORT _score DESC | LIMIT ?k | KEEP _id, source, title, tagline, url, year, tags, is_winner, _score",
+    "params": {
+      "q": { "type": "{{STRING_PARAM_TYPE}}", "description": "The idea, described in one or two sentences." },
+      "k": { "type": "integer", "description": "How many results to return (5-15 is a good range)." }
+    }
+  }
+}

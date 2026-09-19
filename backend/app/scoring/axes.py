@@ -19,6 +19,17 @@ def _fallback_percentile(x: float) -> float:
     return 1 / (1 + math.exp(-8 * (x - 0.5)))
 
 
+def corpus_percentile() -> Callable[[float], float] | None:
+    """The calibration CDF built from the indexed corpus, or None until `app.search.calibration build` has been run.
+    Every crowding score in a run (the idea AND its mutations) must go through the same function."""
+    try:
+        from app.search import calibration
+
+        return None if calibration.is_placeholder() else calibration.percentile
+    except Exception:
+        return None
+
+
 def crowding_lite(sims: list[float]) -> float:
     top = sorted(sims, reverse=True)[:5]
     return 0.6 * top[0] + 0.4 * statistics.fmean(top) if top else 0.0

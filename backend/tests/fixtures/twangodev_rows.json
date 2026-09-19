@@ -1,0 +1,99 @@
+{
+ "_note": "3 real rows from twangodev/devpost-hacks (config=all, split=train) via the HF datasets-server API; description capped at 3,000 chars, readme content at 500.",
+ "columns": [
+  "project_id",
+  "hackathon",
+  "url",
+  "title",
+  "tagline",
+  "description",
+  "built_with",
+  "video_link",
+  "other_links",
+  "results",
+  "is_winner",
+  "readmes"
+ ],
+ "rows": [
+  {
+   "project_id": "88c5282083e5",
+   "hackathon": "cal-hacks-12-0",
+   "url": "https://devpost.com/software/dogood-gu7clt",
+   "title": "DoGood",
+   "tagline": "Bridging social good and self-improvement",
+   "description": "Inspiration\nWe live in an epidemic of burnout and disconnection and the online world effectively fills this gap with instant gratification through the dopamine of scrolling and easy rewards; our vision was to leverage these patterns to Do Good. Through trackable acts of kindness, productivity, and self-growth, DoGood guides users in building purpose while creating a tangible, real-world interest.\nWhat it does\nDoGood will present opportunities for social good and self-improvement through four pages that have tasks that require photo verification: Serve: The first tab, Serve, connects you with ways to give back. You can find local volunteer opportunities, community service projects, or even respond to crisis-assistance alerts. There’s also an environmental mini-game that turns recycling and trash pickup into friendly local competitions where you log what you clean, earn XP, and see your positive impact grow. Be Productive: The Be Productive tab helps you make good use of your time. You can set focus timers for tasks, and the app sends gentle notifications to keep you accountable. It also uses smart tracking to remind you of activities you haven’t done in a while, like that personal project you left half-finished, or that hobby you love but forgot. Completing tasks or having a productive work session with the timer can also earn XP. Self-improve: The Self-Improve tab remembers your progress and gives personalized suggestions to earn XP, maybe journaling today, maybe reconnecting with an old friend. Over time, it becomes your personal coach for growth, mindfulness, and relationships. Shop: Finally, all this effort pays off, literally for good causes. Every task completed earns XP. You can spend your XP in the Shop to fund real charitable donations, from supporting food banks to environmental nonprofits. You’re improving yourself and your community at the same time. If a user opens the app and isn’t sure what part of doing good they want to prioritize for the day, they can speak with the “DoGood companion,” that can work with the user to narrow down goals and provide direction to a page that aligns with what the user can accomplish.\nHow we built it\nOnce narrowing down the scope of what we wanted to accomplish for this version of DoGood, we began working on the frontend and UI/UX by describing the functionality and the vision for the four main buttons and debugging any faulty design through the site. We integrated this code to our GitHub repository with more frontend development made with Cursor and React. We finally integrated sponsors like Claude for the functionality and verification of all the features and LiveKit for the DoGood companion.\nChallenges we ran into",
+   "built_with": [
+    "claude-by-anthropic",
+    "figma-make",
+    "interaction-co",
+    "livekit",
+    "next.js",
+    "react",
+    "tailwindcss"
+   ],
+   "video_link": "https://www.youtube.com/embed/S5d_ydwTqGY?enablejsapi=1&hl=en_US&rel=0&start=&version=3&wmode=transparent",
+   "other_links": [
+    "https://github.com/Sam-T-G/calhacks25"
+   ],
+   "results": "Did Not Place",
+   "is_winner": false,
+   "readmes": [
+    {
+     "repo": "Sam-T-G/calhacks25",
+     "content": "# DoGood App Features\n\nThis is a code bundle for DoGood App Features. The original project is available at https://www.figma.com/design/6sOViGx6ABV7U0aTZF4G6b/DoGood-App-Features. The fully functional site is found here: https://calhacks25-gamma.vercel.app/\n\n## Project Structure\n\n```\ncalhacks25/\n├── src/               # React frontend application\n├── api/               # Vercel serverless functions\n├── voice-agent/       # LiveKit voice agent (Python)\n└── ...\n```\n\n## Setup\n\n### 1. Install Depend",
+     "truncated": true
+    }
+   ]
+  },
+  {
+   "project_id": "f4633bfe02fe",
+   "hackathon": "cal-hacks-12-0",
+   "url": "https://devpost.com/software/githired",
+   "title": "Githired",
+   "tagline": "Git-Hired uses AI to analyze real GitHub activity — projects, commits, and code quality — to show startups who’s genuinely skilled. We replace résumés and traditional coding tests with proof of work.",
+   "description": "Inspiration\nMost startups don’t care how well you solve a random algorithm problem — they care how quickly and effectively you can ship real code.\nBut today’s hiring tools still test engineers in ways that say nothing about how they actually build.\nThat’s why we built Git-Hired — the future of hiring developers.\nWhat it does\nYou create a smart application form and share it anywhere — LinkedIn, Handshake, your own site.\nOur AI turns every application into a live portfolio that analyzes real commits, filters out filler pushes, and ranks candidates based on true technical ability.\nIf you like what you see, send them a coding assessment that mimics how developers really work — with AI as a co-pilot. Yes, we allow the use of AI during our assessments, because let's be real- nobody actually writes each and every line of code manually anymore!\nHow we built it\nFrontend: Next.js, React, TypeScript, Node.js\nBackend: Python, FastAPI, Bright Data, GitHub REST API, ChromaDB, Elastic Search for semantic embeddings\nAI + Analytics: Custom GitHub analyzer, NLP-based code parsing, contribution heatmaps, AI Coding assistant in Letta Cloud with memory\nChallenges we ran into\nParsing GitHub data reliably across different repo structures\nAvoiding false positives when evaluating commit quality\nBuilding an AI assistant that helps — without handing out answers\nIntegrating multiple APIs and ensuring real-time updates\nAccomplishments that we're proud of\nFully functional end-to-end AI hiring workflow\nGitHub data --> live portfolio generation\nSmart rankings that surface best-fit developers\nAI-assisted coding assessments integrated directly into the platform\nWhat we learned\nThe best developers don’t always have the best resumes\nAI can be a powerful equalizer when used ethically\nReal-world hiring problems need more empathy and context than just code\nWhat's next for Githired\nExpand analysis beyond GitHub (LeetCode, Stack Overflow, etc.)\nAdd recruiter dashboards with performance insights\nBuild candidate feedback + improvement analytics\nLaunch beta with partner startups and university recruiters",
+   "built_with": [
+    "brightdata",
+    "chromadb",
+    "claude",
+    "letta",
+    "nextjs",
+    "python",
+    "react",
+    "typescript",
+    "vercel"
+   ],
+   "video_link": "https://www.youtube.com/embed/bajCGzs3QBk?enablejsapi=1&hl=en_US&rel=0&start=&version=3&wmode=transparent",
+   "other_links": [
+    "https://www.githired.tech/"
+   ],
+   "results": "Winner Composio: Best Use of Composio Toolrouter",
+   "is_winner": true,
+   "readmes": []
+  },
+  {
+   "project_id": "fb2fc8e349a3",
+   "hackathon": "hackgt-12",
+   "url": "https://devpost.com/software/scoutexchange",
+   "title": "ScoutExchange",
+   "tagline": "The latest newest app for sports betting!",
+   "description": "\\documentclass{article}\n\\usepackage[margin=1in]{geometry}\n\\usepackage{amsmath}\n\\usepackage{amssymb}\n\\title{\\textbf{Player Stock Market App} \\ \\textit{HackGT Project Story}}\n\\author{Team: Joel, Cyr, Sekun, Jon}\n\\date{HackGT 2024}\n\\begin{document}\n\\maketitle\n\\section{What Inspired Us}\nFantasy sports meet Wall Street -- that's the spark that ignited our \\textbf{ScoutExchange}. We noticed that traditional fantasy leagues lock you into season-long commitments, while sports betting feels too much like gambling. We wanted to create something that combined the \\textbf{strategic depth of long-term investing} with the \\textbf{adrenaline rush of day trading}, all centered around the sports we love.\nThe ``aha moment'' came when we realized we could build \\textbf{two distinct trading experiences}: a Roth IRA-style season portfolio for patient investors, and a live game trading floor for those who thrive on real-time action. Why choose between being Warren Buffett and a Wall Street trader when you can be both?\n\\section{What We Learned}\n\\subsection{Technical Breakthroughs}\n\\begin{itemize}\n\\item \\textbf{WebSocket mastery}: Joel discovered that Socket.IO isn't just about pushing data -- it's about orchestrating real-time experiences. Managing 50+ concurrent connections while maintaining sub-100ms latency taught us the art of efficient event broadcasting.\n\\item \\textbf{State synchronization}: Keeping portfolios consistent between REST API calls and WebSocket updates required careful design. We learned that eventual consistency isn't a bug -- it's a feature when handled gracefully.\n\\item \\textbf{Mobile-first architecture}: Jon realized that Expo's hot reload capability makes rapid iteration possible, but managing real-time data updates in React Native requires thoughtful component lifecycle management.\n\\end{itemize}\n\\subsection{Product Insights}\n\\begin{itemize}\n\\item \\textbf{Gamification drives engagement}: Simple leaderboards and streak counters transformed our app from a trading simulator into an addictive experience. Users care more about beating friends than maximizing returns.\n\\item \\textbf{Scarcity creates urgency}: Limiting live game trades to 5 per user made every decision feel consequential. Constraints breed creativity and emotional investment.\n\\end{itemize}\n\\section{How We Built It}\n\\subsection{Architecture Decision}\nWe chose a \\textbf{microservice-style approach} with clear separation of concerns:\nFrontend Layer\n=\nExpo + React Native (Jon)\nAPI Layer\n=\nNode.js + Express (Cyr & Sekun)\nReal-time Layer\n=\nSocket.IO (Joel)\nData Layer\n=\nRedis + In-memory Objects\n\\subsection{Implementation Strategy}\n\\begin{enumerate}\n\\item \\textbf{MVP-First Development}: We built the core trading loop first -- buy player, see price update, check portfolio value. Everything else was enhancement.\n\\item \\textbf{Mock-Driven Design}: Instead of waiting for real sports data APIs, we created rich mock game scenarios that let us test edge cases and exciting moments.",
+   "built_with": [
+    "expo.io",
+    "express.js",
+    "node.js",
+    "react",
+    "react-native",
+    "socket.io",
+    "supabase",
+    "typescript",
+    "websockets"
+   ],
+   "video_link": "https://www.youtube.com/embed/HguOKq_Ux9I?enablejsapi=1&hl=en_US&rel=0&start=&version=3&wmode=transparent",
+   "other_links": [],
+   "results": "Did Not Place",
+   "is_winner": false,
+   "readmes": []
+  }
+ ]
+}

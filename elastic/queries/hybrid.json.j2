@@ -1,0 +1,33 @@
+{#- Reference copy of the hybrid query (Kibana Dev Tools friendly). The source of truth used at runtime is
+    backend/app/search/hybrid.py::build_hybrid_body - tests assert that both produce the same body.
+    Render with jinja2: q, idea_full, exclude_ids (list), rerank_id, size. -#}
+{
+  "retriever": {
+    "text_similarity_reranker": {
+      "retriever": {
+        "rrf": {
+          "retrievers": [
+            { "standard": { "query": { "multi_match": { "query": {{ q | tojson }}, "fields": ["title^3", "tagline^2", "pitch"] } } } },
+            { "standard": { "query": { "semantic": { "field": "semantic_pitch", "query": {{ q | tojson }} } } } }
+          ],
+          "filter": {
+            "bool": {
+              "must_not": [
+                { "terms": { "quality_flags": ["too_short", "non_english"] } },
+                { "ids": { "values": {{ exclude_ids | tojson }} } }
+              ]
+            }
+          },
+          "rank_window_size": 100,
+          "rank_constant": 20
+        }
+      },
+      "field": "pitch",
+      "inference_id": {{ rerank_id | tojson }},
+      "inference_text": {{ idea_full | tojson }},
+      "rank_window_size": 40
+    }
+  },
+  "size": {{ size }},
+  "_source": {{ source_fields | tojson }}
+}

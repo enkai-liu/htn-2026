@@ -1,0 +1,9 @@
+{
+  "id": "originality.search_nl",
+  "type": "index_search",
+  "description": "Free-form natural-language search over the Whitespace prior-art corpus (Devpost hackathon projects and YC companies). Use it for exploratory questions that the purpose-built originality.* tools do not cover, e.g. 'winning projects from 2024 that use computer vision for accessibility'. Key fields: title, tagline, pitch (what it does), year, source (devpost|yc), tags, tech, is_winner, hackathon, status, url.",
+  "tags": ["whitespace", "originality", "retrieval"],
+  "configuration": {
+    "pattern": "{{INDEX_PATTERN}}"
+  }
+}

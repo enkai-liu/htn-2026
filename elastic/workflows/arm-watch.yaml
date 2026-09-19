@@ -1,0 +1,38 @@
+# Arms a recurring prior-art watch for one analysed idea: "arming" = indexing ONE document into the watches
+# index. The scheduled originality-watch-recheck workflow iterates over all active watches.
+# Rendered by elastic/apply.py ({{WATCHES_INDEX}} etc. come from settings); workflow-native templates use
+# spaces and lower case ("{{ inputs.run_id }}") and are left untouched.
+# Also registered (in the Kibana UI) as the Agent Builder workflow tool `originality.arm_watch`.
+name: originality-arm-watch
+description: Store an idea watch (one document in {{WATCHES_INDEX}}) so new similar projects trigger an alert.
+enabled: true
+triggers:
+  - type: manual
+inputs:
+  - name: run_id
+    type: string
+    required: true
+  - name: idea_text
+    type: string
+    required: true
+  - name: facets_query
+    type: string
+    required: true
+  - name: threshold
+    type: number
+    default: 0.55
+steps:
+  - name: store_watch
+    type: elasticsearch.index
+    with:
+      index: "{{WATCHES_INDEX}}"
+      id: "{{ inputs.run_id }}"
+      document:
+        run_id: "{{ inputs.run_id }}"
+        idea_text: "{{ inputs.idea_text }}"
+        facets_query: "{{ inputs.facets_query }}"
+        threshold: "{{ inputs.threshold }}"
+        active: true
+        armed_by: workflow
+        armed_at: "{{ now }}"
+        last_checked_at: "{{ now }}"

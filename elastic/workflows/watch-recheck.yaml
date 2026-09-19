@@ -1,0 +1,91 @@
+# Closes the loop: every 30 minutes (or on a manual run during the demo) re-search the corpus for documents
+# that were FIRST SEEN after each watch's cursor, let the watch-analyst agent triage them, record an alert
+# (the backend polls {{ALERTS_INDEX}} -> SSE toast) and ping Slack.
+# Rendered by elastic/apply.py: {{INDEX}}, {{WATCHES_INDEX}}, {{ALERTS_INDEX}}, {{RERANK_ID}} and
+# {{SLACK_WEBHOOK_URL}} come from settings/.env and are never committed. When no Slack webhook is configured
+# apply.py removes the notify_slack step instead of deploying an empty URL.
+name: originality-watch-recheck
+description: Re-check every active idea watch against newly indexed prior art; triage with the watch-analyst agent; alert.
+enabled: true
+consts:
+  slack_webhook: "{{SLACK_WEBHOOK_URL}}"
+triggers:
+  - type: scheduled
+    with:
+      every: 30m
+  - type: manual
+steps:
+  - name: find_watches
+    type: elasticsearch.search
+    with:
+      index: "{{WATCHES_INDEX}}"
+      body:
+        size: 50
+        query:
+          term:
+            active: true
+  - name: each_watch
+    type: foreach
+    foreach: "{{ steps.find_watches.output.hits.hits }}"
+    steps:
+      - name: search_new
+        type: elasticsearch.search
+        with:
+          index: "{{INDEX}}"
+          body:
+            size: 5
+            _source: [rid, title, tagline, pitch, url, year, source]
+            retriever:
+              text_similarity_reranker:
+                retriever:
+                  rrf:
+                    retrievers:
+                      - standard:
+                          query:
+                            match:
+                              pitch: "{{ foreach.item._source.facets_query }}"
+                      - standard:
+                          query:
+                            semantic:
+                              field: semantic_pitch
+                              query: "{{ foreach.item._source.idea_text }}"
+                    filter:
+                      range:
+                        first_seen_at:
+                          gt: "{{ foreach.item._source.last_checked_at }}"
+                    rank_window_size: 50
+                field: pitch
+                inference_id: "{{RERANK_ID}}"
+                inference_text: "{{ foreach.item._source.idea_text }}"
+                min_score: 0.55
+      - name: has_new
+        type: if
+        condition: "steps.search_new.output.hits.total.value > 0"
+        steps:
+          - name: triage
+            type: ai.agent
+            with:
+              agent_id: watch-analyst
+              message: "Idea: {{ foreach.item._source.idea_text }}\nCandidates: {{ steps.search_new.output.hits.hits | json }}\nWhich are genuinely the same idea? Answer with a 2-sentence alert or NONE."
+          - name: record_alert
+            type: elasticsearch.index
+            with:
+              index: "{{ALERTS_INDEX}}"
+              document:
+                run_id: "{{ foreach.item._source.run_id }}"
+                created_at: "{{ now }}"
+                summary: "{{ steps.triage.output }}"
+          - name: notify_slack
+            type: http
+            with:
+              method: POST
+              url: "{{ consts.slack_webhook }}"
+              body:
+                text: "New prior art for a watched idea: {{ steps.triage.output }}"
+      - name: advance_cursor
+        type: elasticsearch.update
+        with:
+          index: "{{WATCHES_INDEX}}"
+          id: "{{ foreach.item._id }}"
+          doc:
+            last_checked_at: "{{ now }}"

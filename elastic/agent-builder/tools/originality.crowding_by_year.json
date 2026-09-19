@@ -1,0 +1,12 @@
+{
+  "id": "originality.crowding_by_year",
+  "type": "esql",
+  "description": "How crowded is an idea space over time? Counts projects (and how many of them won a prize) per year whose pitch contains ALL of the given keywords. Use it to show trends such as 'study-buddy chatbots exploded after 2023'. Pass 2-4 plain keywords as `keywords` (e.g. 'flashcards quiz pdf'); every keyword must match, so fewer keywords = broader count. Returns year, projects, winners.",
+  "tags": ["whitespace", "originality", "analytics"],
+  "configuration": {
+    "query": "FROM {{INDEX}} | WHERE MATCH(pitch, ?keywords, {\"operator\": \"AND\"}) | STATS projects = COUNT(*), winners = COUNT(*) WHERE is_winner == true BY year | SORT year",
+    "params": {
+      "keywords": { "type": "{{STRING_PARAM_TYPE}}", "description": "2-4 keywords that must ALL appear in the project pitch, space separated." }
+    }
+  }
+}

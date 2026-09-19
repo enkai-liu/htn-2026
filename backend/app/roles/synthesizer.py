@@ -32,7 +32,7 @@ class Synthesizer(BaseRole):
         stats = await self._corpus_stats(ctx)
         ents = board.top_entities(10)
         calibrated = not any(r.retrieval.get("uncalibrated") for r in board.records.values())
-        crowd = axes.crowding([e.similarity for e in ents], _percentile(), calibrated=calibrated, names=[e.canonical_name for e in ents])
+        crowd = axes.crowding([e.similarity for e in ents], axes.corpus_percentile(), calibrated=calibrated, names=[e.canonical_name for e in ents])
 
         cliches = stats.get("cliches") or []
         idea_terms = set(tokens(board.idea_text))
@@ -119,23 +119,16 @@ class Synthesizer(BaseRole):
             f = board.facets
             facet_dfs = {k: await rarity.facet_df(getattr(f, k)) for k in ("purpose", "mechanism", "audience", "twist") if getattr(f, k)}
             return {
-                "cliches": [TermStat(**t) if isinstance(t, dict) else t for t in nb.get("cliches", [])],
-                "by_year": [YearCount(**y) if isinstance(y, dict) else y for y in nb.get("by_year", [])],
+                "cliches": [TermStat(term=str(b.get("term") or b.get("key")), score=b.get("score"), neighbourhood_count=b.get("doc_count"),
+                                     global_count=b.get("bg_count")) for b in nb.get("cliche_terms", [])],
+                "by_year": [YearCount(year=int(y["year"]), count=int(y["count"])) for y in nb.get("by_year", []) if y.get("year") is not None],
+                "neighbourhood_winners": nb.get("winners", 0),
                 "facet_dfs": facet_dfs,
                 "pair_df": await rarity.pair_df(f.purpose, f.mechanism),
             }
         except Exception as exc:
             await ctx.emit("error", {"message": f"corpus statistics unavailable: {type(exc).__name__}: {exc}"[:200], "recoverable": True})
             return {}
-
-
-def _percentile():
-    try:
-        from app.search import calibration
-
-        return None if getattr(calibration, "is_placeholder", lambda: True)() else calibration.percentile
-    except Exception:
-        return None
 
 
 register("synthesizer")(Synthesizer)

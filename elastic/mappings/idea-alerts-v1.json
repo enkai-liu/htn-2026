@@ -1,0 +1,18 @@
+{
+  "mappings": {
+    "dynamic": true,
+    "_meta": {
+      "owner": "whitespace",
+      "note": "Alerts written by the watch-recheck workflow. The backend polls this index (created_at > last poll) and turns rows into SSE toasts, so no tunnel to localhost is needed."
+    },
+    "properties": {
+      "run_id": { "type": "keyword" },
+      "created_at": { "type": "date" },
+      "summary": { "type": "text" },
+      "candidate_rids": { "type": "keyword" },
+      "candidates": { "type": "object", "enabled": false },
+      "simulated": { "type": "boolean" },
+      "seen": { "type": "boolean" }
+    }
+  }
+}

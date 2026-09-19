@@ -1,0 +1,22 @@
+{
+  "mappings": {
+    "dynamic": false,
+    "_meta": {
+      "owner": "whitespace",
+      "note": "Lenient on purpose: documents that the prior-art-clean pipeline (on_failure) or the bulk loader (mapping / inference rejections) could not index land here with ingest_error. dynamic:false keeps whatever arrived in _source without ever rejecting it. NO default_pipeline here, otherwise a failing pipeline would loop."
+    },
+    "properties": {
+      "rid": { "type": "keyword" },
+      "source": { "type": "keyword" },
+      "url": { "type": "keyword" },
+      "title": { "type": "text" },
+      "pitch": { "type": "text" },
+      "year": { "type": "short", "ignore_malformed": true },
+      "lang": { "type": "keyword" },
+      "quality_flags": { "type": "keyword" },
+      "ingest_error": { "type": "text", "fields": { "kw": { "type": "keyword", "ignore_above": 512 } } },
+      "quarantined_by": { "type": "keyword" },
+      "ingested_at": { "type": "date", "ignore_malformed": true }
+    }
+  }
+}

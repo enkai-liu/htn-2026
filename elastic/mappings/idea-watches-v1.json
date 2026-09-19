@@ -1,0 +1,20 @@
+{
+  "mappings": {
+    "dynamic": true,
+    "_meta": {
+      "owner": "whitespace",
+      "note": "One document per armed watch (_id = run_id). Written by the arm-watch workflow, the Kibana run API, or the backend directly (actuator chain). The scheduled watch-recheck workflow iterates over active:true."
+    },
+    "properties": {
+      "run_id": { "type": "keyword" },
+      "idea_text": { "type": "text" },
+      "facets_query": { "type": "text" },
+      "threshold": { "type": "float" },
+      "active": { "type": "boolean" },
+      "armed_at": { "type": "date" },
+      "last_checked_at": { "type": "date" },
+      "armed_by": { "type": "keyword" },
+      "slack_channel": { "type": "keyword" }
+    }
+  }
+}

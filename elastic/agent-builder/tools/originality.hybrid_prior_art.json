@@ -1,0 +1,13 @@
+{
+  "id": "originality.hybrid_prior_art",
+  "type": "esql",
+  "description": "Find prior art for an idea in the Whitespace corpus (262k Devpost hackathon projects + YC companies). Hybrid retrieval in one ES|QL query: a BM25 leg on `pitch` and a Jina-embedding semantic leg on `semantic_pitch` are FORKed, FUSEd with reciprocal rank fusion, then the top 40 are RERANKed by the Jina reranker against the idea text. Use this first for any 'has this been built before?' question. Pass the full idea description as `q` (one or two sentences work best) and the number of results as `k` (5-15). Returns _id, source, title, tagline, url, year, tags, is_winner and the reranker _score (higher = closer to the idea).",
+  "tags": ["whitespace", "originality", "retrieval"],
+  "configuration": {
+    "query": "FROM {{INDEX}} METADATA _score, _id, _index | FORK (WHERE MATCH(pitch, ?q) | SORT _score DESC | LIMIT 60) (WHERE MATCH(semantic_pitch, ?q) | SORT _score DESC | LIMIT 60) | FUSE | SORT _score DESC | LIMIT 40 | RERANK ?q ON pitch WITH {\"inference_id\": \"{{RERANK_ID}}\"} | SORT _score DESC | LIMIT ?k | KEEP _id, source, title, tagline, url, year, tags, is_winner, _score",
+    "params": {
+      "q": { "type": "{{STRING_PARAM_TYPE}}", "description": "The idea, described in one or two sentences (purpose + mechanism + audience)." },
+      "k": { "type": "integer", "description": "How many results to return (5-15 is a good range)." }
+    }
+  }
+}

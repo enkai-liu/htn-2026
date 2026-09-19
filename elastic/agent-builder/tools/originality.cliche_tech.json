@@ -1,0 +1,12 @@
+{
+  "id": "originality.cliche_tech",
+  "type": "esql",
+  "description": "Which technologies does everybody in this idea space use? Expands the multi-valued `tech` field (Devpost 'Built With') of every project whose pitch matches ANY of the keywords and returns the 15 most common technologies with counts. Use it to spot the cliché stack (e.g. openai + react + pinecone) and, by omission, less-used technology angles.",
+  "tags": ["whitespace", "originality", "analytics"],
+  "configuration": {
+    "query": "FROM {{INDEX}} | WHERE MATCH(pitch, ?keywords) | MV_EXPAND tech | STATS n = COUNT(*) BY tech | SORT n DESC | LIMIT 15",
+    "params": {
+      "keywords": { "type": "{{STRING_PARAM_TYPE}}", "description": "Keywords describing the idea space, space separated (any may match)." }
+    }
+  }
+}

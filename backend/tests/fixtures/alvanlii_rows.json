@@ -1,0 +1,49 @@
+{
+ "_note": "3 real rows from alvanlii/devpost-hackathon-projects (config=default, split=train) fetched via the HF datasets-server API; full_desc trimmed in the middle (head + 'Built With' tail kept).",
+ "columns": [
+  "hackathon_id",
+  "project_link",
+  "full_desc",
+  "title",
+  "brief_desc",
+  "team_members",
+  "prize",
+  "tags",
+  "__index_level_0__"
+ ],
+ "rows": [
+  {
+   "hackathon_id": 20679,
+   "project_link": "https://devpost.com/software/devspot",
+   "full_desc": "DevSpot Logo\n\nHero Page\n\nOrganizers Screen\n\nHacker Page\n\nInspiration\n\nWhile browsing through countless project ideas on Devpost, a thought struck me: \"What if there was a swift way to gauge the potential of my hackathon ideas?\" This seed of curiosity grew into a compelling quest to create something not just for participants but also for the backbone of any hackathon - the organizers. Conversations with various hackathon organizers revealed a shared vision; they were in search of a tool that could streamline the ideation process, making it easier to validate and enhance project concepts. Thus, DevSpot was born - a platform designed to bridge the gap between initial idea and actionable insight, ensuring every participant could quickly assess the uniqueness and viability of their projects while providing organizers a lens into the innovative potential brewing within their events.\n\nWhat it does\n\n🌐 DevSpot\n\nDescription\n\n: DevSpot is a pioneering platform designed to enhance the hackathon experience. Leveraging the power of ChatGPT-4, it offers hackers and organizers a unique toolset to check the originality of hackathon ideas, find open-source resources, and explore Devpost submissions for inspiration.\n\nDevSpot aims to foster innovation and collaboration within the hackathon community by providing instant access to a wealth of resources and insights. Built with React for the frontend and Flask for the backend, it integrates cutting-edge AI to streamline the ideation process and support the development of groundbreaking projects.\n\n🌟 Features\n\nIdea Originality Check\n\n: Utilize ChatGPT-4 to evaluate the uniqueness of your hackathon idea.\n\nOpen-Source Resource Finder\n\n: Get recommendations for open-source tools and resources relevant to your project idea.\n\nDevpost Analysis\n\n: Compare your idea against existing Devpost submissions to ensure originality and find inspiration.\n\nInteractive UI\n\n: Enjoy a seamless user experience with a responsive design tailored for hackers and organizers alike.\n\n📊 Idea Originality Check\n\nBuilt With\n\napi\n\nchatgpt\n\ncss\n\ncss3\n\nfirebase\n\nflask\n\ngithub\n\ngoogle\n\ngoogle-analytics\n\nhtml\n\nhtml5\n\njavascript\n\nnatural-language-processing\n\npython\n\nreact\n\nvs-code\n\nTry it out\n\ngithub.com",
+   "title": "DevSpot",
+   "brief_desc": "DevSpot: Transforming hackathons with AI-driven insights. Validate ideas, find unique resources, and explore similar projects—all in one platform.",
+   "team_members": "['Kartikey Pandey']",
+   "prize": "['Entrepreneurship Award']",
+   "tags": "['api', 'chatgpt', 'css', 'css3', 'firebase', 'flask', 'github', 'google', 'google-analytics', 'html', 'html5', 'javascript', 'natural-language-processing', 'python', 'react', 'vs-code']",
+   "__index_level_0__": 6
+  },
+  {
+   "hackathon_id": 22272,
+   "project_link": "https://devpost.com/software/it-too-long-i-don-t-read",
+   "full_desc": "Example of summarize\n\nInspiration\n\nThe original idea is that when I open a website, sometimes the content is too long, some websites do not provide TLDR, and I hate to scroll the whole page for a few minutes. I need tools to summarize all the content of the website I opened. I created the website version at \n\nhttps://itlidr.thangman22.com/\n\n to help me summarize the content and provide the capabilities to ask some questions directly to the article. Still, It is not seamless because I have to copy the URL and paste it to the website, so I decided to convert the same idea to the Chrome extension version to make summarizing every website I'm opening easier. I also use Chrome's built-in AI feature to achieve speed and smoothness.\n\nWhat it does\n\nThis extension will extract the content of the website then summarize the whole content into a single paragraph. It also provides simple Q&A to allow users to ask for more information from the content.\n\nHow we built it\n\nThis extension uses Vue.js and Gemini API when the local model does not work. For technical reasons, I use the npm package called @extractus/article-extractor to extract content from the site's HTML and use Summarize API to summarize the whole content. The list of questions still uses Gemini API because the local model can't provide results in the JSON format. When the user asks a question, Prompt API will answer it. The extension also provides the capability to translate the summary into other languages, and I use Translation API to achieve the goal. When the content is not in the language that the model supports I will use Gemini API for fallback, which is using model \"gemini-1.5-flash-8b\"\n\nChallenges we ran into\n\nI'm in Thailand, and Prompt API and Summarize API still do not support the Thai language. That is why I still need a fallback API for the non-support language. I hope in the future, the model will support more languages.\n\nAccomplishments that we're proud of\n\nI can find a way to make this plugin work in situations where the API constantly changes and some bugs remain. This plugin is now able to work even when the local model is not available.\n\nWhat we learned\n\nWhat's next for It Too Long I Don't Read\n\nBuilt With\n\nchromeextension\n\ngemini\n\nvuejs\n\nTry it out\n\ngithub.com\n\nchromewebstore.google.com",
+   "title": "It Too Long I Don't Read",
+   "brief_desc": "Tired of endless scrolling? My Chrome extension uses AI to instantly summarize any web page and even lets you ask questions about the content. It's like TLDR on steroids!",
+   "team_members": "['Warat Wongmaneekit']",
+   "prize": "[]",
+   "tags": "['chromeextension', 'gemini', 'vuejs']",
+   "__index_level_0__": 1
+  },
+  {
+   "hackathon_id": 10000,
+   "project_link": "https://devpost.com/software/crazy-cows-game",
+   "full_desc": "P1 Cow Sprite\n\nP2 Cow Sprite\n\nInspiration\n\nGames like Super Smash Bros Brawl and Brawlhallla inspired us.\n\nHow we built it\n\nWe build it using Unity and C#.\n\nChallenges we ran into\n\nOne of the challenges we faced was implementing 2 player interactions.\n\nAccomplishments that we're proud of\n\nWe're proud that we created a game that is able to allow its players to bond in an immersive gaming experience.\n\nWhat we learned\n\nWe learned that collaboration is extremely important.\n\nWhat's next for Crazy Cows Game\n\nWe will further develop this game after Bay Hacks by adding extra features to improve our game.\n\nBuilt With\n\nc#\n\nunity\n\nTry it out\n\ngithub.com",
+   "title": "Crazy Cows Game",
+   "brief_desc": "Crazy Cows is a humorous 2 player platform fighting game.",
+   "team_members": "['Richard Cao', 'Allen Ye']",
+   "prize": "['1st Place']",
+   "tags": "['c#', 'unity']",
+   "__index_level_0__": 0
+  }
+ ]
+}
