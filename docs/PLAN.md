@@ -129,7 +129,7 @@ frontend/components/{IdeaInput,SwarmTimeline,DebateThread,EvidenceCard,EvidenceL
 frontend/lib/{sse,types,graphReducer,replay}.ts
 ingest/{download_hf,parse_sections,load_devpost_hf,load_devpost_recent,load_yc,scrape_galleries,seed_known_prior_art,measure_eis,backfill_semantic}.py
 elastic/{mappings/,pipelines/,queries/,agent-builder/{tools,agents}/,workflows/{arm-watch,watch-recheck}.yaml,apply.py}
-swarm-skill/prior-art-swarm/{SKILL.md (kind: team-skill),roles/*.md,workflow.md,bind.md,dependencies.yaml,scripts/workflow.py}
+swarm-skill/prior-art-swarm/{SKILL.md (kind: swarm-skill, per the official validator),roles/*.md,workflow.md,bind.md,dependencies.yaml,scripts/workflow.py}
 investigation/{sample,scan,neighbours,analyze,export_public}.py
 baseten/{bakeoff.py,reference_distribution.py,surprisal-truss/config.yaml}
 scripts/{smoke_all,smoke_elastic,smoke_baseten,smoke_gptzero,secret_scan}.sh  scripts/{bench_ideas,record_golden}.py
