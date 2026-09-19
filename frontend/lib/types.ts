@@ -10,7 +10,7 @@ export type EventType =
   | "claim.proposed" | "claim.challenged" | "claim.resolved" | "requery.issued" | "jury.vote" | "verify.result"
   | "voice.result" | "prior.sample"
   | "score.updated" | "graph.patch"
-  | "mutation.proposed" | "mutation.scored" | "action.proposed" | "action.done" | "budget.updated";
+  | "mutation.proposed" | "mutation.scored" | "coach.message" | "coach.pitch" | "action.proposed" | "action.done" | "budget.updated";
 
 export interface AgentEvent<T = Record<string, unknown>> {
   seq: number;
@@ -211,6 +211,33 @@ export interface Mutation {
   grounded_in: string[];
   delta?: number | null;
   axes?: Record<string, number> | null;
+}
+
+/** A project the coach points at: a neighbour already on the map (`eid`) or a fresh corpus hit. */
+export interface CoachCite { title: string; url?: string; source?: string; year?: number | null; similarity?: number | null; eid?: string | null }
+
+/** One turn of the coaching conversation. `suggestions` are tap-to-send replies. */
+export interface CoachMessage {
+  id: string;
+  role: "coach" | "user";
+  text: string;
+  question?: string | null;
+  suggestions?: string[];
+  cites?: CoachCite[];
+  mid?: string | null;
+  pitch_version?: number | null;
+}
+
+/** A version of the working idea. v0 is the original pitch; `crowding` is null while the corpus check runs. */
+export interface CoachPitch {
+  version: number;
+  text: string;
+  note?: string;
+  crowding?: number | null;
+  delta?: number | null;
+  headline?: number | null;
+  nearest?: CoachCite[];
+  calibrated?: boolean;
 }
 
 export interface SourceStatus { source: string; status: "ok" | "failed" | "skipped" | "degraded"; n_records: number; error?: string | null }

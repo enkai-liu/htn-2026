@@ -18,6 +18,9 @@ from app.schemas import (  # noqa: E402
     AgentEvent,
     AxisScore,
     Claim,
+    CoachCite,
+    CoachMessage,
+    CoachPitch,
     Conflict,
     ConflictValue,
     Entity,
@@ -285,15 +288,15 @@ def build() -> list[AgentEvent]:
     d1 = Claim(cid="d1", kind="differs", by="advocate", evidence=[], text="No retrieved project coaches the user toward whitespace or re-scores suggestions against evidence.")
     e(0.4, "advocate", "debate", "claim.proposed", {"claim": d1.model_dump(mode="json")}, model=GLM)
     e(0.3, "judge", "debate", "agent.started", {"purpose": "Count the votes, measure the split."})
-    e(2.2, "judge", "debate", "jury.vote", {"subject": "e1 vs idea: purpose", "mean": 0.86, "std": 0.05, "votes": [
+    e(2.2, "judge", "debate", "jury.vote", {"subject": "e1 vs idea: purpose", "eid": "e1", "facet": "purpose", "mean": 0.86, "std": 0.05, "votes": [
         {"model": GLMF, "score": 0.9, "why": "same goal"}, {"model": FLASH, "score": 0.85, "why": "same goal, narrower corpus"}, {"model": OSS, "score": 0.82, "why": "same goal"}]})
-    e(0.3, "judge", "debate", "jury.vote", {"subject": "e1 vs idea: mechanism", "mean": 0.41, "std": 0.27, "votes": [
+    e(0.3, "judge", "debate", "jury.vote", {"subject": "e1 vs idea: mechanism", "eid": "e1", "facet": "mechanism", "mean": 0.41, "std": 0.27, "votes": [
         {"model": GLMF, "score": 0.2, "why": "keyword search is a different mechanism"}, {"model": FLASH, "score": 0.75, "why": "both are LLM + search"},
         {"model": OSS, "score": 0.28, "why": "no verification or resolution step"}]})
     e(0.2, "conductor", "debate", "requery.issued", {"reason": "jury split (std 0.27) on mechanism", "facet": "mechanism",
       "query": "multi-agent debate verification prior art search", "to": "scout.github"}, to="scout.github")
     e(2.0, "scout.github", "debate", "tool.result", {"tool": "github.search_repositories", "summary": "no hackathon-facing project combines debate + verification", "n_hits": 0})
-    e(1.5, "judge", "debate", "jury.vote", {"subject": "e1 vs idea: mechanism (re-vote)", "mean": 0.27, "std": 0.08, "votes": [
+    e(1.5, "judge", "debate", "jury.vote", {"subject": "e1 vs idea: mechanism (re-vote)", "eid": "e1", "facet": "mechanism", "mean": 0.27, "std": 0.08, "votes": [
         {"model": GLMF, "score": 0.2, "why": "different mechanism"}, {"model": FLASH, "score": 0.38, "why": "shared LLM use only"}, {"model": OSS, "score": 0.24, "why": "different mechanism"}]})
     e(0.2, "judge", "debate", "claim.resolved", {"cid": "c1", "status": "challenged", "reason": "purpose overlaps (0.86); mechanism does not (0.27)"})
     e(0.1, "judge", "debate", "claim.resolved", {"cid": "c3", "status": "conceded", "reason": "advocate conceded adjacency"})
@@ -371,7 +374,62 @@ def build() -> list[AgentEvent]:
         mu.delta, mu.axes = delta, {"crowding": 34 + delta}
         e(1.6, "mutator", "mutate", "mutation.scored", {"mid": mu.mid, "delta": delta, "axes": mu.axes})
         e(0.02, "mutator", "mutate", "graph.patch", GraphPatch(update_nodes=[{"id": f"mut:{mu.mid}", "similarity": sim}]))
-    e(0.2, "mutator", "mutate", "agent.finished", {"ok": True, "summary": "3 mutations, all re-scored against the corpus"})
+
+    # ---- the coaching conversation -------------------------------------------------------------------------
+    # A live run only opens the conversation (v0 + the coach's first turn); the author's turns arrive later through
+    # POST /coach. The recording scripts three of them so a replay can show the back-and-forth. Fictional, like the rest.
+    def cite(rid, sim):
+        r = by_rid[rid]
+        return CoachCite(title=r.title, url=r.url, source=r.source, year=r.year, similarity=sim, eid=eid_of[rid])
+
+    by_rid = {r.rid: r for r in RECORDS}
+    radar, check, lens, catch, lab = (cite("devpost:idearadar", 0.91), cite("devpost:hackcheck", 0.88), cite("devpost:noveltylens", 0.71),
+                                      cite("devpost:copycatch", 0.58), cite("github:lab/idea-novelty", 0.55))
+    n_msg = [0]
+
+    def say(dt, role, text, **kw):
+        n_msg[0] += 1
+        m = CoachMessage(id=f"cm{n_msg[0]}", role=role, text=text, **kw)
+        llm = dict(model=KIMI, latency=2300, tok=(3400, 260), cost=0.004) if role == "coach" else {}
+        e(dt, "mutator", "mutate", "coach.message", {"message": m.model_dump(mode="json", exclude_none=True)}, **llm)
+
+    def version(dt, v, text, note, crowding, headline, nearest):
+        draft = CoachPitch(version=v, text=text, note=note)
+        e(0.05, "mutator", "mutate", "coach.pitch", {"pitch": draft.model_dump(mode="json")})
+        done = draft.model_copy(update={"crowding": crowding, "delta": crowding - 34, "headline": headline, "nearest": nearest})
+        e(dt, "mutator", "mutate", "coach.pitch", {"pitch": done.model_dump(mode="json")})
+
+    e(0.3, "mutator", "mutate", "coach.pitch", {"pitch": CoachPitch(version=0, text=IDEA, note="your original pitch", crowding=34, delta=0, headline=49,
+                                                                    nearest=[radar, check, lens]).model_dump(mode="json")})
+    say(0.1, "coach", "The crowded part is the front door. IdeaRadar and HackCheck both take a hackathon idea and hand back an originality score, and "
+        "HackCheck already sells that to judges. What is yours is everything after the search: agents that argue, a verifier that checks every "
+        "quote, one project resolved across sources. None of your neighbours does any of it.",
+        question="Before I suggest anything: picture someone using this at 2am on the Saturday. Who are they, and what are they stuck on?",
+        suggestions=["A first-timer with no idea yet", "A team scared their idea exists", "An organiser screening submissions"], cites=[radar, check])
+    say(2.2, "user", "A team that already has an idea and is scared it has been done. Last year we lost four hours building something that already existed.")
+    say(2.4, "coach", "That is a sharper problem than \"is it original\". It is \"should we pivot, and to what, before we lose the night\". It also rules out "
+        "the organiser direction: HackCheck already lives there, and it is not your story. Every neighbour stops at the verdict. IdeaRadar gives "
+        "you a number out of 100 and leaves, and your four hours were lost after the verdict.",
+        question="When you found out it already existed, what would actually have helped in that moment?",
+        suggestions=["Knowing what to change", "Seeing what nobody had built", "Proof it was really the same"], cites=[radar, check])
+    say(2.2, "user", "Knowing what to change without throwing everything away. We had half the code written.")
+    say(2.4, "coach", "Then that is the idea: not a checker, a pivot partner. It holds what you have built fixed and looks for the nearest open ground from "
+        "there. I searched that framing: nothing in the corpus is about salvaging a half-built project. The closest is NoveltyLens, which is "
+        "inspiration search with no notion of what you already have.",
+        question="What would a team hand it about their half-built project: the repo, the stack, or just a description?",
+        suggestions=["The repo", "Just a description", "Both, repo first"], cites=[lens], pitch_version=1)
+    version(1.6, 1, "Whitespace is a pivot partner for hackathon teams who find out mid-build that their idea exists: tell it what you have already "
+            "built, and it finds the nearest unbuilt idea that keeps your work, with verified evidence that the space is open.",
+            "from grading an idea to salvaging a half-built one", 58, 61, [lens, radar, catch])
+    say(2.0, "user", "The repo. It could read the README and the dependencies.")
+    say(2.4, "coach", "Reading the repo is the part nobody near you does, and lab/idea-novelty shows retrieve-then-rerank holds up for the search half. One "
+        "caution: this corpus is write-ups, not code, so match on what the repo does, not on what it imports.",
+        question="Do you want to pressure-test this version, or back up and try a different direction?",
+        suggestions=["Pressure-test it", "What would a judge poke at?", "Try another direction"], cites=[lab], pitch_version=2)
+    version(1.6, 2, "Point Whitespace at your half-built repo the moment you learn your hackathon idea exists. It reads what you have already made, "
+            "finds the nearest idea nobody has built that reuses it, and shows verified evidence that the space is open.",
+            "the input is your repo, not a pitch", 66, 66, [lens, lab, catch])
+    e(0.2, "mutator", "mutate", "agent.finished", {"ok": True, "summary": "3 mutations re-scored; coaching conversation open"})
 
     # ---- act --------------------------------------------------------------------------------------------
     e(0.3, "actuator", "act", "agent.started", {"purpose": "An answer that doesn't act is a report."})

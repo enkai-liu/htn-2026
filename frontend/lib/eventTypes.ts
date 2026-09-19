@@ -11,7 +11,7 @@ export const EVENT_TYPES = [
   "claim.proposed", "claim.challenged", "claim.resolved", "requery.issued", "jury.vote", "verify.result",
   "voice.result", "prior.sample",
   "score.updated", "graph.patch",
-  "mutation.proposed", "mutation.scored", "action.proposed", "action.done", "budget.updated",
+  "mutation.proposed", "mutation.scored", "coach.message", "coach.pitch", "action.proposed", "action.done", "budget.updated",
 ] as const satisfies readonly EventType[];
 
 type Missing = Exclude<EventType, (typeof EVENT_TYPES)[number]>;

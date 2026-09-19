@@ -4,14 +4,14 @@
 // does not. Everything the old single-page RunView held in local state lives here instead.
 import { useSearchParams } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
-import { ApiError, rescoreMutation, runAction } from "@/lib/api";
+import { ApiError, coachSay, rescoreMutation, runAction } from "@/lib/api";
 import type { ActionState } from "@/lib/runReducer";
 import { selectEvidenceCards, selectLedger, selectSourceStatus, type EvidenceCardModel } from "@/lib/selectors";
 import { useRunEvents, type RunEvents } from "@/lib/useRunEvents";
 import { ToastProvider, useToast } from "../ui";
 import { RunShell } from "./RunShell";
 
-export type RunSegment = "" | "evidence" | "debate" | "coach" | "report" | "swarm";
+export type RunSegment = "" | "debate" | "coach" | "report" | "swarm";
 
 /** Camera pose of the islands map, remembered while another tab is showing. */
 export interface CameraMemo { position: [number, number, number]; target: [number, number, number]; zoom: number; userMoved: boolean }
@@ -23,12 +23,14 @@ export interface RunContextValue {
   streaming: boolean;
   selectedId: string | null;
   select: (id: string | null) => void;
-  evidenceView: "cards" | "ledger";
-  setEvidenceView: (v: "cards" | "ledger") => void;
   busyAction: string | null;
   busyMid: string | null;
   onAct: (a: ActionState) => Promise<void>;
   onRescore: (mid: string) => Promise<void>;
+  /** One turn of the coaching conversation. `pendingSay` is the author's message until the stream echoes it back. */
+  onCoachSay: (text: string, mid?: string | null) => Promise<void>;
+  coachBusy: boolean;
+  pendingSay: string | null;
   cards: EvidenceCardModel[];
   ledger: ReturnType<typeof selectLedger>;
   sourceStatus: ReturnType<typeof selectSourceStatus>;
@@ -56,9 +58,10 @@ function RunProviderInner({ runId, replay, speed, mapMode, children }: { runId: 
   const isReplay = transport === "replay";
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [evidenceView, setEvidenceView] = useState<"cards" | "ledger">("cards");
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [busyMid, setBusyMid] = useState<string | null>(null);
+  const [pendingSay, setPendingSay] = useState<{ text: string; at: number } | null>(null);
+  const [coachBusy, setCoachBusy] = useState(false);
   const seenIslands = useRef<Set<string>>(new Set());
   const cameraMemo = useRef<CameraMemo | null>(null);
 
@@ -101,6 +104,27 @@ function RunProviderInner({ runId, replay, speed, mapMode, children }: { runId: 
     }
   }, [isReplay, replayNotice, resync, runId, toast]);
 
+  const coachCount = state.coach.length;
+  const onCoachSay = useCallback(async (text: string, mid?: string | null) => {
+    const said = text.trim();
+    if (!said) return;
+    if (isReplay) { toast({ title: "This conversation is a recording", body: "Start a live investigation to talk your own idea through with the coach.", tone: "amber" }); return; }
+    setCoachBusy(true);
+    setPendingSay({ text: said, at: coachCount });
+    try {
+      const res = await coachSay(runId, said, mid);
+      if (!res.ok) toast({ title: "The coach could not answer", body: typeof res.message === "string" ? res.message : undefined, tone: "red" });
+      resync();
+    } catch (err) {
+      toast({ title: "Message not sent", body: err instanceof ApiError ? err.message : "Could not reach the backend.", tone: "red" });
+    } finally {
+      setCoachBusy(false);
+      setPendingSay(null);
+    }
+  }, [coachCount, isReplay, resync, runId, toast]);
+  // the stream echoes the author's message back within a beat; from then on the real one is shown
+  const pendingText = pendingSay && coachCount === pendingSay.at ? pendingSay.text : null;
+
   // action.done -> toast
   const lastDone = state.lastActionDone;
   useEffect(() => {
@@ -138,9 +162,9 @@ function RunProviderInner({ runId, replay, speed, mapMode, children }: { runId: 
   }, [mapMode, replay, runId, speed]);
 
   const value = useMemo<RunContextValue>(() => ({
-    runId, run, isReplay, streaming, selectedId, select: setSelectedId, evidenceView, setEvidenceView,
-    busyAction, busyMid, onAct, onRescore, cards, ledger, sourceStatus, seenIslands, cameraMemo, hrefFor, mapMode,
-  }), [runId, run, isReplay, streaming, selectedId, evidenceView, busyAction, busyMid, onAct, onRescore, cards, ledger, sourceStatus, hrefFor, mapMode]);
+    runId, run, isReplay, streaming, selectedId, select: setSelectedId,
+    busyAction, busyMid, onAct, onRescore, onCoachSay, coachBusy, pendingSay: pendingText, cards, ledger, sourceStatus, seenIslands, cameraMemo, hrefFor, mapMode,
+  }), [runId, run, isReplay, streaming, selectedId, busyAction, busyMid, onAct, onRescore, onCoachSay, coachBusy, pendingText, cards, ledger, sourceStatus, hrefFor, mapMode]);
 
   return (
     <RunContext.Provider value={value}>

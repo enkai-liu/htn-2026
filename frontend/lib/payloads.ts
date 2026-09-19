@@ -1,7 +1,7 @@
 // Per-event `data` payloads (docs/events.md table). Frontend-only helper types layered on lib/types.ts.
 // Every field a reducer reads is treated as optional at runtime: a malformed event must never crash the UI.
 import type {
-  Claim, ClaimStatus, Conflict, Entity, Facets, GraphPatch, JurorVote, MergeVerdict, Mutation, Report, Scores,
+  Claim, ClaimStatus, CoachMessage, CoachPitch, Conflict, Entity, Facets, GraphPatch, JurorVote, MergeVerdict, Mutation, Report, Scores,
   SourceRecord, Voice, Evidence } from "./types";
 
 export interface RunStartedData { idea_text: string; orchestrator?: "asyncio" | "jiuwen" | string; replay?: boolean; mock?: boolean }
@@ -22,11 +22,14 @@ export interface ClaimProposedData { claim: Claim; evidence?: Evidence[]; facets
 export interface ClaimChallengedData { cid: string; by: string; challenge_type: "CHALLENGE" | "REBUTTAL" | "CONCEDE"; text: string; evidence?: string[]; simulated?: boolean }
 export interface ClaimResolvedData { cid: string; status: ClaimStatus; reason: string; simulated?: boolean }
 export interface RequeryIssuedData { reason: string; facet: string; query: string; to: string }
-export interface JuryVoteData { subject: string; votes: JurorVote[]; mean: number; std: number }
+/** `eid` and `facet` are sent by the live judge; the mock fixture and older recordings only have `subject`. */
+export interface JuryVoteData { subject: string; eid?: string; facet?: string; votes: JurorVote[]; mean: number; std: number }
 export interface VerifyResultData { cid: string; layer: "quote" | "gptzero"; status: string; detail: string; simulated?: boolean }
 export interface PriorSampleData { model: string; text: string; similarity: number }
 export interface MutationProposedData { mutation: Mutation }
 export interface MutationScoredData { mid: string; delta: number; axes?: Record<string, number> | null }
+export interface CoachMessageData { message: CoachMessage }
+export interface CoachPitchData { pitch: CoachPitch }
 export interface ActionProposedData { action: string; label: string; requires_click: boolean }
 export interface ActionDoneData { action: string; ok: boolean; detail?: string }
 export interface BudgetUpdatedData { calls: number; tokens: number; cost_usd: number; elapsed_s: number; degraded: boolean }
@@ -60,6 +63,8 @@ export interface PayloadMap {
   "graph.patch": GraphPatch;
   "mutation.proposed": MutationProposedData;
   "mutation.scored": MutationScoredData;
+  "coach.message": CoachMessageData;
+  "coach.pitch": CoachPitchData;
   "action.proposed": ActionProposedData;
   "action.done": ActionDoneData;
   "budget.updated": BudgetUpdatedData;

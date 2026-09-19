@@ -105,6 +105,30 @@ async def rescore(run_id: str, mid: str) -> dict:
     return {"ok": reply.get("type") == "RESULT", **(reply.get("payload") or {})}
 
 
+class CoachRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=1500)
+    mid: str | None = Field(default=None, max_length=40)  # a proposed mutation the author wants to talk through
+
+
+@router.post("/runs/{run_id}/coach")
+async def coach(run_id: str, req: CoachRequest) -> dict:
+    """One turn of the coaching conversation. The reply arrives on the event stream (coach.message, coach.pitch)."""
+    run = runstore.get_run(run_id)
+    if run is None:
+        raise HTTPException(409, "coaching needs a live run (this is a recording)")
+    if not req.text.strip():
+        raise HTTPException(422, "say something first")
+    if req.mid is not None and req.mid not in run.board.mutations:
+        raise HTTPException(404, f"unknown mutation {req.mid!r}")
+    if run.coach_lock.locked():
+        raise HTTPException(409, "the coach is still answering your last message")
+    async with run.coach_lock:
+        runstore.keep_alive(run)
+        reply = await run.host.deliver("user", "mutator", task(chat=req.text.strip(), mid=req.mid), timeout=90)
+        runstore.keep_alive(run)
+    return {"ok": reply.get("type") == "RESULT", **(reply.get("payload") or {})}
+
+
 @router.post("/runs/{run_id}/actions/{action}")
 async def act(run_id: str, action: str, body: dict | None = None) -> dict:
     if action not in ACTIONS:

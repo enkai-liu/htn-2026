@@ -16,7 +16,7 @@ const final = foldEvents(events);
 
 describe("mock run fixture", () => {
   it("parses every line and only uses known event types", () => {
-    expect(events.length).toBe(125);
+    expect(events.length).toBeGreaterThanOrEqual(125);
     const known = new Set<string>(EVENT_TYPES);
     expect(events.filter((e) => !known.has(e.type))).toEqual([]);
     expect(events.map((e) => e.seq)).toEqual(events.map((_, i) => i + 1));

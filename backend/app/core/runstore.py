@@ -32,6 +32,7 @@ class Run:
     report: Report | None = None
     created: float = field(default_factory=time.time)
     evict: asyncio.TimerHandle | None = None
+    coach_lock: asyncio.Lock = field(default_factory=asyncio.Lock)  # one coaching turn at a time
 
     @property
     def active(self) -> bool:
@@ -92,6 +93,15 @@ async def evict(run_id: str) -> None:
     if run.evict is not None:
         run.evict.cancel()
     await run.bus.close()
+
+
+def keep_alive(run: Run) -> None:
+    """The author is still talking to the coach: a finished run gets a fresh retention window instead of being evicted mid-conversation."""
+    if run.evict is None:
+        return  # still executing; _drive schedules the eviction when it ends
+    run.evict.cancel()
+    loop = asyncio.get_running_loop()
+    run.evict = loop.call_later(get_settings().run_retention_s, lambda: loop.create_task(evict(run.run_id)))
 
 
 async def _drive(run: Run, warning: str | None) -> None:

@@ -8,17 +8,17 @@ import { applyGraphPatch, emptyGraph, type GraphState } from "./graphReducer";
 import type {
   ActionDoneData, ActionProposedData, AgentFinishedData, AgentStartedData, BudgetUpdatedData, ClaimChallengedData,
   ClaimProposedData, ClaimResolvedData, ConflictDetectedData, EntityMergedData, ErrorData, EvidenceFoundData,
-  FacetsExtractedData, JuryVoteData, MessageSentData, MutationProposedData, MutationScoredData, PriorSampleData,
+  CoachMessageData, CoachPitchData, FacetsExtractedData, JuryVoteData, MessageSentData, MutationProposedData, MutationScoredData, PriorSampleData,
   RequeryIssuedData, RunFinishedData, RunStartedData, SourceFailedData, TeamFormedData, ToolCallData, ToolResultData,
   VerifyResultData,
 } from "./payloads";
 import type {
-  AgentEvent, Claim, ClaimStatus, Conflict, Entity, EventType, Evidence, Facets, GraphPatch, JurorVote, Mutation, Phase,
+  AgentEvent, Claim, ClaimStatus, CoachMessage, CoachPitch, Conflict, Entity, EventType, Evidence, Facets, GraphPatch, JurorVote, Mutation, Phase,
   Report, Scores, SourceRecord, Voice,
 } from "./types";
 
-/** A jury whose scores spread at least this much counts as "split" and is expected to trigger a re-query. */
-export const JURY_SPLIT_STD = 0.2;
+/** A jury whose scores spread at least this much counts as "split" and triggers a re-query. Mirrors SPLIT in backend/app/roles/judge.py. */
+export const JURY_SPLIT_STD = 0.25;
 
 export type AgentStatus = "idle" | "active" | "done" | "failed" | "recovered" | "skipped";
 
@@ -88,6 +88,9 @@ export interface JuryVote {
   seq: number;
   t: number;
   subject: string;
+  /** which entity and facet the jury rated, when the judge said so (see `juryTarget` in lib/debate.ts for the fallback) */
+  eid?: string;
+  facet?: string;
   votes: JurorVote[];
   mean: number;
   std: number;
@@ -205,6 +208,10 @@ export interface RunState {
   scoresSeq: number;
   mutations: Record<string, MutationState>;
   mutationOrder: string[];
+  /** the coaching conversation, oldest first */
+  coach: (CoachMessage & { seq: number })[];
+  /** working-idea versions by version number; [0] is the original pitch */
+  pitches: (CoachPitch & { seq: number })[];
   actions: ActionState[];
   lastActionDone: { seq: number; action: string; ok: boolean; detail?: string } | null;
   budget: (BudgetUpdatedData & { seq: number }) | null;
@@ -249,6 +256,8 @@ export const initialRunState: RunState = {
   scoresSeq: 0,
   mutations: {},
   mutationOrder: [],
+  coach: [],
+  pitches: [],
   actions: [],
   lastActionDone: null,
   budget: null,
@@ -630,7 +639,7 @@ function fold(state: RunState, ev: AgentEvent, t: number): RunState {
       const base = (s: string) => s.replace(/\s*\(re-?vote\)\s*/i, "").trim();
       const revote = /re-?vote/i.test(data.subject ?? "") || next.juryVotes.some((v) => base(v.subject) === base(data.subject ?? ""));
       const split = (data.std ?? 0) >= JURY_SPLIT_STD;
-      const juryVotes = [...next.juryVotes, { seq: ev.seq, t, subject: data.subject ?? "", votes: data.votes ?? [], mean: data.mean ?? 0, std: data.std ?? 0, split, revote }];
+      const juryVotes = [...next.juryVotes, { seq: ev.seq, t, subject: data.subject ?? "", eid: data.eid, facet: data.facet, votes: data.votes ?? [], mean: data.mean ?? 0, std: data.std ?? 0, split, revote }];
       set({ juryVotes, debateFeed: [...next.debateFeed, { kind: "jury", index: juryVotes.length - 1 }] });
       row({
         title: data.subject ?? "jury vote", detail: `mean ${(data.mean ?? 0).toFixed(2)} · σ ${(data.std ?? 0).toFixed(2)} · ${(data.votes ?? []).length} jurors`,
@@ -711,6 +720,26 @@ function fold(state: RunState, ev: AgentEvent, t: number): RunState {
       if (cur) set({ mutations: { ...next.mutations, [data.mid]: { ...cur, delta: data.delta, axes: data.axes ?? cur.axes, scoredSeq: ev.seq } } });
       const sign = data.delta > 0 ? "+" : "";
       row({ title: `${data.mid} re-scored against the corpus: ${sign}${data.delta}`, detail: data.axes ? Object.entries(data.axes).map(([k, v]) => `${k} → ${v}`).join(" · ") : undefined, tag: "re-scored", tone: data.delta > 0 ? "teal" : "muted" });
+      touch(ev.agent);
+      break;
+    }
+    case "coach.message": {
+      const m = (d as CoachMessageData).message;
+      if (m?.id && m.text && !next.coach.some((x) => x.id === m.id)) {
+        set({ coach: [...next.coach, { ...m, seq: ev.seq }] });
+        if (m.role === "coach") row({ title: `coach: ${short(m.question || m.text, 90)}`, tag: "coaching", tone: "teal" });
+      }
+      touch(ev.agent);
+      break;
+    }
+    case "coach.pitch": {
+      const p = (d as CoachPitchData).pitch;
+      if (p && typeof p.version === "number" && p.text) {
+        const i = next.pitches.findIndex((x) => x.version === p.version);
+        const pitches = i >= 0 ? next.pitches.map((x, j) => (j === i ? { ...x, ...p, seq: ev.seq } : x)) : [...next.pitches, { ...p, seq: ev.seq }].sort((a, b) => a.version - b.version);
+        set({ pitches });
+        if (p.version > 0 && p.crowding != null) row({ title: `working idea v${p.version} checked against the corpus${p.delta != null ? `: ${p.delta > 0 ? "+" : ""}${p.delta} crowding` : ""}`, tag: "re-scored", tone: (p.delta ?? 0) > 0 ? "teal" : "muted" });
+      }
       touch(ev.agent);
       break;
     }

@@ -50,6 +50,11 @@ export function runAction(runId: string, action: string, body?: Record<string, u
   return request(`/api/runs/${encodeURIComponent(runId)}/actions/${encodeURIComponent(action)}`, { method: "POST", body: JSON.stringify(body ?? {}) }, 70000);
 }
 
+/** One turn of the coaching conversation; the reply arrives on the event stream. */
+export function coachSay(runId: string, text: string, mid?: string | null): Promise<{ ok: boolean; [k: string]: unknown }> {
+  return request(`/api/runs/${encodeURIComponent(runId)}/coach`, { method: "POST", body: JSON.stringify({ text, ...(mid ? { mid } : {}) }) }, 100000);
+}
+
 export function rescoreMutation(runId: string, mid: string): Promise<{ ok: boolean; [k: string]: unknown }> {
   return request(`/api/runs/${encodeURIComponent(runId)}/mutations/${encodeURIComponent(mid)}/rescore`, { method: "POST" }, 70000);
 }

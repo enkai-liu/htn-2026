@@ -71,7 +71,16 @@ class FakeRouter:
         elif name == "Swaps":
             obj = schema(mutations=[{"facet": "audience", "frm": "hackers", "to": "organisers screening submissions", "rationale": "absent nearby",
                                      "pitch": "A triage console for hackathon organisers that flags recycled projects with verified evidence.",
-                                     "grounded_in": ["organizer"]}] * 3)
+                                     "grounded_in": ["organizer"]}] * 3,
+                         diagnosis="Searching past projects is the crowded part: IdeaRadar already does it.", question="Who do you most want to help?",
+                         suggestions=["Organisers", "First-time hackers"])
+        elif name == "CoachTurn":
+            obj = schema(reply="Organisers is open ground: IdeaRadar only serves hackers.", question="Would you build it for one hackathon first?",
+                         suggestions=["Yes, Hack the North"], cited=[1, 99])
+        elif name == "PitchEdit":
+            moved = "organisers" in kw["user"].rsplit("AUTHOR'S LAST MESSAGE:", 1)[-1]
+            obj = schema(changed=moved, pitch="A triage console for hackathon organisers that flags recycled submissions with verified evidence." if moved else "",
+                         note="audience: organisers" if moved else "")
         else:  # pragma: no cover
             raise AssertionError(f"unexpected schema {name}")
         return obj, self._res(model or "fake/model")
@@ -226,3 +235,33 @@ async def test_host_parity(monkeypatch, request):
         assert run.host.name == host
         counts[host] = Counter(e.type for e in run.bus.history)
     assert counts["asyncio"] == counts["jiuwen"], {k: (counts["asyncio"][k], counts["jiuwen"][k]) for k in counts["asyncio"] | counts["jiuwen"] if counts["asyncio"][k] != counts["jiuwen"][k]}
+
+
+async def test_coach_conversation(offline):
+    """The coach opens the conversation during the run; afterwards each author turn yields a reply and, when the idea
+    moved, a new working-idea version that is announced first and measured second."""
+    from app.orchestration.host import task
+
+    run = runstore.create_run(IDEA)
+    await run.task
+    opened = [e for e in run.bus.history if e.type.startswith("coach.")]
+    assert [e.type for e in opened] == ["coach.pitch", "coach.message"]
+    assert opened[0].data["pitch"]["version"] == 0 and opened[0].data["pitch"]["text"] == IDEA
+    first = opened[1].data["message"]
+    assert first["role"] == "coach" and first["question"] == "Who do you most want to help?" and first["cites"][0]["title"].lower() == "idearadar"
+
+    n = len(run.bus.history)
+    reply = await run.host.deliver("user", "mutator", task(chat="I care most about organisers drowning in submissions."), timeout=30)
+    assert reply["type"] == "RESULT" and reply["payload"]["version"] == 1
+    turn = run.bus.history[n:]
+    assert set(e.type for e in turn) <= EVENT_TYPES
+    msgs = [e.data["message"] for e in turn if e.type == "coach.message"]
+    assert [m["role"] for m in msgs] == ["user", "coach"]
+    assert msgs[1]["pitch_version"] == 1 and [c["title"].lower() for c in msgs[1]["cites"]] == ["idearadar"]  # the out-of-range cite is dropped
+    pitches = [e.data["pitch"] for e in turn if e.type == "coach.pitch"]
+    assert [p["version"] for p in pitches] == [1, 1] and pitches[0]["crowding"] is None and pitches[1]["crowding"] is not None
+    assert pitches[1]["nearest"] and len(run.board.pitches) == 2 and len(run.board.coach) == 3
+
+    # the working idea is the author's: a turn that only answers a question cannot move it, whatever pitch the model writes
+    reply = await run.host.deliver("user", "mutator", task(chat="I have one weekend and I mostly write backend code."), timeout=30)
+    assert reply["type"] == "RESULT" and reply["payload"]["version"] is None and len(run.board.pitches) == 2

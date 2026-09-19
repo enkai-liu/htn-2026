@@ -43,6 +43,8 @@ EVENT_TYPES: frozenset[str] = frozenset(
         # coaching and actions
         "mutation.proposed",
         "mutation.scored",
+        "coach.message",
+        "coach.pitch",
         "action.proposed",
         "action.done",
         "budget.updated",

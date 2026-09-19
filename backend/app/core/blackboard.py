@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from app.schemas import Claim, Entity, Evidence, Facets, Mutation, Scores, SourceRecord, SourceStatus, Voice
+from app.schemas import Claim, CoachMessage, CoachPitch, Entity, Evidence, Facets, Mutation, Scores, SourceRecord, SourceStatus, Voice
 
 WRITE_PERMISSIONS: dict[str, tuple[str, ...]] = {
     "facets": ("conductor",),
@@ -21,6 +21,8 @@ WRITE_PERMISSIONS: dict[str, tuple[str, ...]] = {
     "priors": ("judge",),
     "scores": ("synthesizer", "mutator"),
     "mutations": ("mutator",),
+    "coach": ("mutator",),
+    "pitches": ("mutator",),
     "stats": ("scout.", "synthesizer", "mutator", "conductor"),
 }
 
@@ -44,6 +46,8 @@ class Blackboard:
         self.priors: list[dict[str, Any]] = []
         self.scores: Scores | None = None
         self.mutations: dict[str, Mutation] = {}
+        self.coach: list[CoachMessage] = []  # the coaching conversation, oldest first
+        self.pitches: list[CoachPitch] = []  # working-idea versions; [0] is the original
         self.stats: dict[str, Any] = {}  # cliches, whitespace, by_year, facet dfs
 
     def _check(self, section: str, writer: str) -> None:

@@ -64,12 +64,13 @@ async def test_recorded_run_completes_and_resumes_from_last_event_id(base_url):
     async with httpx.AsyncClient(timeout=20) as client:
         async with client.stream("GET", f"{base_url}/api/runs/mock/events?speed=0") as resp:
             frames = await _read(resp)
-        assert [int(f["id"]) for f in frames] == list(range(1, 126))
+        n = len(frames)  # the fixture grows; what matters is that it is gap-free and resumable
+        assert n >= 125 and [int(f["id"]) for f in frames] == list(range(1, n + 1))
         assert frames[-1]["event"] == "run.finished"
 
-        async with client.stream("GET", f"{base_url}/api/runs/mock/events?speed=0", headers={"Last-Event-ID": "120"}) as resp:
+        async with client.stream("GET", f"{base_url}/api/runs/mock/events?speed=0", headers={"Last-Event-ID": str(n - 5)}) as resp:
             tail = await _read(resp)
-        assert [int(f["id"]) for f in tail] == [121, 122, 123, 124, 125]
+        assert [int(f["id"]) for f in tail] == list(range(n - 4, n + 1))
 
         assert (await client.get(f"{base_url}/api/runs/nope/events")).status_code == 404
 

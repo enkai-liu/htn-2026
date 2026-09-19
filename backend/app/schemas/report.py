@@ -103,6 +103,44 @@ class Mutation(BaseModel):
     axes: dict[str, float] | None = None
 
 
+class CoachCite(BaseModel):
+    """A project the coach points at: either a neighbour already on the map (`eid`) or a fresh corpus hit."""
+
+    title: str
+    url: str = ""
+    source: str = ""
+    year: int | None = None
+    similarity: float | None = None
+    eid: str | None = None
+
+
+class CoachMessage(BaseModel):
+    """One turn of the coaching conversation. `suggestions` are tap-to-send replies offered to the author."""
+
+    id: str
+    role: Literal["coach", "user"]
+    text: str
+    question: str | None = None  # the one thing the coach wants answered next
+    suggestions: list[str] = Field(default_factory=list)
+    cites: list[CoachCite] = Field(default_factory=list)
+    mid: str | None = None  # the mutation this turn explores, if any
+    pitch_version: int | None = None  # the working-idea version this turn produced
+
+
+class CoachPitch(BaseModel):
+    """A version of the working idea. v0 is the original pitch; later versions come out of the conversation and are
+    re-measured against the corpus (crowding only: the other axes are held at the run's values)."""
+
+    version: int
+    text: str
+    note: str = ""  # what changed from the previous version
+    crowding: float | None = None  # None while the corpus check is running
+    delta: float | None = None  # crowding change vs the original idea
+    headline: float | None = None
+    nearest: list[CoachCite] = Field(default_factory=list)
+    calibrated: bool = True
+
+
 class SourceStatus(BaseModel):
     source: str
     status: Literal["ok", "failed", "skipped", "degraded"]

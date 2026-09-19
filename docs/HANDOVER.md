@@ -55,13 +55,24 @@ FIRST TASKS:
 | Ingest + search | tiered loaders (twangodev, alvanlii, YC), Devpost write-up parser, polite fetcher, EIS throughput measurer; hybrid search with degradation ladder, facet/pair rarity, whitespace finder, calibration CDF | `ingest/`, `backend/app/search/` |
 | GPTZero + investigation | client with word ledger/cache/replay, bibliography-scan mapping, quote check, Slop Index pipeline (sample → scan → analyze → export) | `backend/app/signals/`, `investigation/` |
 | Scripts | smokes for Elastic/Baseten/GPTZero (`--live` needed to spend GPTZero words), secret scan, benchmark ideas (Spearman), golden-run recorder, Baseten bake-off | `scripts/`, `baseten/bakeoff.py` |
-| Frontend | Next.js 16 app, redesigned Sat evening: light minimal theme; landing (ambient islands hero); a run is six pages behind a bottom tab bar, `/runs/<id>` Map (3D floating-islands map in plain three.js: your idea at the centre, distance = 1 - similarity, one wedge per source, pop-in / merge / re-score drift, click for a detail card), `/evidence`, `/debate`, `/coach` (mutations + the three actions), `/report` (+ Voice as its own section), `/swarm` (roster, timeline, cost per model). One `RunProvider` in `app/runs/[id]/(tabs)/layout.tsx` streams the run once for all tabs; every in-run link must go through `hrefFor()` or `?replay=`/`?speed=` is lost and the run restarts. The old one-page dark dashboard is kept as the demo fallback at `/runs/<id>/classic`; `?map=2d` swaps the islands for the old 2D chart. Slop Index page (sample data labelled), About. Static replay works with no backend | `frontend/` (`components/run/`, `components/islands/`, `lib/islandLayout.ts`) |
+| Frontend | Next.js 16 app, redesigned Sat evening: light minimal theme; landing (ambient islands hero); a run is six pages behind a bottom tab bar, `/runs/<id>` Map (3D floating-islands map in plain three.js: your idea at the centre, distance = 1 - similarity, one wedge per source, pop-in / merge / re-score drift, click for a detail card), `/evidence`, `/debate` (a hand-off strip critic → advocate → jury → verifier → report with the two back-edges to the scouts, then one case file per prior-art project with its jury bench per facet and the verifier's ruling; grouping lives in `lib/debate.ts`, `/classic` still uses the flat `DebateThread`), `/coach` (mutations + the three actions), `/report` (+ Voice as its own section), `/swarm` (roster, timeline, cost per model). One `RunProvider` in `app/runs/[id]/(tabs)/layout.tsx` streams the run once for all tabs; every in-run link must go through `hrefFor()` or `?replay=`/`?speed=` is lost and the run restarts. The old one-page dark dashboard is kept as the demo fallback at `/runs/<id>/classic`; `?map=2d` swaps the islands for the old 2D chart. Slop Index page (sample data labelled), About. Static replay works with no backend | `frontend/` (`components/run/`, `components/islands/`, `components/debate/`, `lib/islandLayout.ts`, `lib/debate.ts`) |
 
 **Elastic is LIVE (set up Sat ~16:00).** `.env` holds every key. A serverless 9.6.0 project on GCP `us-east4`
 (general-purpose Elasticsearch, NOT the new "Vector Database" project type) has all 17 artifacts applied and
 8,462 Tier 0 docs indexed; `bash scripts/smoke_elastic.sh` is 9/9 and hybrid retrieval returns HackAnalyzer /
 Plagia / DevSpot in the top 5 in ~0.8s. **FORK/FUSE/RERANK works here**, so `originality.hybrid_prior_art` is
 live and the `semantic_prior_art` fallback is not needed. **Still not run against a real LLM or GPTZero.**
+
+**Coach is a conversation (added Sat ~19:30).** The Coach tab is no longer three finished swaps: the mutator opens a
+conversation (what is crowded, what is already yours, one question), the author answers in free text or taps a
+suggested reply, and `POST /api/runs/{id}/coach {text, mid?}` runs one turn. Each turn (i) searches the corpus for what
+the author just said BEFORE answering, so pushback names real projects, (ii) runs the coach reply and a separate
+`PitchEdit` call side by side (asked to do both at once, Kimi just echoed the old pitch), (iii) when the AUTHOR moved
+the idea, writes working-idea v(n+1) and re-measures crowding (headline recomputed with the other axes held). New
+events `coach.message` / `coach.pitch` (docs/events.md); the mock fixture scripts a 3-turn conversation so replays show
+it. Every turn restarts the run's retention window. Verified live on Baseten + Elastic: ~3.5 s per turn, StudyPal went
+23 -> 44 -> 54 over two author moves. UI: `frontend/components/coach/CoachPanel.tsx` (the old `MutationPanel` is still
+used by `/classic`). A backend started before this change has no `/coach` route: restart it.
 
 ## Verify the state
 

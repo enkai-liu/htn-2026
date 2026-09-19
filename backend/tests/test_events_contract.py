@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from app.schemas import EVENT_TYPES, AgentEvent, Claim, Entity, Facets, GraphPatch, Mutation, Report, Scores, SourceRecord, Voice
+from app.schemas import EVENT_TYPES, AgentEvent, Claim, CoachMessage, CoachPitch, Entity, Facets, GraphPatch, Mutation, Report, Scores, SourceRecord, Voice
 
 FIXTURES = Path(__file__).resolve().parents[1] / "fixtures"
 FILES = [FIXTURES / "mock_run.jsonl", *sorted((FIXTURES / "golden").glob("*.jsonl"))]
@@ -18,6 +18,8 @@ PAYLOADS = {
     "score.updated": lambda d: Scores(**d),
     "graph.patch": lambda d: GraphPatch(**d),
     "mutation.proposed": lambda d: Mutation(**d["mutation"]),
+    "coach.message": lambda d: CoachMessage(**d["message"]),
+    "coach.pitch": lambda d: CoachPitch(**d["pitch"]),
     "run.finished": lambda d: Report(**d["report"]),
 }
 
