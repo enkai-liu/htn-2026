@@ -7,7 +7,7 @@ Two moments: the **initial submission by Sat 14:00 EDT** (team, badge IDs and sp
 - [ ] Project created on the Hack the North 2026 Devpost, all 4 teammates added, every badge ID entered
 - [ ] Name, tagline and the short description below pasted in (placeholders are fine, the opt-ins are what lock)
 - [ ] Prizes opted into: **GPTZero · Baseten · Huawei openJiuwen · Rox · Elastic · Browserbase · GoDaddy Registry (MLH domain)**
-- [ ] **RBC: decide by 13:30.** Recommendation stands: do not opt in (it is a financial-data Q&A benchmark on RBC's own MCP server, a different project)
+- [x] **RBC: decided — not opted in** (it is a financial-data Q&A benchmark on RBC's own MCP server, a different project). Sponsor prizes locked at initial submission: GPTZero, Elastic, Baseten, Rox, Huawei openJiuwen, GoDaddy, Browserbase.
 - [ ] Repo link: `github.com/enkai-liu/htn-2026` (private until `scripts/secret_scan.sh` is clean on Sunday morning)
 - [ ] Booth answers written down: Rox (separate write-up or deadline?), Huawei (does agent-core + a validated Swarm Skill count?)
 
