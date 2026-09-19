@@ -8,11 +8,11 @@ import type { GraphState } from "./graphReducer";
 import { hashString, mulberry32 } from "./seeded";
 import type { GraphNode } from "./types";
 
-export const R_MIN = 3.6;
+export const R_MIN = 4.5;
 export const R_SPAN = 12;
 /** clear water kept between two islands */
 export const GAP = 0.3;
-const RADIUS_STEP = 0.9;
+const RADIUS_STEP = 1.1;
 const MAX_RADIUS_STEPS = 14;
 
 export type IslandKind = "idea" | "entity" | "prior" | "mutation";
@@ -91,10 +91,10 @@ export function sectorFor(kind: string, source: string | null | undefined): { ce
 
 export function islandSize(n: Pick<GraphNode, "kind" | "val">): number {
   switch (n.kind) {
-    case "idea": return 1.7;
-    case "prior": return 0.42;
-    case "mutation": return 0.62;
-    default: return 0.78 + Math.min(8, Math.max(0, n.val)) * 0.055;
+    case "idea": return 2.2;
+    case "prior": return 0.56;
+    case "mutation": return 0.82;
+    default: return 1.02 + Math.min(8, Math.max(0, n.val)) * 0.07;
   }
 }
 

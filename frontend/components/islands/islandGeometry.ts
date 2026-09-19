@@ -1,28 +1,44 @@
-// Procedural low-poly islands. Everything is seeded by the node id, so an island has the same coastline, the same
-// buildings and the same trees on every render. One merged, vertex-coloured geometry per island: one draw call each.
-import { BoxGeometry, BufferAttribute, BufferGeometry, Color, ConeGeometry, CylinderGeometry } from "three";
+// Procedural low-poly islands. Everything is seeded by the node id, so an island has the same coastline and the same
+// trees on every render. One merged, vertex-coloured geometry per island: one draw call each.
+//
+// The map is a chart of claimed territory, and every object on it means one thing:
+//   your idea    a lighthouse          prior art    a hill with a flag in the colour of its source (gold: a winner)
+//   LLM prior    bare rock, unclaimed  mutation     a boat leaving your island, bow pointing away from it
+// How much there is of a project is the size of its island, and nothing else.
+import { BufferAttribute, BufferGeometry, Color, ConeGeometry, CylinderGeometry } from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { mulberry32 } from "@/lib/seeded";
 import type { IslandKind } from "@/lib/islandLayout";
 
 const PAPER = new Color("#ece9e2");
-const WHITE = new Color("#ffffff");
 const ROCK_TOP = new Color("#c4bdb0");
 const ROCK_TIP = new Color("#8f887c");
 const TREE = new Color("#6f9b6c");
 const TREE_DARK = new Color("#557f58");
 const GOLD = new Color("#e0a422");
+const POLE = new Color("#5d564b");
+const LIME = new Color("#faf6ec");
+const BAND = new Color("#e9a23b");
+const BAND_DARK = new Color("#c9791f");
+const LANTERN = new Color("#ffd76a");
+const HULL = new Color("#b98f63");
+const DECK = new Color("#e6d2b0");
+const LANTERN_H = 0.13;
+
+/** Height of the lighthouse lantern above an idea island's turf, in island sizes: where the scene hangs the glow. */
+export const LANTERN_AT = 0.1 + 0.3 + 0.18 + 0.32 + 0.035 + LANTERN_H / 2;
 
 export interface IslandLook {
   seed: number;
   size: number;
   kind: IslandKind;
   tint: string;
-  buildings: number;
   winner: boolean;
+  /** which way a boat points, as a rotation about y; ignored by everything that is not a boat */
+  heading: number;
 }
 
-export const lookKey = (l: IslandLook) => `${l.seed}:${l.size.toFixed(3)}:${l.kind}:${l.tint}:${l.buildings}:${l.winner ? 1 : 0}`;
+export const lookKey = (l: IslandLook) => `${l.seed}:${l.size.toFixed(3)}:${l.kind}:${l.tint}:${l.winner ? 1 : 0}:${l.heading.toFixed(2)}`;
 
 function paint(g: BufferGeometry, colour: (x: number, y: number, z: number) => Color): BufferGeometry {
   const pos = g.getAttribute("position");
@@ -36,6 +52,20 @@ function paint(g: BufferGeometry, colour: (x: number, y: number, z: number) => C
 }
 
 const flat = (c: Color) => () => c;
+
+/** A thin triangular plate standing in the xy plane: hoist edge at x = -0.5 (1.732 tall), tip at x = 1. A plate rather
+ *  than a single triangle because the island material is single-sided. */
+function pennant(thickness: number, sail = false): BufferGeometry {
+  const g = new CylinderGeometry(1, 1, thickness, 3, 1); // tip at +z, lying flat
+  g.rotateX(Math.PI / 2); // stand it up: tip at -y
+  g.rotateZ(Math.PI / 2); // tip at +x
+  if (sail) {
+    // a sail is a right triangle: drop the tip to the foot
+    const pos = g.getAttribute("position");
+    for (let i = 0; i < pos.count; i++) if (pos.getX(i) > 0.9) pos.setY(i, -0.866);
+  }
+  return g;
+}
 
 /** Push vertices in or out by an amount that depends only on their bearing, so duplicated seam vertices stay welded. */
 function roughen(g: BufferGeometry, coast: number[], amount: number) {
@@ -63,21 +93,28 @@ export function buildIslandGeometry(look: IslandLook): BufferGeometry {
   // the turf
   const slabH = 0.26 * size + 0.08;
   const ground = kind === "prior" ? new Color("#d5d2ca") : tint.clone().lerp(PAPER, kind === "idea" ? 0.45 : 0.68);
-  const slab = new CylinderGeometry(size, size * 0.9, slabH, sides, 1);
-  roughen(slab, coast, 0.16);
-  slab.translate(0, -slabH / 2, 0);
-  parts.push(paint(slab, flat(ground)));
+  const land = kind !== "mutation"; // a boat has no land under it
+  if (land) {
+    const slab = new CylinderGeometry(size, size * 0.9, slabH, sides, 1);
+    roughen(slab, coast, 0.16);
+    slab.translate(0, -slabH / 2, 0);
+    parts.push(paint(slab, flat(ground)));
+  }
 
-  // the rock underneath, tapering to a point
-  const rockH = size * (1.25 + rnd() * 0.5);
-  const rock = new ConeGeometry(size * 0.88, rockH, sides, 2);
-  roughen(rock, coast, 0.16);
-  rock.rotateX(Math.PI);
-  rock.translate((rnd() - 0.5) * 0.1 * size, -slabH - rockH / 2, (rnd() - 0.5) * 0.1 * size);
-  const tip = new Color();
-  parts.push(paint(rock, (_x, y) => tip.copy(ROCK_TOP).lerp(ROCK_TIP, Math.min(1, (-y - slabH) / rockH))));
+  // the rock underneath: a shallow keel rather than a spike, so the island reads as land first
+  const rockH = size * (0.5 + rnd() * 0.25);
+  const rockX = (rnd() - 0.5) * 0.1 * size;
+  const rockZ = (rnd() - 0.5) * 0.1 * size;
+  if (land) {
+    const rock = new ConeGeometry(size * 0.88, rockH, sides, 2);
+    roughen(rock, coast, 0.16);
+    rock.rotateX(Math.PI);
+    rock.translate(rockX, -slabH - rockH / 2, rockZ);
+    const tip = new Color();
+    parts.push(paint(rock, (_x, y) => tip.copy(ROCK_TOP).lerp(ROCK_TIP, Math.min(1, (-y - slabH) / rockH))));
+  }
 
-  // buildings: pale walls, a roof in the colour of the source
+  // Nothing below is decoration: each kind carries exactly one object, and it says what the island is.
   const taken: { x: number; z: number; r: number }[] = [];
   const spot = (r: number): { x: number; z: number } | null => {
     for (let tries = 0; tries < 24; tries++) {
@@ -90,29 +127,74 @@ export function buildIslandGeometry(look: IslandLook): BufferGeometry {
     return null;
   };
 
-  const walls = tint.clone().lerp(WHITE, 0.62);
-  const roofTint = kind === "idea" ? new Color("#e9a23b") : tint.clone().lerp(PAPER, 0.12);
-  for (let b = 0; b < look.buildings; b++) {
-    const tower = kind === "idea" && b === 0;
-    const w = size * (tower ? 0.3 : 0.2 + rnd() * 0.14);
-    const d = size * (tower ? 0.3 : 0.2 + rnd() * 0.14);
-    const h = size * (tower ? 1.05 : 0.24 + rnd() * 0.42);
-    const at = tower ? (taken.push({ x: 0, z: 0, r: w * 0.75 }), { x: 0, z: 0 }) : spot(Math.max(w, d) * 0.75);
-    if (!at) continue;
-    const turn = rnd() * Math.PI;
-    const body = new BoxGeometry(w, h, d);
-    body.rotateY(turn);
-    body.translate(at.x, h / 2, at.z);
-    parts.push(paint(body, flat(walls)));
-    const roofH = Math.max(0.035, size * 0.05);
-    const roof = new BoxGeometry(w * 1.12, roofH, d * 1.12);
-    roof.rotateY(turn);
-    roof.translate(at.x, h + roofH / 2, at.z);
-    parts.push(paint(roof, flat(look.winner && b === 0 ? GOLD : roofTint)));
+  if (kind === "idea") {
+    // your idea: a lighthouse. The scene hangs its glow on the lantern.
+    taken.push({ x: 0, z: 0, r: size * 0.38 });
+    let y = 0;
+    const stack = (rBottom: number, rTop: number, h: number, colour: Color) => {
+      const g = new CylinderGeometry(size * rTop, size * rBottom, size * h, 8, 1);
+      g.translate(0, y + (size * h) / 2, 0);
+      parts.push(paint(g, flat(colour)));
+      y += size * h;
+    };
+    stack(0.36, 0.3, 0.1, ROCK_TOP);
+    stack(0.21, 0.18, 0.3, LIME);
+    stack(0.18, 0.16, 0.18, BAND);
+    stack(0.16, 0.13, 0.32, LIME);
+    stack(0.19, 0.19, 0.035, POLE);
+    stack(0.1, 0.1, LANTERN_H, LANTERN);
+    const cap = new ConeGeometry(size * 0.15, size * 0.13, 8, 1);
+    cap.translate(0, y + size * 0.065, 0);
+    parts.push(paint(cap, flat(BAND_DARK)));
+  } else if (kind === "entity") {
+    // prior art is claimed land: a low hill with one flag on it, flying the colour of where the project was found
+    const hx = (rnd() - 0.5) * 0.3 * size;
+    const hz = (rnd() - 0.5) * 0.3 * size;
+    const hillH = size * 0.14;
+    taken.push({ x: hx, z: hz, r: size * 0.36 });
+    const hill = new CylinderGeometry(size * 0.15, size * 0.34, hillH, sides, 1);
+    roughen(hill, coast, 0.12);
+    hill.translate(hx, hillH / 2, hz);
+    parts.push(paint(hill, flat(ground.clone().multiplyScalar(0.95))));
+
+    const poleH = size * 0.62;
+    const pole = new CylinderGeometry(Math.max(0.018, size * 0.02), Math.max(0.018, size * 0.02), poleH, 5, 1);
+    pole.translate(hx, hillH + poleH / 2, hz);
+    parts.push(paint(pole, flat(POLE)));
+
+    const flagL = size * 0.44;
+    const flagH = size * 0.27;
+    const flag = pennant(Math.max(0.016, size * 0.022));
+    flag.scale(flagL / 1.5, flagH / 1.732, 1);
+    flag.translate(flagL / 3, 0, 0); // the hoist edge onto the pole
+    flag.rotateY(rnd() * Math.PI * 2);
+    flag.translate(hx, hillH + poleH - flagH / 2 - size * 0.02, hz);
+    parts.push(paint(flag, flat(look.winner ? GOLD : tint)));
+  } else if (kind === "mutation") {
+    // a mutation is your idea setting out for open water: a boat, bow pointing away from home
+    const boat: BufferGeometry[] = [];
+    const hull = new CylinderGeometry(1, 0.55, 1, 6, 1);
+    hull.scale(size * 0.36, size * 0.24, size * 0.82);
+    hull.translate(0, -size * 0.02, 0);
+    boat.push(paint(hull, flat(HULL)));
+    const deck = new CylinderGeometry(1, 1, 1, 6, 1);
+    deck.scale(size * 0.3, size * 0.03, size * 0.72);
+    deck.translate(0, size * 0.115, 0);
+    boat.push(paint(deck, flat(DECK)));
+    const mastH = size * 0.95;
+    const mast = new CylinderGeometry(Math.max(0.018, size * 0.022), Math.max(0.018, size * 0.022), mastH, 5, 1);
+    mast.translate(0, size * 0.1 + mastH / 2, size * 0.2);
+    boat.push(paint(mast, flat(POLE)));
+    const sail = pennant(Math.max(0.016, size * 0.024), true);
+    sail.rotateY(Math.PI / 2); // tip astern, hoist edge on the mast
+    sail.scale(1, (size * 0.72) / 1.732, (size * 0.62) / 1.5);
+    sail.translate(0, size * 0.6, size * 0.2 - (size * 0.62) / 3 - size * 0.02);
+    boat.push(paint(sail, flat(tint)));
+    for (const g of boat) { g.rotateY(look.heading); parts.push(g); }
   }
 
-  // trees
-  const trees = kind === "prior" ? 0 : kind === "mutation" ? 1 : 1 + Math.floor(rnd() * 3);
+  // trees: on land people have been to. LLM guesses stay bare rock.
+  const trees = kind === "idea" || kind === "entity" ? 1 + Math.floor(rnd() * 3) : 0;
   for (let t = 0; t < trees; t++) {
     const r = size * (0.09 + rnd() * 0.05);
     const at = spot(r);

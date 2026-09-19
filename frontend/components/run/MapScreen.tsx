@@ -50,7 +50,7 @@ export function MapScreen() {
       {mapMode === "2d" ? flat : (
         <IslandMap
           graph={graph} layout={layout} selectedId={selectedId} onSelect={select}
-          seen={seenIslands.current} cameraMemo={cameraMemo} recenterTick={recenterTick} fallback={flat}
+          seen={seenIslands.current} cameraMemo={cameraMemo} recenterTick={recenterTick} fallback={flat} pending={empty}
         />
       )}
 

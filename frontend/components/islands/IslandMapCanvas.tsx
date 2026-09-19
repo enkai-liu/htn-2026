@@ -12,6 +12,8 @@ export interface IslandMapCanvasProps {
   onSelect: (id: string | null) => void;
   onHover?: (id: string | null) => void;
   onContextLost: () => void;
+  /** the scene has drawn its first frame */
+  onReady?: () => void;
   /** islands that have already popped in (owned by the provider so it survives this component unmounting) */
   seen: Set<string>;
   cameraMemo?: { current: CameraPose | null };
@@ -20,13 +22,13 @@ export interface IslandMapCanvasProps {
   ambient?: boolean;
 }
 
-export default function IslandMapCanvas({ islands, links, layout, selectedId, onSelect, onHover, onContextLost, seen, cameraMemo, recenterTick = 0, ambient }: IslandMapCanvasProps) {
+export default function IslandMapCanvas({ islands, links, layout, selectedId, onSelect, onHover, onContextLost, onReady, seen, cameraMemo, recenterTick = 0, ambient }: IslandMapCanvasProps) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const labelRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<IslandScene | null>(null);
-  const cb = useRef({ onSelect, onHover, onContextLost });
-  useEffect(() => { cb.current = { onSelect, onHover, onContextLost }; });
+  const cb = useRef({ onSelect, onHover, onContextLost, onReady });
+  useEffect(() => { cb.current = { onSelect, onHover, onContextLost, onReady }; });
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -38,6 +40,7 @@ export default function IslandMapCanvas({ islands, links, layout, selectedId, on
         onHover: (id) => cb.current.onHover?.(id),
         onSelect: (id) => cb.current.onSelect(id),
         onContextLost: () => cb.current.onContextLost(),
+        onReady: () => cb.current.onReady?.(),
       }, {
         reducedMotion: window.matchMedia("(prefers-reduced-motion: reduce)").matches,
         ambient, seen, camera: cameraMemo?.current ?? null, labelLayer: labelRef.current,

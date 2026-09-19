@@ -11,23 +11,22 @@ import {
 } from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { layoutExtent, ringRadius, type IslandPlacement, type LayoutState } from "@/lib/islandLayout";
-import { buildIslandGeometry, lookKey, type IslandLook } from "./islandGeometry";
+import { buildIslandGeometry, LANTERN_AT, lookKey, type IslandLook } from "./islandGeometry";
 
 export interface IslandDatum {
   id: string;
   label: string;
   tint: string;
-  buildings: number;
   badges: string[];
   similarity: number | null;
   p: IslandPlacement;
 }
 export interface SceneLink { a: string; b: string; kind: "similar" | "possible_same_as" | "mutation_of" }
 export interface CameraPose { position: [number, number, number]; target: [number, number, number]; zoom: number; userMoved: boolean }
-export interface SceneCallbacks { onHover(id: string | null): void; onSelect(id: string | null): void; onContextLost(): void }
+export interface SceneCallbacks { onHover(id: string | null): void; onSelect(id: string | null): void; onContextLost(): void; /** the first frame is on screen */ onReady?(): void }
 export interface SceneOptions { reducedMotion: boolean; ambient?: boolean; seen: Set<string>; camera: CameraPose | null; labelLayer: HTMLElement | null }
 
-const FLOOR_Y = -3.4;
+const FLOOR_Y = -2.5;
 const POP_MS = 720;
 const MOVE_MS = 1400;
 const MERGE_MS = 620;
@@ -103,7 +102,7 @@ export class IslandScene {
   private shadowGeo = new CircleGeometry(1, 28);
   private rippleGeo = new RingGeometry(0.94, 1, 56);
   /** a generous invisible cylinder around each island: what the pointer actually hits */
-  private hitGeo = new CylinderGeometry(1.12, 0.9, 2.1, 10);
+  private hitGeo = new CylinderGeometry(1.1, 0.95, 1.8, 10);
   private hitMat = new MeshBasicMaterial({ visible: false });
   private halo: Sprite;
   private rings = new Group();
@@ -123,6 +122,7 @@ export class IslandScene {
   private w = 1;
   private h = 1;
   private disposed = false;
+  private drawn = false;
   private io: IntersectionObserver | null = null;
   private tmp = new Vector3();
   private focus = new Vector3();
@@ -230,7 +230,7 @@ export class IslandScene {
         cur.look = lookKey(look);
         cur.shadow.scale.setScalar(d.p.size * 1.5);
         cur.hit.scale.setScalar(d.p.size);
-        cur.hit.position.y = -0.25 * d.p.size;
+        cur.hit.position.y = -0.05 * d.p.size;
       }
       if (d.p.x !== cur.to.x || d.p.z !== cur.to.z || d.p.y !== cur.to.y) {
         this.current(cur, now, cur.from);
@@ -264,7 +264,7 @@ export class IslandScene {
   }
 
   private lookOf(d: IslandDatum): IslandLook {
-    return { seed: d.p.seed, size: d.p.size, kind: d.p.kind, tint: d.tint, buildings: d.buildings, winner: d.badges.includes("winner") };
+    return { seed: d.p.seed, size: d.p.size, kind: d.p.kind, tint: d.tint, winner: d.badges.includes("winner"), heading: d.p.kind === "mutation" ? Math.atan2(d.p.x, d.p.z) : 0 };
   }
 
   private add(d: IslandDatum, bornAt: number) {
@@ -273,7 +273,7 @@ export class IslandScene {
     mesh.userData.id = d.id;
     const hit = new Mesh(this.hitGeo, this.hitMat);
     hit.scale.setScalar(d.p.size);
-    hit.position.y = -0.25 * d.p.size;
+    hit.position.y = -0.05 * d.p.size;
     hit.userData.id = d.id;
     const group = new Group();
     group.add(mesh, hit);
@@ -454,7 +454,7 @@ export class IslandScene {
       const p = this.current(i, now, i.group.position);
       const born = i.bornAt === -Infinity ? 1 : clamp01((now - i.bornAt) / POP_MS);
       let scale = born <= 0 ? 0 : easeOutBack(born);
-      p.y += (1 - easeOutCubic(born)) * -2.6;
+      p.y += (1 - easeOutCubic(born)) * -2.2;
       if (!still) p.y += Math.sin(now * 0.0011 + i.phase) * 0.07;
 
       const wantLift = id === this.selectedId ? 0.42 : id === this.hoverId ? 0.22 : 0;
@@ -482,7 +482,7 @@ export class IslandScene {
 
     const idea = this.islands.get("idea");
     if (idea) {
-      this.halo.position.copy(idea.group.position).y += 0.5;
+      this.halo.position.copy(idea.group.position).y += idea.datum.p.size * LANTERN_AT * idea.group.scale.y;
       const born = idea.bornAt === -Infinity ? 1 : clamp01((now - idea.bornAt) / POP_MS);
       (this.halo.material as SpriteMaterial).opacity = born * (still ? 0.6 : 0.52 + Math.sin(now * 0.0016) * 0.12);
     } else (this.halo.material as SpriteMaterial).opacity = 0;
@@ -498,6 +498,8 @@ export class IslandScene {
 
     for (const arc of this.arcs.values()) this.updateArc(arc, now);
     this.renderer.render(this.scene, this.camera);
+    // the first render is the slow one (it compiles the shaders), so this is when the loader may go
+    if (!this.drawn && this.w > 1) { this.drawn = true; this.cb.onReady?.(); }
     if (!this.opts.ambient) this.placeLabels();
   }
 
@@ -579,7 +581,7 @@ export class IslandScene {
       el.dataset.on = id === this.selectedId || id === this.hoverId ? "1" : "0";
 
       this.tmp.copy(i.group.position);
-      this.tmp.y += i.datum.p.size * (id === "idea" ? 1.2 : 0.8) + 0.3;
+      this.tmp.y += i.datum.p.size * (id === "idea" ? 1.3 : 0.8) + 0.3; // clear of the lighthouse cap
       this.tmp.project(this.camera);
       const x = (this.tmp.x * 0.5 + 0.5) * this.w;
       const y = (-this.tmp.y * 0.5 + 0.5) * this.h;
