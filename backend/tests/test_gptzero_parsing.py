@@ -50,7 +50,7 @@ assert len(PITCH) >= 250
 
 
 def fixture(name: str) -> dict:
-    return json.loads((FIXTURES / f"{name}.json").read_text())
+    return json.loads((FIXTURES / f"{name}.json").read_text(encoding="utf-8"))
 
 
 def minimal_payload(**doc_overrides) -> dict:
@@ -146,7 +146,7 @@ def test_strip_deprecated_is_recursive():
 def test_source_never_reads_deprecated_fields():
     """The names may appear exactly once: in the constant used to DELETE them from payloads before caching."""
     for path in SIGNALS_DIR.glob("*.py"):
-        lines = [ln for ln in path.read_text().splitlines() if any(d in ln for d in DEPRECATED)]
+        lines = [ln for ln in path.read_text(encoding="utf-8").splitlines() if any(d in ln for d in DEPRECATED)]
         if path.name == "gptzero.py":
             assert len(lines) == 1 and lines[0].startswith("_DEPRECATED_KEYS"), lines
         else:
@@ -370,7 +370,7 @@ async def test_live_retries_429_then_caches_and_charges_once(tmp_path):
 
     cached_files = list((tmp_path / "cache" / "predict").glob("*.json"))
     assert len(cached_files) == 1 and cached_files[0].stem == gz.text_sha256(PITCH)
-    assert not any(d in cached_files[0].read_text() for d in DEPRECATED), "deprecated fields must not be persisted"
+    assert not any(d in cached_files[0].read_text(encoding="utf-8") for d in DEPRECATED), "deprecated fields must not be persisted"
 
 
 async def test_word_limit_429_is_not_retried_and_releases_the_reservation(tmp_path):

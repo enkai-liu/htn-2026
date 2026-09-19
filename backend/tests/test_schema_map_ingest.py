@@ -17,11 +17,11 @@ from ingest.devpost_page import parse_gallery_page, parse_project_page  # noqa: 
 from app.schemas.records import GPTZeroScan, SourceRecord  # noqa: E402
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
-ALVANLII = {r["title"]: r for r in json.loads((FIXTURES / "alvanlii_rows.json").read_text())["rows"]}
-TWANGODEV = {r["title"]: r for r in json.loads((FIXTURES / "twangodev_rows.json").read_text())["rows"]}
-YC = {r["name"]: r for r in json.loads((FIXTURES / "yc_rows.json").read_text())["rows"]}
+ALVANLII = {r["title"]: r for r in json.loads((FIXTURES / "alvanlii_rows.json").read_text(encoding="utf-8"))["rows"]}
+TWANGODEV = {r["title"]: r for r in json.loads((FIXTURES / "twangodev_rows.json").read_text(encoding="utf-8"))["rows"]}
+YC = {r["name"]: r for r in json.loads((FIXTURES / "yc_rows.json").read_text(encoding="utf-8"))["rows"]}
 HACKATHONS = sm.load_hackathons(FIXTURES / "hackathons_sample.json")
-MAPPING = json.loads((REPO_ROOT / "elastic" / "mappings" / "prior-art-v1.json").read_text())["mappings"]["properties"]
+MAPPING = json.loads((REPO_ROOT / "elastic" / "mappings" / "prior-art-v1.json").read_text(encoding="utf-8"))["mappings"]["properties"]
 
 
 # ---------------------------------------------------------------- value helpers

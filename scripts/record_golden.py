@@ -26,7 +26,7 @@ def main() -> int:
     if not src.exists():
         print(f"no such run: {src}")
         return 1
-    events = [AgentEvent(**json.loads(line)) for line in src.read_text().splitlines() if line.strip()]
+    events = [AgentEvent(**json.loads(line)) for line in src.read_text(encoding="utf-8").splitlines() if line.strip()]
     if not events or events[-1].type != "run.finished":
         last = events[-1].type if events else "nothing"
         print(f"run {run_id} did not finish cleanly (last event: {last}); not promoting it")

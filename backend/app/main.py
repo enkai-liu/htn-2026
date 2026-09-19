@@ -45,4 +45,4 @@ async def slop_index() -> dict:
     path = REPO_ROOT / "investigation" / "results" / "slop_index.json"
     if not path.exists():
         raise HTTPException(404, "investigation has not been run yet")
-    return json.loads(path.read_text())
+    return json.loads(path.read_text(encoding="utf-8"))

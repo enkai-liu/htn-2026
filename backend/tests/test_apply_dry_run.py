@@ -68,7 +68,7 @@ def test_inference_ids_and_index_names_come_from_settings(plan):
 
 def test_nothing_committed_hardcodes_an_inference_id_or_a_webhook():
     for path in [*ELASTIC.rglob("*.json"), *ELASTIC.rglob("*.yaml"), *ELASTIC.rglob("*.j2")]:
-        text = path.read_text()
+        text = path.read_text(encoding="utf-8")
         assert ".jina-" not in text and ".elser" not in text, path
         assert "hooks.slack.com" not in text, path
 

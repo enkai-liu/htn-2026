@@ -40,7 +40,7 @@ def load_done(log_path: Path, *, include_replay: bool) -> dict[str, dict[str, An
     done: dict[str, dict[str, Any]] = {}
     if not log_path.exists():
         return done
-    for line in log_path.read_text().splitlines():
+    for line in log_path.read_text(encoding="utf-8").splitlines():
         try:
             row = json.loads(line)
         except ValueError:
@@ -137,7 +137,7 @@ async def run(args: argparse.Namespace) -> int:
     stop = asyncio.Event()
     counts = {"ok": 0, "failed": 0, "skipped": 0}
     started = time.monotonic()
-    log_file = log_path.open("a")
+    log_file = log_path.open("a", encoding="utf-8")
 
     async def one(rec: dict[str, Any]) -> None:
         if stop.is_set():

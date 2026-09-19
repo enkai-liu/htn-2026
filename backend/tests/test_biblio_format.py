@@ -32,7 +32,7 @@ FIXTURE = Path(__file__).resolve().parents[1] / "fixtures" / "gptzero" / "biblio
 
 
 def load_fixture() -> tuple[dict, list[Claim], list[Evidence]]:
-    raw = json.loads(FIXTURE.read_text())
+    raw = json.loads(FIXTURE.read_text(encoding="utf-8"))
     inputs = raw["_inputs"]
     return raw, [Claim(**c) for c in inputs["claims"]], [Evidence(**e) for e in inputs["evidence"]]
 

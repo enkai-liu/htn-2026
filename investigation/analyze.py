@@ -224,7 +224,7 @@ def main(argv: list[str] | None = None) -> int:
         print("note: no nn_sim column (run investigation/neighbours.py): the tie-in test is skipped, tie_in = null")
 
     summary_path = scans_path.parent / "sample_summary.json"
-    summary = json.loads(summary_path.read_text()) if summary_path.exists() else None
+    summary = json.loads(summary_path.read_text(encoding="utf-8")) if summary_path.exists() else None
     result = build_slop_index(frame, sample_summary=summary)
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)

@@ -24,7 +24,7 @@ class EventBus:
         if persist:
             RUNS_DIR.mkdir(parents=True, exist_ok=True)
             self._path = RUNS_DIR / f"{run_id}.jsonl"
-            self._path.write_text("")
+            self._path.write_text("", encoding="utf-8")
 
     @property
     def closed(self) -> bool:
@@ -40,7 +40,7 @@ class EventBus:
         )
         self.history.append(ev)
         if self._path is not None:
-            with self._path.open("a") as f:
+            with self._path.open("a", encoding="utf-8") as f:
                 f.write(json.dumps(ev.model_dump(mode="json", exclude_none=True)) + "\n")
         for q in list(self._subs):
             q.put_nowait(ev)
@@ -75,7 +75,7 @@ class EventBus:
 
 
 def load_jsonl(path: Path) -> list[AgentEvent]:
-    return [AgentEvent(**json.loads(line)) for line in path.read_text().splitlines() if line.strip()]
+    return [AgentEvent(**json.loads(line)) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
 
 
 async def replay(events: list[AgentEvent], *, speed: float = 1.5, max_gap: float = 2.5, after_seq: int = 0) -> AsyncIterator[AgentEvent]:

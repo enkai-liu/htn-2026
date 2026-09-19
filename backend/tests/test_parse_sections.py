@@ -12,8 +12,8 @@ if str(REPO_ROOT) not in sys.path:
 from ingest import parse_sections as ps  # noqa: E402
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
-ALVANLII = {r["title"]: r for r in json.loads((FIXTURES / "alvanlii_rows.json").read_text())["rows"]}
-TWANGODEV = {r["title"]: r for r in json.loads((FIXTURES / "twangodev_rows.json").read_text())["rows"]}
+ALVANLII = {r["title"]: r for r in json.loads((FIXTURES / "alvanlii_rows.json").read_text(encoding="utf-8"))["rows"]}
+TWANGODEV = {r["title"]: r for r in json.loads((FIXTURES / "twangodev_rows.json").read_text(encoding="utf-8"))["rows"]}
 
 
 @pytest.mark.parametrize(

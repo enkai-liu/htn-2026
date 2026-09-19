@@ -6,8 +6,8 @@ Two buckets with separate caps (settings: GPTZERO_INTERACTIVE_WORD_CAP / GPTZERO
 
 Persisted at RUNS_DIR/gptzero_ledger.json so the cap survives restarts and is shared by the backend and the
 investigation scripts. Safe across threads, asyncio tasks and processes: a process-local RLock plus an exclusive
-flock on a sidecar lock file around every read-modify-write, and atomic replace on write. Calls are sub-millisecond
-file operations, so they are fine to make directly from async code.
+flock (a bounded msvcrt lock on Windows) on a sidecar lock file around every read-modify-write, and atomic
+replace on write. Calls are sub-millisecond file operations, so they are fine to make directly from async code.
 
     r = ledger.reserve("interactive", n_words)     # raises BudgetExceeded before any network call
     try:    ...call GPTZero...; ledger.commit(r)
@@ -28,16 +28,58 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-try:  # POSIX only; on other platforms we fall back to the in-process lock
+try:  # POSIX
     import fcntl
 except ImportError:  # pragma: no cover
     fcntl = None  # type: ignore[assignment]
+try:  # Windows: without this, two handles (or processes) on one ledger lose updates and os.replace hits sharing errors
+    import msvcrt
+except ImportError:  # pragma: no cover
+    msvcrt = None  # type: ignore[assignment]
+
 
 from app.config import RUNS_DIR, get_settings
 
 from .textutil import count_words
 
 log = logging.getLogger(__name__)
+
+# The ledger is called synchronously on the server's event loop, so waiting for the Windows lock must be bounded: a
+# lock that is never released (stale handle, another process) would otherwise freeze every run in the server.
+WINDOWS_LOCK_WAIT_S = 2.0
+
+
+def _lock_file(f: Any) -> bool:
+    """Exclusive cross-process lock on the sidecar file. False = not acquired (Windows only, after WINDOWS_LOCK_WAIT_S);
+    the in-process RLock still serialises this process."""
+    if fcntl is not None:
+        fcntl.flock(f.fileno(), fcntl.LOCK_EX)
+        return True
+    if msvcrt is None:  # pragma: no cover
+        return False
+    deadline = time.monotonic() + WINDOWS_LOCK_WAIT_S  # pragma: no cover - Windows only
+    while True:  # pragma: no cover - Windows only
+        try:
+            f.seek(0)
+            msvcrt.locking(f.fileno(), msvcrt.LK_NBLCK, 1)
+            return True
+        except OSError:
+            if time.monotonic() >= deadline:
+                log.warning("GPTZero ledger lock busy for %.0fs; continuing with the in-process lock only", WINDOWS_LOCK_WAIT_S)
+                return False
+            time.sleep(0.005)
+
+
+def _unlock_file(f: Any) -> None:
+    if fcntl is not None:
+        fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+    elif msvcrt is not None:  # pragma: no cover - Windows only
+        try:
+            f.seek(0)
+            msvcrt.locking(f.fileno(), msvcrt.LK_UNLCK, 1)
+        except OSError as exc:
+            log.warning("GPTZero ledger unlock failed (%s); the lock is released when the handle closes", exc)
+
 
 BUCKETS = ("interactive", "investigation")
 LEDGER_FILENAME = "gptzero_ledger.json"
@@ -150,8 +192,7 @@ class WordLedger:
             self.path.parent.mkdir(parents=True, exist_ok=True)
             lock_path = self.path.with_name(self.path.name + ".lock")
             with open(lock_path, "a+") as lock_file:
-                if fcntl is not None:
-                    fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+                locked = _lock_file(lock_file)
                 try:
                     state = self._load()
                     before = json.dumps(state, sort_keys=True)
@@ -159,14 +200,14 @@ class WordLedger:
                     if write or json.dumps(state, sort_keys=True) != before:
                         self._save(state)
                 finally:
-                    if fcntl is not None:
-                        fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+                    if locked:
+                        _unlock_file(lock_file)
 
     def _load(self) -> dict[str, Any]:
         state: dict[str, Any] = {}
         if self.path.exists():
             try:
-                state = json.loads(self.path.read_text() or "{}")
+                state = json.loads(self.path.read_text(encoding="utf-8") or "{}")
             except (json.JSONDecodeError, OSError) as exc:
                 backup = self.path.with_name(f"{self.path.name}.corrupt-{int(time.time())}")
                 log.warning("GPTZero ledger unreadable (%s); moved to %s and starting from zero. "
@@ -194,11 +235,18 @@ class WordLedger:
         state["caps"] = dict(self.caps)  # informational; the authoritative caps come from settings
         state["updated_at"] = time.time()
         tmp = self.path.with_name(f"{self.path.name}.tmp-{os.getpid()}-{threading.get_ident()}")
-        with open(tmp, "w") as f:
+        with open(tmp, "w", encoding="utf-8") as f:
             json.dump(state, f, indent=2, sort_keys=True)
             f.flush()
             os.fsync(f.fileno())
-        os.replace(tmp, self.path)
+        for attempt in range(10):
+            try:
+                os.replace(tmp, self.path)
+                return
+            except PermissionError:  # Windows: a scanner (e.g. Defender) briefly holds the file we just rewrote
+                if attempt == 9:
+                    raise
+                time.sleep(0.025)
 
 
 @lru_cache

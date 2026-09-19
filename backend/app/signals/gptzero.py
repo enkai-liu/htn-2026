@@ -432,7 +432,7 @@ class GPTZeroClient:
     @staticmethod
     def _cache_read(path: Path) -> dict[str, Any] | None:
         try:
-            data = json.loads(path.read_text())
+            data = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             return None
         if not isinstance(data, dict) or not isinstance(data.get("response"), dict):
@@ -455,7 +455,7 @@ class GPTZeroClient:
     def load_fixture(self, name: str) -> dict[str, Any]:
         path = self.fixtures_dir / f"{name}.json"
         try:
-            return json.loads(path.read_text())
+            return json.loads(path.read_text(encoding="utf-8"))
         except (OSError, ValueError) as exc:
             raise GPTZeroError(f"replay fixture missing or unreadable: {path}") from exc
 

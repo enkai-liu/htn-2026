@@ -72,7 +72,7 @@ def test_persists_across_instances_and_is_valid_json(tmp_path):
     assert b.used("interactive") == 250 and b.remaining("interactive") == 700
     b.commit(held)
     assert a.used("interactive") == 300
-    data = json.loads(a.path.read_text())
+    data = json.loads(a.path.read_text(encoding="utf-8"))
     assert data["buckets"]["interactive"] == {"committed": 300, "calls": 2} and data["pending"] == {}
     assert not list(a.path.parent.glob("*.tmp-*")), "atomic write must not leave temp files behind"
 
@@ -104,7 +104,7 @@ def test_corrupt_file_is_set_aside_not_fatal(tmp_path):
     assert led.remaining("interactive") == 1_000
     assert list(led.path.parent.glob("gptzero_ledger.json.corrupt-*"))
     led.commit(led.reserve("interactive", 5))
-    assert json.loads(led.path.read_text())["buckets"]["interactive"]["committed"] == 5
+    assert json.loads(led.path.read_text(encoding="utf-8"))["buckets"]["interactive"]["committed"] == 5
 
 
 def test_reset(tmp_path):

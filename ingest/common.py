@@ -354,11 +354,11 @@ class Checkpoint:
         self.path = (directory or CHECKPOINT_DIR) / f"{job}.json"
         self.state: dict[str, Any] = {"job": job, "offset": 0}
         if resume and self.path.exists():
-            self.state = json.loads(self.path.read_text())
+            self.state = json.loads(self.path.read_text(encoding="utf-8"))
             print(f"[checkpoint] resuming {job} at offset {self.offset} ({self.path})")
         elif self.path.exists():
             print(f"[checkpoint] ignoring existing {self.path.name} (pass --resume to continue from offset "
-                  f"{json.loads(self.path.read_text()).get('offset')})")
+                  f"{json.loads(self.path.read_text(encoding="utf-8")).get('offset')})")
 
     @property
     def offset(self) -> int:
