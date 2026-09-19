@@ -9,7 +9,7 @@ setup: $(VENV)/.ok frontend/node_modules
 $(VENV)/.ok: backend/pyproject.toml
 	$(PY) -m venv $(VENV)
 	$(BIN)/pip install -q --upgrade pip
-	$(BIN)/pip install -q -e "backend[dev]"
+	$(BIN)/pip install -q -e "backend[dev,ingest]"
 	touch $@
 
 frontend/node_modules: frontend/package.json
