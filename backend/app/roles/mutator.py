@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 from app.config import get_settings
 from app.orchestration.host import Ctx, error, result
 from app.orchestration.registry import register
-from app.roles.base import HOUSE_RULES, BaseRole
+from app.roles.base import HOUSE_RULES, BaseRole, clipped
 from app.schemas import GraphLink, GraphNode, GraphPatch, Mutation
 from app.scoring import axes
 from app.scoring.similarity import rerank
@@ -16,10 +16,10 @@ from app.scoring.similarity import rerank
 
 class Swap(BaseModel):
     facet: str = Field(description="purpose | mechanism | audience | data | twist")
-    frm: str = Field(max_length=120)
-    to: str = Field(max_length=160)
-    rationale: str = Field(max_length=260)
-    pitch: str = Field(max_length=500, description="the rewritten idea in 1-2 sentences")
+    frm: clipped(120)
+    to: clipped(160)
+    rationale: clipped(260)
+    pitch: clipped(500) = Field(description="the rewritten idea in 1-2 sentences")
     grounded_in: list[str] = Field(default_factory=list, description="whitespace terms or evidence this swap is based on")
 
 

@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import hashlib
+from typing import Annotated, Any
+
+from pydantic import BeforeValidator
 
 from app.llm.router import LLMRouter, get_router
 from app.orchestration.host import Ctx
@@ -26,6 +29,18 @@ class BaseRole:
 def eid_for(rid: str) -> str:
     """Stable entity id for a record before resolution; the resolver keeps the best record's id as canonical."""
     return "e" + hashlib.sha1(rid.encode()).hexdigest()[:7]
+
+
+def clipped(n: int) -> Any:
+    """Free-text field in an LLM output schema: cut to `n` characters, never rejected.
+
+    A hard `max_length` turned a chatty model into a ValidationError, one re-ask, then a dropped juror or a failed
+    role. The limit exists for the UI, so truncation is the right outcome.
+    """
+    def clip(v: Any) -> Any:
+        return v[:n] if isinstance(v, str) else v
+
+    return Annotated[str, BeforeValidator(clip)]
 
 
 # Shared instructions go FIRST in every prompt so provider-side prefix caching can reuse them across roles.

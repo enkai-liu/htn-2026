@@ -12,7 +12,7 @@ from app.llm.models import JURY_MODELS, PRIOR_MODELS
 from app.llm.router import LLMUnavailable
 from app.orchestration.host import Ctx, result
 from app.orchestration.registry import register
-from app.roles.base import HOUSE_RULES, BaseRole
+from app.roles.base import HOUSE_RULES, BaseRole, clipped
 from app.schemas import GraphLink, GraphNode, GraphPatch
 from app.scoring.similarity import cosine, embed, lexical_cosine
 
@@ -24,7 +24,7 @@ class Overlap(BaseModel):
     entity: int
     purpose: float = Field(ge=0, le=1)
     mechanism: float = Field(ge=0, le=1)
-    why: str = Field(max_length=200)
+    why: clipped(200)
 
 
 class Ballot(BaseModel):

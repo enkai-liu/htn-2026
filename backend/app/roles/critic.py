@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 
 from app.orchestration.host import Ctx, envelope, result
 from app.orchestration.registry import register
-from app.roles.base import HOUSE_RULES, BaseRole
+from app.roles.base import HOUSE_RULES, BaseRole, clipped
 from app.schemas import Claim, Entity, Evidence
 
 MAX_FOLLOWUPS = 2
@@ -16,16 +16,16 @@ SITE = {"devpost": "Devpost", "yc": "Y Combinator", "github": "GitHub", "hn": "H
 
 class ExistsClaim(BaseModel):
     entity: int = Field(description="index of the entity in the list you were given")
-    text: str = Field(max_length=260, description="one-sentence claim that this prior work already does (part of) the idea")
-    quote: str = Field(max_length=300, description="verbatim excerpt from that entity's text supporting the claim")
+    text: clipped(260) = Field(description="one-sentence claim that this prior work already does (part of) the idea")
+    quote: clipped(300) = Field(description="verbatim excerpt from that entity's text supporting the claim")
     facets: list[str] = Field(default_factory=list, description="which facets overlap: purpose, mechanism, audience, data, twist")
 
 
 class FollowUp(BaseModel):
     facet: str
-    query: str = Field(max_length=120)
+    query: clipped(120)
     scout: str = Field(description="one of the scouts on the team, e.g. scout.devpost")
-    reason: str = Field(max_length=200)
+    reason: clipped(200)
 
 
 class Critique(BaseModel):

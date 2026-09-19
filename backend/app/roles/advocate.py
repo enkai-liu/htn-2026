@@ -10,18 +10,18 @@ from pydantic import BaseModel, Field
 
 from app.orchestration.host import Ctx, result
 from app.orchestration.registry import register
-from app.roles.base import HOUSE_RULES, BaseRole
+from app.roles.base import HOUSE_RULES, BaseRole, clipped
 from app.schemas import Claim, ThreadEntry
 
 
 class Response(BaseModel):
     cid: str
     type: Literal["CONCEDE", "REBUTTAL", "CHALLENGE"]
-    text: str = Field(max_length=320)
+    text: clipped(320)
 
 
 class Difference(BaseModel):
-    text: str = Field(max_length=260, description="a concrete way the idea differs from ALL the prior work shown")
+    text: clipped(260) = Field(description="a concrete way the idea differs from ALL the prior work shown")
     facet: str
 
 

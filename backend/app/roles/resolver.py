@@ -8,12 +8,12 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from app.llm.router import LLMUnavailable
 from app.orchestration.host import Ctx, result
 from app.orchestration.registry import register
-from app.roles.base import HOUSE_RULES, BaseRole, eid_for
+from app.roles.base import HOUSE_RULES, BaseRole, clipped, eid_for
 from app.schemas import Entity, GraphLink, GraphPatch, MergeDecision, SourceRecord
 from app.wrangle.blocking import candidate_pairs
 from app.wrangle.fuse import fuse
@@ -24,7 +24,7 @@ MAX_LLM_PAIRS = 8
 class PairVerdict(BaseModel):
     pair: int
     verdict: Literal["same", "different", "insufficient_evidence"]
-    rationale: str = Field(max_length=240)
+    rationale: clipped(240)
 
 
 class Adjudication(BaseModel):
