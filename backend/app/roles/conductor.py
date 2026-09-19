@@ -44,8 +44,8 @@ class Conductor(BaseRole):
             return error(f"planning failed: {exc}")
         scouts = await self._form_team(ctx, plan)
 
-        voice = asyncio.create_task(ctx.send("verifier", task(kind="voice"), timeout=45))  # Voice is independent of the search
-        await self._scout(ctx, plan, scouts)
+        # Voice is independent of the search, so it runs alongside the scouts (and finishes before the verifier is needed again).
+        await asyncio.gather(ctx.send("verifier", task(kind="voice"), timeout=45), self._scout(ctx, plan, scouts))
         await ctx.emit("budget.updated", ctx.budget.snapshot(), phase="scout")
 
         if board.records:
@@ -53,7 +53,6 @@ class Conductor(BaseRole):
             await self._debate(ctx, scouts)
             await asyncio.gather(ctx.send("verifier", task(kind="claims"), timeout=90),
                                  ctx.send("judge", task(kind="priors"), timeout=60))
-        await voice
         await ctx.send("synthesizer", task(kind="score"), timeout=90)
         if board.records and not ctx.budget.exhausted():
             await ctx.send("mutator", task(), timeout=120)

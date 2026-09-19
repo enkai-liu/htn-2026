@@ -40,3 +40,16 @@ bench: $(VENV)/.ok
 
 secret-scan:
 	bash scripts/secret_scan.sh
+
+# openJiuwen host lives in its own venv (86 dependencies); ORCHESTRATOR=jiuwen needs the backend started from it.
+JW := backend/.venv-jiuwen
+setup-jiuwen:
+	$(PY) -m venv $(JW)
+	$(JW)/bin/pip install -q --upgrade pip
+	$(JW)/bin/pip install -q -e "backend[dev,jiuwen]"
+
+backend-jiuwen:
+	cd backend && ORCHESTRATOR=jiuwen ../$(JW)/bin/uvicorn app.main:app --port $${BACKEND_PORT:-8000}
+
+test-jiuwen:
+	cd backend && ../$(JW)/bin/pytest -q -p no:warnings tests/test_pipeline_offline.py

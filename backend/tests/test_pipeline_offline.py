@@ -77,9 +77,19 @@ class FakeRouter:
         return obj, self._res(model or "fake/model")
 
 
-@pytest.fixture
-def offline(monkeypatch):
+def _hosts():
+    try:
+        import openjiuwen  # noqa: F401
+
+        return ["asyncio", "jiuwen"]
+    except ImportError:  # the main venv does not carry openjiuwen's 86 dependencies
+        return ["asyncio", pytest.param("jiuwen", marks=pytest.mark.skip(reason="openjiuwen not installed in this venv"))]
+
+
+@pytest.fixture(params=_hosts())
+def offline(monkeypatch, request):
     s = get_settings()
+    monkeypatch.setattr(s, "orchestrator", request.param)
     monkeypatch.setattr(s, "es_url", "")  # no Elasticsearch: corpus scouts are skipped and the headline must abstain
     monkeypatch.setattr(s, "es_api_key", "")
     monkeypatch.setattr(s, "gptzero_mode", "replay")
@@ -106,6 +116,9 @@ async def test_full_run_offline(offline):
     await run.task
     events = run.bus.history
     types = [e.type for e in events]
+    assert events[0].data["orchestrator"] == get_settings().orchestrator, [e.data for e in events if e.type == "error"]
+    if run.host.name == "jiuwen":  # events must really have travelled through the openJiuwen session stream
+        assert run.host.mirrored > 50
     assert set(types) <= EVENT_TYPES
     assert [e.seq for e in events] == list(range(1, len(events) + 1))
     assert types[0] == "run.started" and types[-1] == "run.finished", [e.data for e in events if e.type == "error"]
@@ -168,3 +181,48 @@ def test_blackboard_permissions():
     with pytest.raises(BlackboardPermissionError):
         board.set("voice", "synthesizer", None)  # only the verifier writes voice
     board.put("records", "scout.hn", "hn:1", object())  # any scout may add records
+
+
+async def test_post_run_rescore_streams_to_same_bus(offline):
+    """After run.finished the bus stays open: an API-triggered re-score reaches the mutator on either host."""
+    from app.orchestration.host import task
+
+    run = runstore.create_run(IDEA)
+    await run.task
+    before = len(run.bus.history)
+    reply = await run.host.deliver("user", "mutator", task(rescore="mu1"), timeout=30)
+    assert reply["type"] == "RESULT" and reply["payload"]["mid"] == "mu1", reply
+    assert [e.type for e in run.bus.history[before:]].count("mutation.scored") == 1
+
+
+@pytest.mark.skipif(len([h for h in _hosts() if isinstance(h, str)]) < 2, reason="openjiuwen not installed in this venv")
+async def test_host_parity(monkeypatch, request):
+    """Same roles, two runtimes: the asyncio host and the openJiuwen host must produce the same event-type multiset."""
+    from collections import Counter
+
+    counts = {}
+    for host in ("asyncio", "jiuwen"):
+        monkeypatch.setattr(get_settings(), "orchestrator", host)
+        request.getfixturevalue  # noqa: B018
+        s = get_settings()
+        for k in ("es_url", "es_api_key"):
+            monkeypatch.setattr(s, k, "")
+        monkeypatch.setattr(router_mod, "_router", FakeRouter())
+        state = {"n": 0}
+
+        async def gh_search(query, *, n=8):
+            return [from_github(GH)]
+
+        async def hn_search(query, *, n=8, _state=state):
+            _state["n"] += 1
+            if _state["n"] == 1:
+                raise SourceError("TimeoutException from hn.algolia.com after 3 attempts")
+            return [from_hn(HN)]
+
+        monkeypatch.setattr(github, "search", gh_search)
+        monkeypatch.setattr(hn, "search", hn_search)
+        run = runstore.create_run(IDEA)
+        await run.task
+        assert run.host.name == host
+        counts[host] = Counter(e.type for e in run.bus.history)
+    assert counts["asyncio"] == counts["jiuwen"], {k: (counts["asyncio"][k], counts["jiuwen"][k]) for k in counts["asyncio"] | counts["jiuwen"] if counts["asyncio"][k] != counts["jiuwen"][k]}
