@@ -1,0 +1,141 @@
+"""Facets, scores, graph patches, mutations and the final report."""
+from __future__ import annotations
+
+from typing import Any, Literal
+
+from pydantic import BaseModel, Field
+
+from .claims import Claim
+from .entities import Entity, Evidence
+
+FACET_KEYS = ("purpose", "mechanism", "audience", "data", "twist")
+
+
+class Facets(BaseModel):
+    purpose: str
+    mechanism: str
+    audience: str = ""
+    data: str = ""
+    twist: str = ""
+    domain: str = ""  # drives dynamic team formation
+    keywords: list[str] = Field(default_factory=list)
+
+
+class AxisScore(BaseModel):
+    score: float | None  # 0..100, higher = more original; None when the axis abstains
+    detail: dict[str, Any] = Field(default_factory=dict)
+    note: str = ""
+
+
+class Abstain(BaseModel):
+    active: bool = False
+    reason: str = ""
+
+
+class Scores(BaseModel):
+    crowding: AxisScore
+    facet_rarity: AxisScore
+    llm_predictability: AxisScore
+    headline: float | None = None
+    band: float | None = None
+    confidence: float = 0.0
+    abstain: Abstain = Field(default_factory=Abstain)
+
+
+class VoiceSentence(BaseModel):
+    text: str
+    start: int
+    end: int
+    flagged: bool
+
+
+class Voice(BaseModel):
+    """GPTZero on the pitch. A separate channel: never folded into the headline score."""
+
+    too_short: bool = False
+    predicted_class: Literal["human", "ai", "mixed"] | None = None
+    confidence_category: Literal["high", "medium", "low"] | None = None
+    result_message: str | None = None
+    ai_sentence_share: float | None = None
+    sentences: list[VoiceSentence] = Field(default_factory=list)
+    neighbourhood_slop_share: float | None = None
+
+
+NodeKind = Literal["idea", "facet", "entity", "theme", "prior", "mutation"]
+LinkKind = Literal["similar", "has_facet", "shares_facet", "same_as", "possible_same_as", "mutation_of", "tagged"]
+
+
+class GraphNode(BaseModel):
+    id: str
+    kind: NodeKind
+    label: str
+    source: str | None = None
+    similarity: float | None = None
+    year: int | None = None
+    url: str | None = None
+    badges: list[str] = Field(default_factory=list)  # merged, conflict, imputed, ai_written, winner, source_failed
+    val: float = 1.0
+
+
+class GraphLink(BaseModel):
+    source: str
+    target: str
+    kind: LinkKind
+    weight: float = 1.0
+
+
+class GraphPatch(BaseModel):
+    add_nodes: list[GraphNode] = Field(default_factory=list)
+    add_links: list[GraphLink] = Field(default_factory=list)
+    update_nodes: list[dict[str, Any]] = Field(default_factory=list)  # {id, ...changed fields}
+    remove_nodes: list[str] = Field(default_factory=list)
+
+
+class Mutation(BaseModel):
+    mid: str
+    facet: str
+    frm: str
+    to: str
+    rationale: str
+    pitch: str  # the rewritten one-paragraph idea
+    grounded_in: list[str] = Field(default_factory=list)  # whitespace terms that seeded it
+    delta: float | None = None  # change in crowding score after re-scoring
+    axes: dict[str, float] | None = None
+
+
+class SourceStatus(BaseModel):
+    source: str
+    status: Literal["ok", "failed", "skipped", "degraded"]
+    n_records: int = 0
+    error: str | None = None
+
+
+class TermStat(BaseModel):
+    term: str
+    score: float | None = None
+    global_count: int | None = None
+    neighbourhood_count: int | None = None
+
+
+class YearCount(BaseModel):
+    year: int
+    count: int
+    winners: int = 0
+
+
+class Report(BaseModel):
+    run_id: str
+    idea_text: str
+    facets: Facets
+    scores: Scores
+    voice: Voice | None = None
+    entities: list[Entity] = Field(default_factory=list)
+    claims: list[Claim] = Field(default_factory=list)
+    evidence: list[Evidence] = Field(default_factory=list)
+    cliches: list[TermStat] = Field(default_factory=list)
+    whitespace: list[TermStat] = Field(default_factory=list)
+    by_year: list[YearCount] = Field(default_factory=list)
+    mutations: list[Mutation] = Field(default_factory=list)
+    sources: list[SourceStatus] = Field(default_factory=list)
+    citations: list[str] = Field(default_factory=list)
+    summary_md: str = ""

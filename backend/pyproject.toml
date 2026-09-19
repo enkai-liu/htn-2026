@@ -1,0 +1,42 @@
+[project]
+name = "whitespace-backend"
+version = "0.1.0"
+description = "Multi-agent idea-originality checker (Hack the North 2026)"
+requires-python = ">=3.11,<3.14"
+dependencies = [
+  "fastapi>=0.115",
+  "uvicorn[standard]>=0.30",
+  "sse-starlette>=2.1",
+  "httpx>=0.27",
+  "openai>=1.50",
+  "elasticsearch>=9.0,<10",
+  "pydantic>=2.7",
+  "pydantic-settings>=2.4",
+  "python-dotenv>=1.0",
+  "tenacity>=9.0",
+  "json-repair>=0.30",
+  "numpy>=2.0",
+  "jinja2>=3.1",
+  "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "pytest-asyncio>=0.24", "ruff>=0.6"]
+ingest = ["pyarrow>=17", "pandas>=2.2", "huggingface_hub>=0.25", "beautifulsoup4>=4.12", "feedparser>=6.0"]
+# Heavy (86 deps). Kept optional so the asyncio host never depends on it. Falls back to its own venv if it conflicts.
+jiuwen = ["openjiuwen==0.1.18"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py312"
