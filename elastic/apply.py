@@ -34,6 +34,7 @@ from app.config import Settings, get_settings  # noqa: E402
 PIPELINE_NAME = "prior-art-clean"
 PLACEHOLDER = re.compile(r"\{\{([A-Z][A-Z0-9_]*)\}\}")
 ALL_KINDS = ("pipeline", "indices", "tools", "agents", "workflows")
+STRING_PARAM_TYPES = ("string", "keyword", "text")
 WORKFLOWS_HINT = "Workflows API not enabled — enable workflows:ui:enabled (Kibana > Advanced Settings), then re-run"
 
 
@@ -46,7 +47,7 @@ def index_pattern(index: str) -> str:
     return f"{m.group(1)}*" if m else index
 
 
-def template_vars(settings: Settings, *, string_param_type: str = "keyword") -> dict[str, str]:
+def template_vars(settings: Settings, *, string_param_type: str = "string") -> dict[str, str]:
     return {
         "EMBED_ID": settings.es_embed_inference_id,
         "RERANK_ID": settings.es_rerank_inference_id,
@@ -123,7 +124,7 @@ class Step:
         return str(self.source.relative_to(REPO_ROOT))
 
 
-def build_plan(settings: Settings, *, string_param_type: str = "keyword", no_lang_ident: bool = False,
+def build_plan(settings: Settings, *, string_param_type: str = "string", no_lang_ident: bool = False,
                only: tuple[str, ...] = ALL_KINDS) -> list[Step]:
     """Render every artifact in apply order. Pure: no network, works with empty settings."""
     v = template_vars(settings, string_param_type=string_param_type)
@@ -244,7 +245,7 @@ def describe(step: Step, settings: Settings, kibana_prefix: str) -> str:
         return f"POST {kb}/api/agent_builder/agents   (PUT …/agents/{step.name} if it exists; {len(ids)} tools)"
     steps = [s["name"] for s in (step.parsed or {}).get("steps", [])]
     triggers = [t["type"] for t in (step.parsed or {}).get("triggers", [])]
-    return f"POST {kb}/api/workflows/workflow   body={{yaml}}  (PUT …/workflow/<id> if it exists; triggers={triggers}, steps={steps})"
+    return f"POST {kb}/api/workflows   body={{workflows:[{{yaml}}]}}  (PUT …/workflows/<id> if it exists; triggers={triggers}, steps={steps})"
 
 
 def dry_run(settings: Settings, args: argparse.Namespace) -> int:
@@ -333,14 +334,20 @@ def apply_index(c: Clients, step: Step, rep: Report) -> None:
     rep.add("FAIL", step.kind, step.name, msg + hint)
 
 
-def _swap_string_type(body: dict[str, Any]) -> dict[str, Any] | None:
+def _string_type_variants(body: dict[str, Any]) -> list[tuple[str, dict[str, Any]]]:
     params = body.get("configuration", {}).get("params") or {}
-    if not any(p.get("type") in ("keyword", "text") for p in params.values()):
-        return None
-    out = copy.deepcopy(body)
-    for p in out["configuration"]["params"].values():
-        if p.get("type") in ("keyword", "text"):
-            p["type"] = "text" if p["type"] == "keyword" else "keyword"
+    if not any(p.get("type") in STRING_PARAM_TYPES for p in params.values()):
+        return []
+    current = next(p["type"] for p in params.values() if p.get("type") in STRING_PARAM_TYPES)
+    out = []
+    for candidate in STRING_PARAM_TYPES:
+        if candidate == current:
+            continue
+        body2 = copy.deepcopy(body)
+        for p in body2["configuration"]["params"].values():
+            if p.get("type") in STRING_PARAM_TYPES:
+                p["type"] = candidate
+        out.append((candidate, body2))
     return out
 
 
@@ -354,13 +361,12 @@ def _upsert(c: Clients, collection: str, body: dict[str, Any], immutable: tuple[
 
 def apply_tool(c: Clients, step: Step, rep: Report, available: set[str]) -> None:
     r, verb = _upsert(c, "tools", step.body, ("id", "type"))
-    if r.status_code >= 400 and r.status_code != 404:
-        swapped = _swap_string_type(step.body)
-        if swapped is not None and re.search(r"param|type|keyword|text|schema|valid", _short(r), re.I):
-            r2, verb2 = _upsert(c, "tools", swapped, ("id", "type"))
+    if r.status_code >= 400 and r.status_code != 404 and re.search(r"param|type|keyword|text|schema|valid", _short(r), re.I):
+        for candidate, variant in _string_type_variants(step.body):
+            r2, verb2 = _upsert(c, "tools", variant, ("id", "type"))
             if r2.status_code < 300:
                 available.add(step.name)
-                return rep.add("OK", step.kind, step.name, f"{verb2} with the alternative string param type (pass --string-param-type to make it the default)")
+                return rep.add("OK", step.kind, step.name, f"{verb2} with string param type '{candidate}' (pass --string-param-type {candidate} to make it the default)")
     if r.status_code < 300:
         available.add(step.name)
         return rep.add("OK", step.kind, step.name, verb)
@@ -392,19 +398,31 @@ def apply_agent(c: Clients, step: Step, rep: Report, available: set[str], planne
     rep.add("FAIL", step.kind, step.name, _short(r))
 
 
+def _list_workflows(c: Clients) -> list[dict[str, Any]]:
+    """List existing workflows. Kibana 9.6 serves GET /api/workflows; older builds POST /api/workflows/search."""
+    attempts = (
+        lambda: c.kb.get("/api/workflows"),  # no query params: 9.6 rejects unknown ones and defaults to size 100
+        lambda: c.kb.post("/api/workflows/search", json={"limit": 100, "page": 1}),
+    )
+    for call in attempts:
+        try:
+            r = call()
+            if r.status_code != 200:
+                continue
+            data = r.json()
+        except Exception:
+            continue
+        items = data.get("results") or data.get("workflows") or data.get("items") or data.get("data") or []
+        if isinstance(items, list):
+            return [i for i in items if isinstance(i, dict)]
+    return []
+
+
 def _find_workflow_id(c: Clients, name: str) -> str | None:
     """Best effort: look an existing workflow up by name so a re-run updates instead of duplicating."""
-    try:
-        r = c.kb.post("/api/workflows/search", json={"query": name, "limit": 100, "page": 1})
-        if r.status_code != 200:
-            return None
-        data = r.json()
-        items = data.get("results") or data.get("workflows") or data.get("items") or data.get("data") or []
-        for item in items:
-            if isinstance(item, dict) and item.get("name") == name and item.get("id"):
-                return str(item["id"])
-    except Exception:
-        return None
+    for item in _list_workflows(c):
+        if item.get("name") == name and item.get("id"):
+            return str(item["id"])
     return None
 
 
@@ -412,17 +430,31 @@ def apply_workflow(c: Clients, step: Step, rep: Report) -> None:
     note = "; ".join(step.notes)
     existing = _find_workflow_id(c, step.name)
     if existing:
-        r = c.kb.put(f"/api/workflows/workflow/{existing}", json={"yaml": step.body})
+        # Never fall through to create when the workflow is already there: that would duplicate it.
+        r = c.kb.put(f"/api/workflows/{existing}", json={"yaml": step.body})
+        if r.status_code == 404:
+            r = c.kb.put(f"/api/workflows/workflow/{existing}", json={"yaml": step.body})
         if r.status_code < 300:
             return rep.add("OK", step.kind, step.name, f"updated ({existing})" + (f"; {note}" if note else ""))
-    r = c.kb.post("/api/workflows/workflow", json={"yaml": step.body})
+        return rep.add("FAIL", step.kind, step.name, _short(r, 500) + f"  (updating {existing})")
+    # Kibana 9.6: bulk create, {"workflows":[{"yaml":...}]} -> {"created":[...],"failed":[...]}.
+    r = c.kb.post("/api/workflows", json={"workflows": [{"yaml": step.body}]})
+    bulk = r.status_code != 404
+    if r.status_code == 404:
+        r = c.kb.post("/api/workflows/workflow", json={"yaml": step.body})
     if r.status_code == 404:
         return rep.add("SKIP", step.kind, step.name, WORKFLOWS_HINT)
     if r.status_code < 300:
         try:
-            wid = r.json().get("id")
+            data = r.json()
         except Exception:
-            wid = None
+            data = {}
+        # The bulk endpoint answers 200 even when an item was rejected, so read `failed` before claiming success.
+        failed = data.get("failed") or [] if bulk else []
+        if failed:
+            return rep.add("FAIL", step.kind, step.name, f"{json.dumps(failed)[:500]}  HINT: validate the YAML in the Kibana Workflows editor")
+        created = data.get("created") or [] if bulk else []
+        wid = (created[0].get("id") if created and isinstance(created[0], dict) else None) or data.get("id")
         return rep.add("OK", step.kind, step.name, f"created ({wid})" + (f"; {note}" if note else ""))
     rep.add("FAIL", step.kind, step.name, _short(r, 500) + "  HINT: validate the YAML in the Kibana Workflows editor or POST /api/workflows/test")
 
@@ -542,13 +574,19 @@ def check(settings: Settings, args: argparse.Namespace) -> int:
             rep.add("OK", "kibana", "agent_builder/tools", f"{len(tools)} tools visible; ours: {ours or 'none yet'}")
         else:
             rep.add("FAIL", "kibana", "agent_builder/tools", _short(r))
-        r = c.kb.post("/api/workflows/search", json={"limit": 1, "page": 1})
+        r = c.kb.get("/api/workflows")
+        if r.status_code == 404:
+            r = c.kb.post("/api/workflows/search", json={"limit": 1, "page": 1})
         if r.status_code == 200:
-            rep.add("OK", "kibana", "workflows API", "reachable")
+            try:
+                total = r.json().get("total")
+            except Exception:
+                total = None
+            rep.add("OK", "kibana", "workflows API", "reachable" + (f" ({total} existing)" if total is not None else ""))
         elif r.status_code == 404:
             rep.add("WARN", "kibana", "workflows API", WORKFLOWS_HINT)
         else:
-            rep.add("WARN", "kibana", "workflows API", f"search probe answered {_short(r)} (creation may still work)")
+            rep.add("WARN", "kibana", "workflows API", f"list probe answered {_short(r)} (creation may still work)")
     except Exception as exc:
         rep.add("FAIL", "kibana", "connect", f"{type(exc).__name__}: {exc}")
     return rep.finish()
@@ -562,8 +600,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     mode.add_argument("--dry-run", action="store_true", help="no network: render every templated artifact and print the plan")
     ap.add_argument("--only", default=",".join(ALL_KINDS), help=f"comma list from: {', '.join(ALL_KINDS)}")
     ap.add_argument("--verbose", "-v", action="store_true", help="dry-run: also print every rendered body (secrets masked)")
-    ap.add_argument("--string-param-type", choices=("keyword", "text"), default="keyword",
-                    help="Agent Builder ES|QL string param type (the other one is retried automatically on a 400)")
+    ap.add_argument("--string-param-type", choices=STRING_PARAM_TYPES, default="string",
+                    help="Agent Builder ES|QL string param type (9.6 accepts string|integer|float|boolean|date|array; "
+                         "the other candidates are retried automatically on a 400)")
     ap.add_argument("--no-lang-ident", action="store_true", help="apply the pipeline without the lang_ident_model_1 inference processor")
     ap.add_argument("--space", default="", help="Kibana space name for non-default spaces (adds the /s/<space> prefix)")
     args = ap.parse_args(argv)

@@ -1,4 +1,4 @@
-# Handover — written Sat 2026-09-19 (code state as of ~03:30 EDT; check `date` — the 14:00 EDT prize lock may be close or past)
+# Handover — written Sat 2026-09-19 (code state as of ~16:00 EDT, after Elastic went live; check `date` — the 14:00 EDT prize lock is past, the Sun 08:00 final submission is next)
 
 Paste the block below into a fresh Claude Code session opened in `/Users/enkailiu/Projects/htn-2026`.
 
@@ -15,8 +15,9 @@ openjiuwen host design and the demo script are in docs/design-full.md; sponsor r
 
 HARD DEADLINES (EDT): Sat Sep 19 14:00 initial Devpost submission + sponsor prizes LOCKED. Sun Sep 20 08:00 final
 submission (aim 07:15). Sponsor judging Sun 09:45-11:45; judging is a 5-minute LIVE demo. Team of 4.
-Tracks: GPTZero, Baseten, Huawei openJiuwen, Rox, Elastic, + GoDaddy domain, + Browserbase. RBC: recommended NOT
-opting in (it is a financial-data Q&A benchmark on RBC's own MCP server) - user decides by 13:30.
+Tracks (LOCKED at initial Devpost submission, Sat 14:00): GPTZero, Baseten, Huawei openJiuwen, Rox, Elastic,
+GoDaddy domain, Browserbase. RBC: NOT opted in (its challenge is a financial-data Q&A benchmark on RBC's own
+MCP server - a different project).
 
 MACHINE QUIRKS: /usr/bin/git and /usr/bin/make are blocked by an unaccepted Xcode licence. Prefix every git/make
 command with DEVELOPER_DIR=/Library/Developer/CommandLineTools (or the user runs `sudo xcodebuild -license`).
@@ -56,7 +57,11 @@ FIRST TASKS:
 | Scripts | smokes for Elastic/Baseten/GPTZero (`--live` needed to spend GPTZero words), secret scan, benchmark ideas (Spearman), golden-run recorder, Baseten bake-off | `scripts/`, `baseten/bakeoff.py` |
 | Frontend | Next.js 16 app: landing, live run view (swarm timeline, radial idea-space graph, gauges, Voice, evidence/debate/coach/report tabs, cost meter, replay controls), Slop Index page (sample data labelled), About. Static replay works with no backend | `frontend/` |
 
-**Nothing has run against a real LLM, Elasticsearch, or GPTZero yet — there are no keys in `.env`.** Everything is tested offline with fakes.
+**Elastic is LIVE (set up Sat ~16:00).** `.env` holds every key. A serverless 9.6.0 project on GCP `us-east4`
+(general-purpose Elasticsearch, NOT the new "Vector Database" project type) has all 17 artifacts applied and
+8,462 Tier 0 docs indexed; `bash scripts/smoke_elastic.sh` is 9/9 and hybrid retrieval returns HackAnalyzer /
+Plagia / DevSpot in the top 5 in ~0.8s. **FORK/FUSE/RERANK works here**, so `originality.hybrid_prior_art` is
+live and the `semantic_prior_art` fallback is not needed. **Still not run against a real LLM or GPTZero.**
 
 ## Verify the state
 
@@ -77,11 +82,13 @@ Dev servers: `.claude/launch.json` defines `frontend` (:3000) and `backend` (:80
 3. **Frontend contract notes already fixed on the backend side** (eid on `evidence.found`, quotes on `claim.proposed`, `agent.finished` after retries); the mock fixture was regenerated — run `pnpm sync-replay` after any future fixture change.
 4. `docs/PLAN.md` GPTZero budget: a 1,800-char write-up is ~290 words, so the full 8×150 scan (~350k words) exceeds the 230k cap → ask the booth for a bump or `scan --per-year 95`.
 5. Not started: Browserbase evidence-browser agent (`backend/app/sources/browserbase.py`, `roles/scouts/browser.py`), alerts poller (`idea-alerts-v1` → SSE toast), fire-drill trigger endpoint, MCP tool use by scouts (design-full §1 "G4"), Truss surprisal (P2), `docs/sponsors/*.md` (huawei.md done), Devpost write-up (draft in `docs/devpost.md`; every TODO needs a real measurement), replay-only Vercel deploy + GoDaddy domain.
+6. **`elastic/apply.py` had two bugs that reported success while deploying nothing — fixed Sat ~16:00, worth checking for the same shape elsewhere.** (i) The Kibana Workflows paths were stale: 9.6 serves `GET /api/workflows` (400s on unknown query params) and `POST /api/workflows` with `{"workflows":[{yaml}]}`, and that bulk create answers **200 with a `failed` array** rather than an error status, so the old code would have claimed success having deployed nothing; `/api/workflows/workflow` and `/api/workflows/search` now 404. (ii) Agent Builder ES|QL param `type` must be `string|integer|float|boolean|date|array` — `keyword`/`text` are mapping types and are rejected, so 6 of 8 tools failed and both agents were created with those tools silently stripped out. Default is now `string` and the retry tries every candidate. `workflows:ui:enabled` is ON by default on 9.6, so a 404 there means a wrong path, not a disabled feature.
+7. **Transient network flakiness on this machine:** two consecutive `smoke_elastic.sh` runs failed with curl timeouts and `Could not resolve host`, then a third passed untouched with no changes. Re-run before debugging a failure, especially mid-demo.
 
 ## Once keys exist (user fills `.env` from `.env.example`)
 
-1. `bash scripts/smoke_all.sh` → then `backend/.venv/bin/python elastic/apply.py --check` (prints real Jina inference IDs; fix `ES_EMBED_INFERENCE_ID` / `ES_RERANK_INFERENCE_ID` if they differ) → `elastic/apply.py`.
-2. With the user's go-ahead for downloads: `make ingest-tier0` → `make measure` (EIS docs/s decides Tier 1 size) → `make search Q="validate hackathon idea originality"` must return DevSpot/HackAnalyzer in the top 5.
+1. ~~smoke → `apply.py --check` → `apply.py`~~ **DONE Sat ~16:00.** `.jina-embeddings-v3` (1024-dim) and `.jina-reranker-v3` both exist as assumed, so no `.env` change was needed. Two real bugs in `elastic/apply.py` were found and fixed on the way — see "Open issues" 6.
+2. ~~`make ingest-tier0`~~ **DONE.** 8,462 docs (6,237 YC + 2,222 Devpost + 3 seeds), 0 failed / 0 quarantined / 0 429s, EIS at 97-145 docs/s. Canary returns DevSpot/HackAnalyzer/Plagia in the top 5. Still to do: `make measure` (EIS docs/s decides Tier 1 size) and `make search Q="..."` through the backend's own search path.
 3. Start the backend, run a real idea end to end, fix prompt/latency issues, then `python scripts/bench_ideas.py --out docs/benchmarks.md` (pass = Spearman ≥ 0.8).
 4. Overnight: `make ingest-tier1` (372 MB download, resumable, `caffeinate`), then `make ingest-tier2`, then `make calibrate`.
 5. GPTZero: `bash scripts/smoke_gptzero.sh --live` (learn bibliography-scan entitlement + billing) → investigation pilot.
@@ -90,4 +97,4 @@ Dev servers: `.claude/launch.json` defines `frontend` (:3000) and `backend` (:80
 
 ## Things only the user can do (unchanged)
 
-Huawei credits (luma.com/mc7lijgs, first-come) · Baseten account + verification + promo code from Slack `#spons-baseten-2026` · Elastic Cloud **Serverless** trial · GPTZero key · OpenRouter key · Browserbase key · Slack webhook · booth visits Sat 09:00–10:30 (Rox: separate write-up/deadline? Huawei: does agent-core + Swarm Skill count? GPTZero: word bump, bibliography-scan access; Baseten: training access, prompt logprobs; Elastic: EIS limits, reranker ID) · Devpost initial submission by 14:00 with all badge IDs.
+Huawei credits (luma.com/mc7lijgs, first-come) · Baseten account + verification + promo code from Slack `#spons-baseten-2026` · ~~Elastic Cloud **Serverless** trial~~ (DONE) · GPTZero key · OpenRouter key · Browserbase key · Slack webhook · booth visits Sat 09:00–10:30 (Rox: separate write-up/deadline? Huawei: does agent-core + Swarm Skill count? GPTZero: word bump, bibliography-scan access; Baseten: training access, prompt logprobs; Elastic: EIS limits, reranker ID) · Devpost initial submission by 14:00 with all badge IDs.

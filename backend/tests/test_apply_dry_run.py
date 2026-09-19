@@ -126,7 +126,8 @@ def test_esql_tools(plan):
     hybrid = tools["originality.hybrid_prior_art"]["configuration"]
     for kw in ("FORK", "FUSE", "RERANK ?q ON pitch", "MATCH(semantic_pitch, ?q)", "LIMIT ?k", "_index"):
         assert kw in hybrid["query"]
-    assert hybrid["params"]["k"]["type"] == "integer" and hybrid["params"]["q"]["type"] == "keyword"
+    # Agent Builder 9.6 accepts string|integer|float|boolean|date|array for esql params; 'keyword' is rejected.
+    assert hybrid["params"]["k"]["type"] == "integer" and hybrid["params"]["q"]["type"] == "string"
     fallback = tools["originality.semantic_prior_art"]["configuration"]["query"]
     assert "FORK" not in fallback and "RERANK" not in fallback and "MATCH(semantic_pitch, ?q)" in fallback
     slop = tools["originality.slop_by_year"]["configuration"]["query"]

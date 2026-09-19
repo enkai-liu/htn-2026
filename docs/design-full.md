@@ -17,7 +17,7 @@ Working title: **Whitespace**. Three interfaces are verified and the rest is a p
 | 7 | `[V]` Devpost returns 403 only for the bare UA `Mozilla/5.0`. A full Chrome UA or the default UA returns 200 for galleries and project pages. `devpost.com/api/hackathons` returns JSON. | Fresh 2025-26 data is scrapeable without Browserbase. |
 | 8 | `[V]` `hackathons.json` (9 MB) in the HF repo has `submission_period_dates` such as "Oct 01 - Dec 04, 2024". | This gives the year join for the Slop Index. |
 | 9 | `[V]` `twangodev/devpost-hacks` needs config `all`. It covers 2024-2026 (TreeHacks 2024/25/26, CalHacks 12, HackGT 12, PennApps XXV, Hacktech 2026, MadHacks) and includes `other_links` and `readmes`. | It doubles as Devpost-to-GitHub entity-resolution ground truth. |
-| 10 | `[V]` Elastic Workflows have a Kibana API: `POST /api/workflows/workflow` with `{id?, yaml}`, `POST /api/workflows/workflow/{id}/run` with `{inputs}`, `GET …/executions`, and `POST /api/workflows/test`. | Workflows can be deployed from the repo. |
+| 10 | `[V]` Elastic Workflows have a Kibana API. **Corrected against a live 9.6.0 Serverless project on 2026-09-19:** list is `GET /api/workflows` -> `{page,size,total,results}` (it rejects unknown query params), create is `POST /api/workflows` with `{"workflows":[{yaml}]}` -> `{created,failed}` (200 even when an item fails, so read `failed`), and `POST /api/workflows/test` needs `inputs`. The earlier `/api/workflows/workflow` and `/api/workflows/search` paths 404. | Workflows can be deployed from the repo. |
 | 11 | `[V]` DevSpot is in the HF dataset (hackathon_id 20679). The same search surfaced "Plagia: A plagiarism detector for hackers". `devpost.com/software/hackanalyzer` and `/devspot` both return 200. | Seed the hero-demo prior art explicitly. |
 | 12 | EIS rate limits are undocumented. | Measure them in hour 1 (section 2.4). |
 
@@ -407,7 +407,7 @@ steps:
 - `elastic/apply.py` applies mappings, pipeline, tools, agents and workflows idempotently.
 - **Actuator chain:**
   - Try the workflow tool over MCP.
-  - Then try `POST /api/workflows/workflow/{id}/run`.
+  - Then try `POST /api/workflows/{id}/run` (the `/workflow/` segment is gone in 9.6; the run path is unconfirmed until a workflow exists).
   - Then index directly into `idea-watches-v1`.
 - **Demo beat:**
   - The live gallery scraper indexes a new HTN 2026 submission. Failing that, index a clearly labelled simulated one.
