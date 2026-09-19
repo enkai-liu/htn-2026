@@ -6,46 +6,27 @@ Also runs the Voice axis (GPTZero on the pitch) - a separate channel that never 
 """
 from __future__ import annotations
 
-import re
-
 from app.config import get_settings
 from app.orchestration.host import Ctx, result
 from app.orchestration.registry import register
 from app.roles.base import BaseRole
 from app.schemas import Verification, Voice
+from app.signals.biblio import resolve_status
+from app.signals.quote_check import quote_in_text
 
 MIN_VOICE_CHARS = 250
 
 
-def _norm(text: str) -> str:
-    text = text.lower().translate(str.maketrans({"’": "'", "‘": "'", "“": '"', "”": '"', "–": "-", "—": "-"}))
-    return re.sub(r"[^a-z0-9]+", " ", text).strip()
-
-
 def _quote_in_text(quote: str, text: str) -> tuple[bool, str]:
-    """Layer 1. Returns (match, human-readable detail)."""
-    try:
-        from app.signals.quote_check import quote_in_text  # tolerant containment: exact, then in-order fuzzy window
-
-        m = quote_in_text(quote, text)
-        return m.match, m.detail
-    except ImportError:
-        q = _norm(quote)
-        ok = bool(q) and q in _norm(text)
-        return ok, "quote found in the source record" if ok else "quote does NOT appear in the source record"
+    """Layer 1: tolerant containment (exact, then in-order fuzzy window). Returns (match, human-readable detail)."""
+    m = quote_in_text(quote, text)
+    return m.match, m.detail
 
 
 def _final_status(v: Verification) -> str:
     """Both layers -> verified | unverified_lead | rejected. A citation GPTZero calls fake is rejected, unless we hold the
     source ourselves and the quote is in it: then the layers disagree and the claim is kept only as an unverified lead."""
-    try:
-        from app.signals.biblio import resolve_status
-
-        return resolve_status(v, trust_local_match_over_fake=True)
-    except ImportError:
-        if v.gptzero_status == "fake":
-            return "unverified_lead" if v.local_quote_match else "rejected"
-        return "verified" if (v.local_quote_match and "contradict" not in (v.stance or "")) else "unverified_lead"
+    return resolve_status(v, trust_local_match_over_fake=True)
 
 
 class Verifier(BaseRole):
