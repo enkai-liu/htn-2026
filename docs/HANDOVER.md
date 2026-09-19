@@ -1,4 +1,4 @@
-# Handover — Sat 2026-09-19 ~03:30 EDT
+# Handover — written Sat 2026-09-19 (code state as of ~03:30 EDT; check `date` — the 14:00 EDT prize lock may be close or past)
 
 Paste the block below into a fresh Claude Code session opened in `/Users/enkailiu/Projects/htn-2026`.
 
