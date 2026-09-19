@@ -36,19 +36,19 @@ type AgentEvent = {
 
 | type | data | UI |
 |---|---|---|
-| `run.started` | `{idea_text, orchestrator: "asyncio"\|"jiuwen", replay?: bool}` | header |
+| `run.started` | `{idea_text, orchestrator: "asyncio"\|"jiuwen", replay?: bool, mock?: bool}` | header; `mock` = fictional fixture data → persistent banner |
 | `facets.extracted` | `{facets: Facets}` | facet chips; facet nodes in graph |
 | `team.formed` | `{team: [{agent, purpose}], skipped: [{agent, why}]}` | SwarmTimeline roster (skipped shown greyed with reason) |
 | `agent.started` | `{purpose?}` | timeline row goes active |
-| `agent.finished` | `{ok: bool, summary?}` | timeline row done/failed |
+| `agent.finished` | `{ok: bool, summary?}` | timeline row done/failed. Emitted after every handled request (`TASK`, `REPLAN`, `REQUEST_EVIDENCE`), so an agent can finish more than once; failed → ok reads as *recovered* |
 | `tool.call` | `{tool, args_summary}` | timeline sub-row |
 | `tool.result` | `{tool, summary, n_hits?}` | timeline sub-row |
 | `message.sent` | `{mid, msg_type, to, summary}` | arrow between agents (`msg_type` = Message.type) |
 | `source.failed` | `{source, error, reassigned_to?}` | red badge; confidence drops |
-| `evidence.found` | `{record: SourceRecord}` | EvidenceCard appears |
+| `evidence.found` | `{record: SourceRecord, eid}` | EvidenceCard appears. `eid` = the record's graph node `ent:<eid>` before resolution (the resolver may absorb it later) |
 | `entity.merged` | `{entity: Entity, rids: string[], verdict}` | cards collapse into one entity |
 | `conflict.detected` | `{eid, conflict: Conflict}` | conflict badge + ledger row |
-| `claim.proposed` | `{claim: Claim}` | DebateThread |
+| `claim.proposed` | `{claim: Claim, evidence?: Evidence[], facets?: string[]}` | DebateThread. `evidence` carries the quoted receipts so quotes show while the debate streams |
 | `claim.challenged` | `{cid, by, challenge_type: "CHALLENGE"\|"REBUTTAL"\|"CONCEDE", text}` | DebateThread |
 | `claim.resolved` | `{cid, status: ClaimStatus, reason}` | claim badge |
 | `requery.issued` | `{reason, facet, query, to}` | "scout sent back out" |
@@ -78,4 +78,5 @@ Shapes of `Facets`, `Scores`, `Voice`, `GraphPatch`, `Mutation`, `Report`, `Sour
 
 1. Every degradation is an event (`source.failed`, `budget.updated{degraded:true}`, `error{recoverable:true}`). Nothing fails silently.
 2. Never put raw GPTZero probabilities in events meant for display: send `result_message` + `confidence_category`.
-3. Simulated or injected items (the fire drill) carry `data.simulated = true` and are labelled in the UI.
+3. Simulated or injected items (the fire drill) carry `data.simulated = true` (on `claim.proposed`, its `evidence[]`, `verify.result`, `claim.resolved`) and are labelled in the UI.
+4. The final `Report` is a summary, not a replacement: clients merge it into what already streamed (longer debate threads, simulated claims and merge decisions may exist only in the stream).

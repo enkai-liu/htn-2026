@@ -1,0 +1,92 @@
+# Handover — Sat 2026-09-19 ~03:30 EDT
+
+Paste the block below into a fresh Claude Code session opened in `/Users/enkailiu/Projects/htn-2026`.
+
+---
+
+```text
+You are continuing a Hack the North 2026 build called "Whitespace": a multi-agent tool that scores how original a
+hackathon/startup idea is (retrieval-grounded, with verified citations) and coaches the author toward a more original
+version. Repo: /Users/enkailiu/Projects/htn-2026 (remote github.com/enkai-liu/htn-2026, private, branch main).
+
+READ FIRST, in this order: docs/HANDOVER.md (state + open issues), docs/PLAN.md (approved plan, lanes, schedule, cut
+lines), docs/events.md (the SSE contract every lane builds on), docs/scoring.md. Exact Elastic JSON/YAML, the
+openjiuwen host design and the demo script are in docs/design-full.md; sponsor research is in docs/research/.
+
+HARD DEADLINES (EDT): Sat Sep 19 14:00 initial Devpost submission + sponsor prizes LOCKED. Sun Sep 20 08:00 final
+submission (aim 07:15). Sponsor judging Sun 09:45-11:45; judging is a 5-minute LIVE demo. Team of 4.
+Tracks: GPTZero, Baseten, Huawei openJiuwen, Rox, Elastic, + GoDaddy domain, + Browserbase. RBC: recommended NOT
+opting in (it is a financial-data Q&A benchmark on RBC's own MCP server) - user decides by 13:30.
+
+MACHINE QUIRKS: /usr/bin/git and /usr/bin/make are blocked by an unaccepted Xcode licence. Prefix every git/make
+command with DEVELOPER_DIR=/Library/Developer/CommandLineTools (or the user runs `sudo xcodebuild -license`).
+Python: use backend/.venv (3.12; system python is 3.14 and too new). openjiuwen lives in backend/.venv-jiuwen.
+No docker, no uv. Node 23 + pnpm. Do not add attribution lines to commits. Commit small and often; push to origin main.
+
+RULES THAT MUST HOLD: never build anything that defeats bot detection (Devpost's /software/search is behind an AWS WAF
+challenge - leave it alone; galleries/project pages are fine at <=1 req/s; a blocked site is reported as blocked).
+GPTZero "Voice" stays a separate axis, never folded into the originality score; never show raw probabilities; replay/
+fixture GPTZero data must never be presented as a real reading. Mock/simulated data is always labelled. Publish only
+aggregated/anonymised investigation results. I cannot create accounts or enter credentials - the user does that.
+Dataset downloads need the user's explicit go-ahead (Tier 0 ~15 MB, Tier 1 372 MB from Hugging Face).
+
+FIRST TASKS:
+1. Run the checks in docs/HANDOVER.md "Verify the state" and confirm everything is green.
+2. Fix OPEN ISSUE #1 (live SSE path in a real browser) - it blocks real runs from showing in the UI.
+3. Finish the Swarm Skill (OPEN ISSUE #2) until the official validator passes.
+4. Ask me which API keys are now in .env, then follow "Once keys exist" in docs/HANDOVER.md.
+```
+
+---
+
+## What is built (all pushed to `origin main`, 302 backend tests + 19 frontend tests passing)
+
+| Area | State | Where |
+|---|---|---|
+| Contracts | Pydantic schemas, event protocol, TS mirror, 125-event fictional mock run (generator + fixture) | `backend/app/schemas/`, `docs/events.md`, `frontend/lib/types.ts`, `backend/fixtures/make_mock_run.py` |
+| Backend API | FastAPI: `POST /api/runs`, SSE `/api/runs/{id}/events` with `Last-Event-ID` resume, JSONL persistence = replay format, `/api/replay/{name}/events`, report, rescore, actions, health, slop-index | `backend/app/api/runs.py`, `app/main.py`, `app/core/` |
+| Agents | conductor, 4 scouts (devpost, yc via Elasticsearch; github, hn live), resolver, critic, advocate, judge (jury + LLM-predictability), verifier (veto in code), synthesizer, mutator (re-scores), actuator | `backend/app/roles/` |
+| Hosts | asyncio host **and** openjiuwen agent-core host (TeamRuntime P2P + session streaming). Same roles, event-parity tested. `ORCHESTRATOR=asyncio\|jiuwen` | `backend/app/orchestration/` |
+| Messy-data (Rox) | live-source schema matching with provenance, blocking (URL xref + name trigrams), LLM adjudication with `insufficient_evidence`, union-find merge, field fusion with reliability priors, visible conflicts + imputed fields | `backend/app/wrangle/`, `roles/resolver.py` |
+| Scoring | 3 axes + headline (weighted geometric mean), confidence, abstention rules; one similarity scale via the Jina reranker on EIS (lexical fallback labelled uncalibrated) | `backend/app/scoring/`, `docs/scoring.md` |
+| LLM router | Baseten → OpenRouter fallback, token bucket, JSON-schema structured output with repair + one re-ask, cost table, `x-session-affinity` | `backend/app/llm/` |
+| Elastic | mappings, ingest pipeline, 8 Agent Builder tools + 2 agents, 2 workflows, idempotent `apply.py` (`--check`, `--dry-run`) | `elastic/` |
+| Ingest + search | tiered loaders (twangodev, alvanlii, YC), Devpost write-up parser, polite fetcher, EIS throughput measurer; hybrid search with degradation ladder, facet/pair rarity, whitespace finder, calibration CDF | `ingest/`, `backend/app/search/` |
+| GPTZero + investigation | client with word ledger/cache/replay, bibliography-scan mapping, quote check, Slop Index pipeline (sample → scan → analyze → export) | `backend/app/signals/`, `investigation/` |
+| Scripts | smokes for Elastic/Baseten/GPTZero (`--live` needed to spend GPTZero words), secret scan, benchmark ideas (Spearman), golden-run recorder, Baseten bake-off | `scripts/`, `baseten/bakeoff.py` |
+| Frontend | Next.js 16 app: landing, live run view (swarm timeline, radial idea-space graph, gauges, Voice, evidence/debate/coach/report tabs, cost meter, replay controls), Slop Index page (sample data labelled), About. Static replay works with no backend | `frontend/` |
+
+**Nothing has run against a real LLM, Elasticsearch, or GPTZero yet — there are no keys in `.env`.** Everything is tested offline with fakes.
+
+## Verify the state
+
+```bash
+cd backend && .venv/bin/pytest -q -p no:warnings            # expect 302 passed, 3 skipped
+cd backend && .venv-jiuwen/bin/pytest -q -p no:warnings tests/test_pipeline_offline.py   # expect 7 passed (openjiuwen host)
+cd frontend && pnpm test && pnpm typecheck && pnpm lint      # expect 19 passed, clean
+backend/.venv/bin/python elastic/apply.py --dry-run          # 17-step plan, sends nothing
+bash scripts/smoke_all.sh                                    # SKIPs without keys, exit 0
+```
+Dev servers: `.claude/launch.json` defines `frontend` (:3000) and `backend` (:8000). Recorded run: http://localhost:3000/runs/mock?speed=3
+
+## Open issues, most important first
+
+1. **Live SSE path fails in a real browser (UNRESOLVED).** `/runs/mock` (static replay) is perfect. But a run served by the real backend stays on "connecting". Reproduce: `cp backend/fixtures/mock_run.jsonl backend/runs/ssetest.jsonl`, start both servers, open `/runs/ssetest`. Findings so far: `curl` with an `Origin` header streams fine (200, `access-control-allow-origin: *`); in-page `fetch('/api/health')` → 200; a hand-made `EventSource` **opens, receives `run.started` and `facets.extracted`, then fires `onerror`** and the app never renders. Not a run-id filter (checked). Suspects, in order: (a) `sse-starlette` + the `replay()` async generator being cancelled/erroring after the first sleep (check uvicorn logs while the page is open); (b) the client's `onerror` handling closing on the first transient error (`frontend/lib/sse.ts`, `MAX_FAILURES_*`) combined with the server not honouring `Last-Event-ID` on reconnect for recorded runs when `speed` differs; (c) the embedded browser pane itself — confirm in real Chrome before changing code. Add a backend test that consumes the SSE endpoint with `httpx` streaming for >2 events.
+2. **Swarm Skill is half-written (the agent hit the account session limit).** Present: `swarm-skill/prior-art-swarm/SKILL.md`, `roles/{scout,resolver,critic,advocate}.md`, `scripts/workflow.py`. Missing: `roles/{judge,verifier,synthesizer,coach}.md`, `workflow.md`, `bind.md`, `dependencies.yaml`, `README.md`, `scripts/validate_swarm_skill.sh`, `docs/sponsors/huawei.md`. The official validator requires `kind: swarm-skill` and per-role `kind: ai_agent` (NOT `team-skill`). Fetch templates + validator from `openJiuwen-ai/jiuwenswarm` branch `develop`, path `jiuwenswarm/resources/agent/workspace/skills/swarmskill-creator/` (`templates/`, `reference/compliance-checklist.md`, `scripts/validate_swarmskill.py` — stdlib-only, read it before running). Done = validator exits 0.
+3. **Frontend contract notes already fixed on the backend side** (eid on `evidence.found`, quotes on `claim.proposed`, `agent.finished` after retries); the mock fixture was regenerated — run `pnpm sync-replay` after any future fixture change.
+4. `docs/PLAN.md` GPTZero budget: a 1,800-char write-up is ~290 words, so the full 8×150 scan (~350k words) exceeds the 230k cap → ask the booth for a bump or `scan --per-year 95`.
+5. Not started: Browserbase evidence-browser agent (`backend/app/sources/browserbase.py`, `roles/scouts/browser.py`), alerts poller (`idea-alerts-v1` → SSE toast), fire-drill trigger endpoint, MCP tool use by scouts (design-full §1 "G4"), Truss surprisal (P2), `docs/sponsors/*.md`, Devpost write-up, replay-only Vercel deploy + GoDaddy domain.
+
+## Once keys exist (user fills `.env` from `.env.example`)
+
+1. `bash scripts/smoke_all.sh` → then `backend/.venv/bin/python elastic/apply.py --check` (prints real Jina inference IDs; fix `ES_EMBED_INFERENCE_ID` / `ES_RERANK_INFERENCE_ID` if they differ) → `elastic/apply.py`.
+2. With the user's go-ahead for downloads: `make ingest-tier0` → `make measure` (EIS docs/s decides Tier 1 size) → `make search Q="validate hackathon idea originality"` must return DevSpot/HackAnalyzer in the top 5.
+3. Start the backend, run a real idea end to end, fix prompt/latency issues, then `python scripts/bench_ideas.py --out docs/benchmarks.md` (pass = Spearman ≥ 0.8).
+4. Overnight: `make ingest-tier1` (372 MB download, resumable, `caffeinate`), then `make ingest-tier2`, then `make calibrate`.
+5. GPTZero: `bash scripts/smoke_gptzero.sh --live` (learn bibliography-scan entitlement + billing) → investigation pilot.
+6. Baseten: verify the account (15 → 120 RPM), `python baseten/bakeoff.py`, then edit `backend/app/llm/models.py` from the results. OpenRouter slugs in `models.py` are a guess (`openai/gpt-oss-120b` for everything) — confirm.
+7. Record golden runs early: `python scripts/record_golden.py <run_id> self` → replay at `/runs/self?replay=self`.
+
+## Things only the user can do (unchanged)
+
+Huawei credits (luma.com/mc7lijgs, first-come) · Baseten account + verification + promo code from Slack `#spons-baseten-2026` · Elastic Cloud **Serverless** trial · GPTZero key · OpenRouter key · Browserbase key · Slack webhook · booth visits Sat 09:00–10:30 (Rox: separate write-up/deadline? Huawei: does agent-core + Swarm Skill count? GPTZero: word bump, bibliography-scan access; Baseten: training access, prompt logprobs; Elastic: EIS limits, reranker ID) · Devpost initial submission by 14:00 with all badge IDs.

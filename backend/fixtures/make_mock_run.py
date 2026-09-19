@@ -193,7 +193,7 @@ def build() -> list[AgentEvent]:
 
     def found(dt, agent, rid):
         r = BY_RID[rid]
-        e(dt, agent, "scout", "evidence.found", {"record": r.model_dump(mode="json")})
+        e(dt, agent, "scout", "evidence.found", {"record": r.model_dump(mode="json"), "eid": eid_of[rid]})
         badges = (["winner"] if r.traction.get("is_winner") else []) + (["ai_written"] if r.gptzero and r.gptzero.predicted_class == "ai" else [])
         e(0.02, agent, "scout", "graph.patch", GraphPatch(add_nodes=[node_for(r, eid_of[rid], badges)],
           add_links=[GraphLink(source="idea", target=f"ent:{eid_of[rid]}", kind="similar", weight=r.retrieval["rerank_score"])]))
@@ -212,6 +212,7 @@ def build() -> list[AgentEvent]:
     e(0.1, "conductor", "scout", "message.sent", {"mid": "m-retry-hn", "msg_type": "REPLAN", "to": "scout.hn", "summary": "one broadened retry, then degrade"}, to="scout.hn")
     e(2.4, "scout.hn", "scout", "tool.result", {"tool": "hn.algolia_search", "summary": "retry succeeded with a broadened query", "n_hits": 1})
     found(0.2, "scout.hn", "hn:40000001")
+    e(0.05, "scout.hn", "scout", "agent.finished", {"ok": True, "summary": "1 record after a broadened retry"})
     for s, n in (("devpost", 5), ("yc", 1), ("github", 2)):
         e(0.05, f"scout.{s}", "scout", "agent.finished", {"ok": True, "summary": f"{n} records"}, model=FLASH, latency=900, tok=(1400, 260), cost=0.0003)
     e(0.2, "conductor", "scout", "budget.updated", {"calls": 11, "tokens": 9800, "cost_usd": 0.004, "elapsed_s": 17.0, "degraded": False})
@@ -266,7 +267,9 @@ def build() -> list[AgentEvent]:
     c2 = Claim(cid="c2", kind="exists", by="critic", evidence=["ev2"], text="HackCheck (2023) already detects look-alike hackathon submissions.")
     c3 = Claim(cid="c3", kind="exists", by="critic", evidence=["ev3"], text="PitchProbe already validates ideas against existing competitors.")
     for i, c in enumerate((c1, c2, c3)):
-        e(1.2 if i == 0 else 0.5, "critic", "debate", "claim.proposed", {"claim": c.model_dump(mode="json")}, model=PRO, latency=2300, tok=(3100, 380), cost=0.004)
+        e(1.2 if i == 0 else 0.5, "critic", "debate", "claim.proposed",
+          {"claim": c.model_dump(mode="json"), "evidence": [evs[i].model_dump(mode="json")], "facets": ["purpose"]},
+          model=PRO, latency=2300, tok=(3100, 380), cost=0.004)
     e(0.4, "critic", "debate", "requery.issued", {"reason": "need to know whether any prior tool coaches the user, not just scores", "facet": "twist",
       "query": "suggest changes to make hackathon idea more original", "to": "scout.devpost"}, to="scout.devpost")
     e(0.1, "critic", "debate", "message.sent", {"mid": "m-req-1", "msg_type": "REQUEST_EVIDENCE", "to": "scout.devpost", "summary": "twist facet: coaching / re-scoring"}, to="scout.devpost")
@@ -302,7 +305,10 @@ def build() -> list[AgentEvent]:
         e(0.35, "verifier", "verify", "verify.result", {"cid": cid, "layer": "quote", "status": "match", "detail": "quote found verbatim in the fetched page"})
     fire = Claim(cid="c9", kind="exists", by="fire-drill", evidence=["ev9"], text="OriginalityOracle (2025) already does exactly this, per its TechCrunch launch.")
     fire_d = fire.model_dump(mode="json") | {"simulated": True}
-    e(0.6, "verifier", "verify", "claim.proposed", {"claim": fire_d, "simulated": True})
+    fire_ev = Evidence(evid="ev9", eid="sim", rid="sim:originalityoracle", url="https://example.org/simulated/originality-oracle",
+                       quote="OriginalityOracle already scores and coaches hackathon ideas with verified multi-agent debate",
+                       citation='[9] "OriginalityOracle launches." TechCrunch. 2025. https://example.org/simulated/originality-oracle')
+    e(0.6, "verifier", "verify", "claim.proposed", {"claim": fire_d, "evidence": [fire_ev.model_dump(mode="json") | {"simulated": True}], "simulated": True})
     e(1.0, "verifier", "verify", "verify.result", {"cid": "c9", "layer": "quote", "status": "no_match", "detail": "cited page does not exist", "simulated": True})
     for cid, st in (("c1", "exist"), ("c2", "exist"), ("c3", "exist")):
         e(0.9, "verifier", "verify", "verify.result", {"cid": cid, "layer": "gptzero", "status": st, "detail": "citation exists; source stance: support"})

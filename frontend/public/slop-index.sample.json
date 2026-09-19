@@ -1,0 +1,142 @@
+{
+  "sample": true,
+  "notice": "SAMPLE DATA. Illustrative numbers for building the page only: NOT results. The real file comes from investigation/ via GET /api/investigation/slop-index.",
+  "corpus": "Devpost project pitches, English, at least 600 characters, truncated to 1,800 characters at a sentence boundary",
+  "detector": "GPTZero /v2/predict/text: predicted class ai or mixed, confidence_category = high only",
+  "years": [
+    {
+      "year": 2018,
+      "scanned": 150,
+      "ai_high": 1,
+      "mixed_high": 1,
+      "by_subclass": {
+        "pure_ai": 0,
+        "ai_paraphrased": 0,
+        "polished": 2,
+        "concatenated": 0
+      },
+      "ci_low": 0.0037,
+      "ci_high": 0.0473
+    },
+    {
+      "year": 2019,
+      "scanned": 150,
+      "ai_high": 0,
+      "mixed_high": 1,
+      "by_subclass": {
+        "pure_ai": 0,
+        "ai_paraphrased": 0,
+        "polished": 1,
+        "concatenated": 0
+      },
+      "ci_low": 0.0012,
+      "ci_high": 0.0368
+    },
+    {
+      "year": 2021,
+      "scanned": 150,
+      "ai_high": 1,
+      "mixed_high": 1,
+      "by_subclass": {
+        "pure_ai": 0,
+        "ai_paraphrased": 1,
+        "polished": 1,
+        "concatenated": 0
+      },
+      "ci_low": 0.0037,
+      "ci_high": 0.0473
+    },
+    {
+      "year": 2022,
+      "scanned": 150,
+      "ai_high": 2,
+      "mixed_high": 3,
+      "by_subclass": {
+        "pure_ai": 1,
+        "ai_paraphrased": 1,
+        "polished": 2,
+        "concatenated": 1
+      },
+      "ci_low": 0.0143,
+      "ci_high": 0.0757
+    },
+    {
+      "year": 2023,
+      "scanned": 150,
+      "ai_high": 19,
+      "mixed_high": 12,
+      "by_subclass": {
+        "pure_ai": 9,
+        "ai_paraphrased": 8,
+        "polished": 10,
+        "concatenated": 4
+      },
+      "ci_low": 0.1496,
+      "ci_high": 0.2784
+    },
+    {
+      "year": 2024,
+      "scanned": 150,
+      "ai_high": 33,
+      "mixed_high": 19,
+      "by_subclass": {
+        "pure_ai": 17,
+        "ai_paraphrased": 12,
+        "polished": 16,
+        "concatenated": 7
+      },
+      "ci_low": 0.2752,
+      "ci_high": 0.4258
+    },
+    {
+      "year": 2025,
+      "scanned": 150,
+      "ai_high": 41,
+      "mixed_high": 22,
+      "by_subclass": {
+        "pure_ai": 22,
+        "ai_paraphrased": 14,
+        "polished": 18,
+        "concatenated": 9
+      },
+      "ci_low": 0.344,
+      "ci_high": 0.5
+    },
+    {
+      "year": 2026,
+      "scanned": 150,
+      "ai_high": 45,
+      "mixed_high": 23,
+      "by_subclass": {
+        "pure_ai": 25,
+        "ai_paraphrased": 15,
+        "polished": 18,
+        "concatenated": 10
+      },
+      "ci_low": 0.3758,
+      "ci_high": 0.5332
+    }
+  ],
+  "placebo_fpr": 0.0111,
+  "placebo": {
+    "years": [
+      2018,
+      2019,
+      2021
+    ],
+    "flagged": 5,
+    "scanned": 450,
+    "ci_low": 0.0048,
+    "ci_high": 0.0257
+  },
+  "tie_in": {
+    "cliffs_delta": 0.24,
+    "p_value": 0.0008,
+    "median_nn_sim_flagged": 0.71,
+    "median_nn_sim_human": 0.63,
+    "n_flagged": 214,
+    "n_human": 386,
+    "test": "Mann-Whitney U within year, pooled 2023-2026"
+  },
+  "user_percentile": null
+}

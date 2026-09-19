@@ -50,7 +50,7 @@ class ScoutRole(BaseRole):
         new.sort(key=lambda r: -float(r.retrieval.get("rerank_score") or 0))
         for r in new:
             ctx.board.put("records", self.id, r.rid, r)
-            await ctx.emit("evidence.found", {"record": r.model_dump(mode="json")}, phase=phase)
+            await ctx.emit("evidence.found", {"record": r.model_dump(mode="json"), "eid": eid_for(r.rid)}, phase=phase)
             sim = float(r.retrieval.get("rerank_score") or 0)
             badges = (["winner"] if r.traction.get("is_winner") else []) + (
                 ["ai_written"] if r.gptzero and r.gptzero.predicted_class != "human" and r.gptzero.confidence_category == "high" else [])

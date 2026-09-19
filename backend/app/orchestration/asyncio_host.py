@@ -66,7 +66,7 @@ class AsyncioHost:
             reply, ok, summary = error(f"{to} timed out after {timeout:.0f}s"), False, f"timed out after {timeout:.0f}s"
         except Exception as exc:  # a role crash must never take the run down
             reply, ok, summary = error(f"{type(exc).__name__}: {exc}"), False, f"{type(exc).__name__}: {exc}"[:140]
-        if full["type"] == "TASK":
+        if full["type"] in ("TASK", "REPLAN", "REQUEST_EVIDENCE"):  # a retried or re-queried agent reports again, so the UI can show "recovered"
             await ctx.emit("agent.finished", {"ok": ok, "summary": summary})
         return finalize(reply, run_id=self.run_id, frm=to, to=frm) | {"in_reply_to": full["mid"]}
 

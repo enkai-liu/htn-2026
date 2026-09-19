@@ -74,7 +74,7 @@ class RoleAgent(CommunicableAgent, BaseAgent):
             ok, summary = reply.get("type") != "ERROR", summarize(reply)
         except Exception as exc:  # a role crash must never take the run down
             reply, ok, summary = error(f"{type(exc).__name__}: {exc}"), False, f"{type(exc).__name__}: {exc}"[:140]
-        if inputs["type"] == "TASK":
+        if inputs["type"] in ("TASK", "REPLAN", "REQUEST_EVIDENCE"):  # a retried or re-queried agent reports again, so the UI can show "recovered"
             await ctx.emit("agent.finished", {"ok": ok, "summary": summary})
         return finalize(reply, run_id=self.host.run_id, frm=self.role.id, to=inputs.get("frm")) | {"in_reply_to": inputs.get("mid")}
 

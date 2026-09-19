@@ -1,0 +1,273 @@
+@import "tailwindcss";
+
+/* Whitespace: a star atlas of idea-space.
+   Ink-blue night, parchment type, one amber star (your idea), teal for open water (whitespace),
+   vermilion for anything that failed or was struck. Hairlines, tick marks and range rings, not cards and gradients. */
+
+@theme {
+  --color-ink-950: #04060b;
+  --color-ink-900: #070b14;
+  --color-ink-850: #0a101c;
+  --color-ink-800: #0e1626;
+  --color-ink-700: #152036;
+  --color-ink-600: #1e2d4a;
+  --color-ink-500: #2b3d61;
+  --color-line: rgb(150 176 230 / 0.13);
+  --color-line-strong: rgb(150 176 230 / 0.26);
+
+  --color-bone: #ece5d3;
+  --color-bone-dim: #b4b09f;
+  --color-mute: #7c8498;
+  --color-faint: #4d566b;
+
+  --color-amber: #f4b942;
+  --color-amber-dim: #a97f2b;
+  --color-teal: #4fd6c0;
+  --color-teal-dim: #2c8677;
+  --color-vermilion: #ff5d4d;
+  --color-vermilion-dim: #9c352c;
+  --color-cloud: #8891a5;
+
+  --color-src-devpost: #78b4ff;
+  --color-src-yc: #ff9466;
+  --color-src-github: #c4bdf0;
+  --color-src-hn: #e87fa6;
+  --color-src-arxiv: #9ad17f;
+  --color-src-web: #9cc9d9;
+
+  --font-display: var(--font-instrument-serif), "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+  --font-sans: var(--font-instrument-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-dm-mono), ui-monospace, "SFMono-Regular", Menlo, monospace;
+
+  --animate-rise: rise 0.42s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  --animate-flip: flip 0.5s cubic-bezier(0.3, 1.4, 0.5, 1) both;
+  --animate-beacon: beacon 1.6s ease-out infinite;
+  --animate-flash: flash 1.4s ease-out both;
+  --animate-drift: drift 120s linear infinite;
+}
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes flip {
+  0% { opacity: 0; transform: perspective(300px) rotateX(-88deg); }
+  100% { opacity: 1; transform: perspective(300px) rotateX(0); }
+}
+@keyframes beacon {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 70%, transparent); }
+  100% { box-shadow: 0 0 0 7px transparent; }
+}
+@keyframes flash {
+  0% { background-color: color-mix(in srgb, var(--flash, var(--color-amber)) 26%, transparent); }
+  100% { background-color: transparent; }
+}
+@keyframes drift {
+  from { background-position: 0 0, 0 0, 0 0; }
+  to { background-position: 900px 300px, -600px 400px, 300px -500px; }
+}
+@keyframes sweep {
+  to { transform: rotate(360deg); }
+}
+@keyframes dash {
+  to { stroke-dashoffset: -24; }
+}
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+
+:root {
+  color-scheme: dark;
+}
+
+html, body {
+  height: 100%;
+}
+
+body {
+  background: var(--color-ink-950);
+  color: var(--color-bone);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  font-feature-settings: "ss01", "cv11";
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Night sky: three sparse star layers + a faint graticule, fixed behind everything. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
+  background-image:
+    radial-gradient(1px 1px at 12% 18%, rgb(236 229 211 / 0.75) 50%, transparent 51%),
+    radial-gradient(1px 1px at 71% 9%, rgb(236 229 211 / 0.5) 50%, transparent 51%),
+    radial-gradient(1.4px 1.4px at 38% 72%, rgb(236 229 211 / 0.6) 50%, transparent 51%),
+    radial-gradient(1px 1px at 88% 64%, rgb(160 190 255 / 0.65) 50%, transparent 51%),
+    radial-gradient(1px 1px at 55% 41%, rgb(236 229 211 / 0.35) 50%, transparent 51%),
+    radial-gradient(1.2px 1.2px at 23% 89%, rgb(160 190 255 / 0.5) 50%, transparent 51%),
+    radial-gradient(1px 1px at 94% 27%, rgb(236 229 211 / 0.45) 50%, transparent 51%),
+    radial-gradient(1px 1px at 6% 52%, rgb(236 229 211 / 0.4) 50%, transparent 51%);
+  background-size: 640px 520px, 480px 610px, 720px 680px, 560px 450px, 390px 370px, 810px 590px, 450px 730px, 530px 490px;
+}
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 90% 70% at 50% -10%, rgb(40 66 120 / 0.22), transparent 60%),
+    radial-gradient(ellipse 60% 50% at 100% 100%, rgb(79 214 192 / 0.05), transparent 60%),
+    repeating-linear-gradient(0deg, rgb(150 176 230 / 0.035) 0 1px, transparent 1px 96px),
+    repeating-linear-gradient(90deg, rgb(150 176 230 / 0.035) 0 1px, transparent 1px 96px);
+}
+
+::selection {
+  background: rgb(244 185 66 / 0.35);
+  color: #fff;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-ink-600) transparent;
+}
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-thumb { background: var(--color-ink-600); border-radius: 0; }
+*::-webkit-scrollbar-track { background: transparent; }
+
+:focus-visible {
+  outline: 1px solid var(--color-amber);
+  outline-offset: 2px;
+}
+
+@layer components {
+  /* A chart plate: hairline frame with registration ticks in two corners. */
+  .plate {
+    position: relative;
+    background: linear-gradient(180deg, rgb(12 19 34 / 0.92), rgb(8 12 22 / 0.94));
+    border: 1px solid var(--color-line);
+  }
+  .plate::before,
+  .plate::after {
+    content: "";
+    position: absolute;
+    width: 9px;
+    height: 9px;
+    pointer-events: none;
+    border-color: var(--color-amber-dim);
+    border-style: solid;
+    opacity: 0.9;
+  }
+  .plate::before { top: -1px; left: -1px; border-width: 1px 0 0 1px; }
+  .plate::after { bottom: -1px; right: -1px; border-width: 0 1px 1px 0; }
+
+  .plate-head {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 30px;
+    padding: 0 0.75rem;
+    border-bottom: 1px solid var(--color-line);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--color-mute);
+    flex: none;
+  }
+  .plate-head .idx { color: var(--color-amber); letter-spacing: 0.08em; }
+  .plate-head .ttl { color: var(--color-bone-dim); }
+
+  .label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--color-mute);
+  }
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    height: 18px;
+    padding: 0 6px;
+    border: 1px solid var(--color-line-strong);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    line-height: 1;
+    white-space: nowrap;
+    color: var(--color-bone-dim);
+    background: rgb(150 176 230 / 0.04);
+  }
+  .chip[data-tone="amber"] { color: var(--color-amber); border-color: rgb(244 185 66 / 0.45); background: rgb(244 185 66 / 0.07); }
+  .chip[data-tone="teal"] { color: var(--color-teal); border-color: rgb(79 214 192 / 0.45); background: rgb(79 214 192 / 0.07); }
+  .chip[data-tone="red"] { color: var(--color-vermilion); border-color: rgb(255 93 77 / 0.5); background: rgb(255 93 77 / 0.08); }
+  .chip[data-tone="mute"] { color: var(--color-mute); border-color: var(--color-line); }
+  .chip[data-tone="bone"] { color: var(--color-bone); border-color: rgb(236 229 211 / 0.35); }
+
+  /* hazard tape for anything simulated */
+  .hazard {
+    background-image: repeating-linear-gradient(-45deg, rgb(244 185 66 / 0.16) 0 6px, transparent 6px 12px);
+    border: 1px dashed rgb(244 185 66 / 0.6);
+    color: var(--color-amber);
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    height: 34px;
+    padding: 0 14px;
+    border: 1px solid var(--color-line-strong);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--color-bone);
+    background: rgb(150 176 230 / 0.04);
+    transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.15s;
+    cursor: pointer;
+  }
+  .btn:hover:not(:disabled) { border-color: var(--color-bone-dim); background: rgb(150 176 230 / 0.09); }
+  .btn:active:not(:disabled) { transform: translateY(1px); }
+  .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+  .btn-primary { background: var(--color-amber); border-color: var(--color-amber); color: #130d02; font-weight: 500; }
+  .btn-primary:hover:not(:disabled) { background: #ffd074; border-color: #ffd074; }
+  .btn-teal { border-color: rgb(79 214 192 / 0.5); color: var(--color-teal); background: rgb(79 214 192 / 0.06); }
+  .btn-teal:hover:not(:disabled) { background: rgb(79 214 192 / 0.14); border-color: var(--color-teal); }
+  .btn-sm { height: 26px; padding: 0 9px; font-size: 10px; }
+  .btn-icon { width: 28px; height: 26px; padding: 0; }
+
+  .prose-atlas p { margin: 0 0 0.7em; }
+  .prose-atlas strong { color: var(--color-bone); font-weight: 600; }
+  .prose-atlas ul { margin: 0 0 0.7em; padding-left: 1.1em; list-style: square; }
+  .prose-atlas code { font-family: var(--font-mono); font-size: 0.9em; color: var(--color-amber); }
+  .prose-atlas h3, .prose-atlas h4 { font-family: var(--font-display); font-size: 1.25em; margin: 0.4em 0 0.3em; color: var(--color-bone); }
+  .prose-atlas sup a { color: var(--color-amber); font-family: var(--font-mono); font-size: 0.85em; text-decoration: none; padding: 0 1px; }
+  .prose-atlas sup a:hover { text-decoration: underline; }
+}
+
+/* scale-bar ticks used by the gauges */
+.ticks {
+  background-image: repeating-linear-gradient(90deg, var(--color-line-strong) 0 1px, transparent 1px 10%);
+}
+
+/* recharts: inherit our type */
+.recharts-wrapper, .recharts-surface { font-family: var(--font-mono); font-size: 10px; }
+.recharts-wrapper:focus, .recharts-surface:focus, .recharts-wrapper *:focus { outline: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
