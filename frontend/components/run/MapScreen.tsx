@@ -3,11 +3,11 @@
 import { LocateFixed } from "lucide-react";
 import { useMemo, useState } from "react";
 import { agentColor } from "@/lib/agents";
-import { sourceColor, sourceLabel } from "@/lib/format";
 import { IdeaGraph } from "../IdeaGraph";
 import { IslandMap } from "../islands/IslandMap";
 import { SimulatedTag } from "../ui";
 import { DetailCard } from "./DetailCard";
+import { MapLegend } from "./MapLegend";
 import { useRun } from "./RunProvider";
 
 export function MapScreen() {
@@ -18,14 +18,15 @@ export function MapScreen() {
 
   const stats = useMemo(() => {
     const counts = { entity: 0, prior: 0, mutation: 0 };
-    const sources = new Set<string>();
+    const bySource = new Map<string, number>();
     for (const id of graph.order) {
       const n = graph.nodes[id];
-      if (n.kind === "entity") { counts.entity++; if (n.source) sources.add(n.source); }
+      if (n.kind === "entity") { counts.entity++; if (n.source) bySource.set(n.source, (bySource.get(n.source) ?? 0) + 1); }
       else if (n.kind === "prior") counts.prior++;
       else if (n.kind === "mutation") counts.mutation++;
     }
-    return { counts, sources: [...sources] };
+    const sources = [...bySource].map(([source, count]) => ({ source, count })).sort((a, b) => b.count - a.count);
+    return { counts, sources };
   }, [graph]);
 
   const caption = useMemo(() => {
@@ -64,13 +65,12 @@ export function MapScreen() {
           </div>
 
           {!empty && (
-            <ul className="pointer-events-none absolute bottom-14 left-5 flex flex-col gap-1 text-[12px] text-mute sm:left-7">
-              <li className="flex items-center gap-2"><span className="size-[9px] rounded-full" style={{ background: "var(--color-accent-fill)" }} />Your idea</li>
-              {stats.sources.map((s) => <li key={s} className="flex items-center gap-2"><span className="size-[9px] rounded-full" style={{ background: sourceColor(s) }} />{sourceLabel(s)}</li>)}
-              {stats.counts.prior > 0 && <li className="flex items-center gap-2" title="What model families propose when given only the problem and the audience"><span className="size-[9px] rounded-full bg-faint" />LLM prior</li>}
-              {stats.counts.mutation > 0 && <li className="flex items-center gap-2 text-teal"><span className="size-[9px] rounded-full bg-teal" />Mutation</li>}
-              {graph.links.some((l) => l.kind === "possible_same_as") && <li className="flex items-center gap-2 text-amber"><span className="w-[9px] border-t-2 border-dashed border-amber" />Same project? Left open</li>}
-            </ul>
+            <div className="absolute bottom-14 left-5 sm:left-7">
+              <MapLegend
+                sources={stats.sources} priors={stats.counts.prior} mutations={stats.counts.mutation}
+                sameAs={graph.links.some((l) => l.kind === "possible_same_as")}
+              />
+            </div>
           )}
 
           {!empty && !selected && (
