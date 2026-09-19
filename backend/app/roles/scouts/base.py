@@ -25,22 +25,26 @@ class ScoutRole(BaseRole):
         queries = [q for q in (p.get("queries") or [p.get("query")]) if q]
         phase = "debate" if msg["type"] == "REQUEST_EVIDENCE" else "scout"
         found: dict[str, SourceRecord] = {}
-        try:
-            for q in queries:
+        failed: str | None = None
+        for q in queries:
+            try:
                 await ctx.emit("tool.call", {"tool": self.tool, "args_summary": q[:120]}, phase=phase)
                 hits = await self.search(q, self.per_query)
                 if not hits and len(tokens(q)) > 3:  # adaptive broaden-and-retry: keep the 3 most specific terms
                     broad = " ".join(sorted(set(tokens(q)), key=len, reverse=True)[:3])
                     await ctx.emit("tool.call", {"tool": self.tool, "args_summary": f"broadened: {broad}"}, phase=phase)
                     hits = await self.search(broad, self.per_query)
-                await ctx.emit("tool.result", {"tool": self.tool, "summary": f"{len(hits)} hits", "n_hits": len(hits)}, phase=phase)
-                for r in hits:
-                    r.retrieval.setdefault("query", q)
-                    found.setdefault(r.rid, r)
-        except SourceError as exc:
-            ctx.board.put("sources", self.id, self.source, SourceStatus(source=self.source, status="failed", error=str(exc)))
-            await ctx.emit("source.failed", {"source": self.source, "error": str(exc), "reassigned_to": None}, phase=phase)
-            return error(str(exc), source=self.source)
+            except SourceError as exc:
+                failed = str(exc)
+                await ctx.emit("source.failed", {"source": self.source, "error": failed, "reassigned_to": None}, phase=phase)
+                break  # the source is unwell; whatever earlier queries returned is still real evidence
+            await ctx.emit("tool.result", {"tool": self.tool, "summary": f"{len(hits)} hits", "n_hits": len(hits)}, phase=phase)
+            for r in hits:
+                r.retrieval.setdefault("query", q)
+                found.setdefault(r.rid, r)
+        if failed and not found:
+            ctx.board.put("sources", self.id, self.source, SourceStatus(source=self.source, status="failed", error=failed))
+            return error(failed, source=self.source)
 
         new = [r for rid, r in found.items() if rid not in ctx.board.records]
         if new and not self.already_scored:
@@ -60,6 +64,8 @@ class ScoutRole(BaseRole):
                 add_links=[GraphLink(source="idea", target=f"ent:{eid_for(r.rid)}", kind="similar", weight=sim)]), phase=phase)
 
         prev = ctx.board.sources.get(self.source)
-        total = (prev.n_records if prev and prev.status == "ok" else 0) + len(new)
-        ctx.board.put("sources", self.id, self.source, SourceStatus(source=self.source, status="ok", n_records=total))
-        return result(rids=[r.rid for r in new], summary=f"{len(new)} new records from {self.source}")
+        total = (prev.n_records if prev and prev.status in ("ok", "degraded") else 0) + len(new)
+        status = "degraded" if failed else "ok"
+        ctx.board.put("sources", self.id, self.source, SourceStatus(source=self.source, status=status, n_records=total, error=failed))
+        return result(rids=[r.rid for r in new], summary=f"{len(new)} new records from {self.source}"
+                      + (f" before it failed: {failed}"[:160] if failed else ""))

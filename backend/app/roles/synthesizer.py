@@ -47,8 +47,9 @@ class Synthesizer(BaseRole):
         coverage = sum(SOURCE_WEIGHT.get(s.source, 0.05) for s in planned if s.status in ("ok", "degraded")) / total_w
         exists = [c for c in board.claims.values() if c.kind == "exists"]
         verified_share = (sum(c.status == "verified" for c in exists) / len(exists)) if exists else 0.5
-        corpus_ok = any(s.source in CORPUS and s.status == "ok" for s in planned)
-        canary = 1.0 if any(s.source in CORPUS and s.status == "ok" and s.n_records > 0 for s in planned) else 0.0
+        searched = ("ok", "degraded")  # degraded = it answered, then failed or needed a retry; the corpus WAS searched
+        corpus_ok = any(s.source in CORPUS and s.status in searched for s in planned)
+        canary = 1.0 if any(s.source in CORPUS and s.status in searched and s.n_records > 0 for s in planned) else 0.0
         conf = axes.confidence(coverage=coverage, jury_std=jury_std, verified_share=verified_share, canary_pass=canary)
         missing = [f"{s.source} {s.status}" for s in planned if s.status in ("failed", "skipped")]
         if not corpus_ok:
