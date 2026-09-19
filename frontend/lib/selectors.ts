@@ -118,6 +118,14 @@ const titleOfRid = (state: RunState, rid: string) => state.records[rid]?.title ?
 export function selectLedger(state: RunState): LedgerRow[] {
   const rows: LedgerRow[] = [];
   const seenConflicts = new Set<string>();
+  // A Devpost record whose year was inferred from the hackathon name carries BOTH field_provenance.date = "imputed"
+  // and date_precision = "inferred", which is one imputed field described twice, not two of them.
+  const seenImputed = new Set<string>();
+  const pushImputed = (row: Extract<LedgerRow, { kind: "imputed" }>) => {
+    if (seenImputed.has(row.key)) return;
+    seenImputed.add(row.key);
+    rows.push(row);
+  };
 
   for (const eid of state.entityOrder) {
     const ent = state.entities[eid];
@@ -132,7 +140,7 @@ export function selectLedger(state: RunState): LedgerRow[] {
       rows.push({ kind: "conflict", key, eid, entity: ent.canonical_name, field: c.field, values: (c.values ?? []).map((v) => ({ ...v, source: sourceOfRid(state, v.rid) })), resolution: c.resolution, rule: c.rule });
     }
     for (const [field, f] of Object.entries(ent.fields ?? {})) {
-      if (f?.imputed) rows.push({ kind: "imputed", key: `i:${eid}:${field}`, eid, entity: ent.canonical_name, field, value: f.value, provenance: f.provenance ?? [] });
+      if (f?.imputed) pushImputed({ kind: "imputed", key: `i:${eid}:${field}`, eid, entity: ent.canonical_name, field, value: f.value, provenance: f.provenance ?? [] });
     }
   }
 
@@ -146,9 +154,9 @@ export function selectLedger(state: RunState): LedgerRow[] {
   for (const rid of state.recordOrder) {
     const rec = state.records[rid];
     for (const [field, prov] of Object.entries(rec.field_provenance ?? {})) {
-      if (prov === "imputed") rows.push({ kind: "imputed", key: `i:${rid}:${field}`, eid: state.recordEntity[rid] ?? null, entity: rec.title, field, value: (rec as unknown as Record<string, unknown>)[field], provenance: [rid] });
+      if (prov === "imputed") pushImputed({ kind: "imputed", key: `i:${rid}:${field}`, eid: state.recordEntity[rid] ?? null, entity: rec.title, field, value: (rec as unknown as Record<string, unknown>)[field], provenance: [rid] });
     }
-    if (rec.date_precision === "inferred") rows.push({ kind: "imputed", key: `i:${rid}:date`, eid: state.recordEntity[rid] ?? null, entity: rec.title, field: "date", value: rec.date ?? rec.year, provenance: [rid] });
+    if (rec.date_precision === "inferred") pushImputed({ kind: "imputed", key: `i:${rid}:date`, eid: state.recordEntity[rid] ?? null, entity: rec.title, field: "date", value: rec.date ?? rec.year, provenance: [rid] });
   }
 
   for (const f of Object.values(state.failedSources)) {

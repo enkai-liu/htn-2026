@@ -165,6 +165,24 @@ describe("selectors", () => {
     expect(ledger.filter((r) => r.kind === "source_failed").length).toBe(1);
   });
 
+  it("describes one imputed field once, however many ways the record says it is imputed", () => {
+    // A Devpost record whose year came from the hackathon name carries field_provenance.date = "imputed" AND
+    // date_precision = "inferred". Emitting a row for each gives two rows under one React key.
+    const state = foldEvents([{
+      seq: 1, run_id: "t", ts: 0, agent: "scout.devpost", phase: "scout", type: "evidence.found",
+      data: {
+        eid: "e1",
+        record: {
+          rid: "devpost:omnis-gb4zfj", source: "devpost", url: "https://devpost.com/software/omnis-gb4zfj",
+          title: "Omnis", year: 2024, date_precision: "inferred", field_provenance: { date: "imputed" },
+        },
+      },
+    } as unknown as AgentEvent]);
+    const keys = selectLedger(state).filter((r) => r.kind === "imputed").map((r) => r.key);
+    expect(keys).toEqual(["i:devpost:omnis-gb4zfj:date"]);
+    expect(new Set(keys).size).toBe(keys.length);
+  });
+
   it("reports source status and spend", () => {
     expect(selectSourceStatus(final).find((s) => s.source === "hn")?.status).toBe("degraded");
     const mid = foldEvents(events.filter((e) => e.seq <= 39));
