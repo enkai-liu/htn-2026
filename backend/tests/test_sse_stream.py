@@ -7,6 +7,7 @@ import json
 import httpx
 import pytest
 import uvicorn
+from sse_starlette.sse import AppStatus
 
 from app.config import get_settings
 from app.llm import router as router_mod
@@ -17,14 +18,22 @@ IDEA = "A tool that checks how original a hackathon idea is by searching past pr
 
 @pytest.fixture
 async def base_url():
+    """One uvicorn server per test. sse-starlette >=3.4 drains open streams when it detects a shutdown, and it detects
+    ours: it finds the Server through the SIGTERM handler and latches a PROCESS-GLOBAL `AppStatus.should_exit`. Left
+    set, the next test's server thinks it is shutting down and ends every stream early without the terminating chunk
+    (uvicorn: "ASGI callable returned without completing response"; client: RemoteProtocolError), so only a test that
+    reads to EOF would notice. Clear the latch this fixture trips."""
     server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=0, log_level="warning", lifespan="off"))
     serving = asyncio.create_task(server.serve())
     while not server.started:
         await asyncio.sleep(0.01)
     port = server.servers[0].sockets[0].getsockname()[1]
-    yield f"http://127.0.0.1:{port}"
-    server.should_exit = True
-    await serving
+    try:
+        yield f"http://127.0.0.1:{port}"
+    finally:
+        server.should_exit = True
+        await serving
+        AppStatus.should_exit = False
 
 
 async def _read(resp: httpx.Response, *, stop_after: int | None = None) -> list[dict]:
