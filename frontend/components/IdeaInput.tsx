@@ -10,12 +10,22 @@ const SEARCH_MIN_CHARS = 1; // backend RunRequest.idea_text min_length
 const MAX_CHARS = 5000;
 const REPLAY_ONLY = process.env.NEXT_PUBLIC_REPLAY_ONLY === "1";
 
+// The shuffle chip is the one-click way to fill the box for a demo, so every pitch here clears
+// VOICE_MIN_CHARS on its own: a half-length sample would land in a form the Voice check abstains on.
+const PITCHES: string[] = [
+  "Chorus is a rehearsal room for bands whose members live in different cities. Each musician records their part in the browser, and the app time-aligns every take against a shared click track so drift never piles up. A mixing view lets anyone mute, pan or re-record a single bar without disturbing the others, and a finished song exports as stems or as one master ready to upload.",
+  "Ledger Lamp points a phone camera at a paper receipt and turns it into a line-item expense claim. It reads the vendor, the tax and each item, checks them against the reimbursement policy your finance team wrote in plain English, and flags whatever is going to bounce before you submit it. Approved claims sync to the accounting system overnight.",
+  "Tidewatch is a flood early-warning board for small coastal towns. It pulls tide gauges, rainfall radar and storm-surge forecasts onto one map, learns which streets historically go under at which water level, and texts residents in plain language a few hours before their own street is at risk, instead of the county-wide alert nobody acts on.",
+  "Frets is a practice coach for people teaching themselves guitar. It listens through the laptop microphone, scores each attempt at a passage on timing and clean fretting, then slows down and loops the exact two bars you keep fumbling. A weekly review shows which chord changes got faster and picks a next song that stretches you only a little.",
+];
+
 export function IdeaInput() {
   const router = useRouter();
   const [text, setText] = useState("");
   const [url, setUrl] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [nextPitch, setNextPitch] = useState(0);
 
   const chars = text.trim().length;
   const voiceReady = chars >= VOICE_MIN_CHARS;
@@ -43,6 +53,19 @@ export function IdeaInput() {
     <form onSubmit={submit} className="plate animate-rise p-0" style={{ animationDelay: "0.25s" }}>
       <div className="plate-head">
         <span className="ttl">Your pitch</span>
+        <button
+          type="button"
+          className="chip ml-auto cursor-pointer normal-case tracking-normal hover:text-bone"
+          data-tone="mute"
+          aria-label="Fill the box with an example pitch"
+          onClick={() => {
+            setText(PITCHES[nextPitch]);
+            setError(null);
+            setNextPitch((i) => (i + 1) % PITCHES.length);
+          }}
+        >
+          <span aria-hidden>&#128256;</span> Shuffle
+        </button>
       </div>
 
       <div className="p-4 sm:p-5">
