@@ -23,29 +23,10 @@ export function Wordmark({ className }: { className?: string }) {
   );
 }
 
-const LINKS = [
-  { href: "/", label: "Investigate" },
-];
-
-export function SiteNav({ active }: { active?: string }) {
+export function SiteNav() {
   return (
     <header className="relative z-10 flex h-[60px] flex-none items-center justify-between px-5 sm:px-8">
       <Wordmark />
-      <nav className="flex items-center gap-1 text-[13.5px]">
-        {LINKS.map((l) => (
-          <Link
-            key={l.href}
-            href={l.href}
-            className={clsx(
-              "px-2.5 py-1.5 transition-colors hover:text-bone",
-              active === l.href ? "text-bone" : "text-mute",
-              l.href === "/" && "hidden sm:block",
-            )}
-          >
-            {l.label}
-          </Link>
-        ))}
-      </nav>
     </header>
   );
 }

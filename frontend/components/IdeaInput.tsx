@@ -71,7 +71,7 @@ export function IdeaInput() {
           id="idea"
           value={text}
           onChange={(e) => setText(e.target.value.slice(0, MAX_CHARS))}
-          onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && voiceReady) void submit(); }}
+          onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") void submit(); }}
           rows={7}
           spellCheck
           placeholder="What does it do, for whom, and how? Write it the way you would pitch it to a judge."
@@ -87,6 +87,7 @@ export function IdeaInput() {
             <span className={voiceReady ? "text-teal" : "text-amber"}>
               {chars.toLocaleString("en-US")} <span className="text-mute">/ {VOICE_MIN_CHARS} characters</span>
             </span>
+            {!voiceReady && searchReady && <span className="text-right text-mute">Shorter pitches still run; Voice abstains under {VOICE_MIN_CHARS}.</span>}
           </div>
         </div>
 
@@ -105,15 +106,10 @@ export function IdeaInput() {
         </div>
 
         <div className="mt-4 flex flex-wrap items-center gap-3">
-          <button type="submit" className="btn btn-primary h-10 px-5" disabled={!voiceReady || busy}>
+          <button type="submit" className="btn btn-primary h-10 px-5" disabled={!searchReady || busy}>
             {busy ? <LoaderCircle size={14} className="animate-spin" /> : <ArrowRight size={14} />}
             {busy ? "Forming the team" : "Investigate"}
           </button>
-          {!voiceReady && searchReady && !busy && (
-            <button type="button" onClick={() => void submit()} className="font-mono text-[10.5px] uppercase tracking-[0.12em] text-mute underline decoration-dotted underline-offset-4 hover:text-bone">
-              Run anyway (Voice will abstain)
-            </button>
-          )}
         </div>
 
         {error && (

@@ -14,7 +14,7 @@
 
 ## 1. Product
 
-Input: an idea pitch (≥250 chars; optional Devpost/GitHub URL). Output: a live-streamed investigation, a 4-axis report, coached mutations, and actions.
+Input: an idea pitch (≥20 chars, Voice abstains under 250; optional Devpost/GitHub URL). Output: a live-streamed investigation, a 4-axis report, coached mutations, and actions.
 
 Your two assessment families map to four axes (plus a confidence score that can abstain):
 

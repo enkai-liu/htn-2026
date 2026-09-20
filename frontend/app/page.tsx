@@ -5,7 +5,7 @@ import { SiteNav } from "@/components/SiteNav";
 export default function Home() {
   return (
     <>
-      <SiteNav active="/" />
+      <SiteNav />
       {/* flex-none: a flex item with overflow hidden may shrink below its content, which would clip the form */}
       <main className="relative flex-none overflow-hidden">
         <HeroIslands className="pointer-events-none absolute -right-32 top-0 hidden h-[640px] w-[820px] lg:block xl:-right-10" />
