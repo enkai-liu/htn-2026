@@ -123,11 +123,12 @@ function jitter(i: number, j: number): number {
  * the water they are drawn on.
  */
 const WAVES: readonly (readonly [number, number, number, number, number])[] = [
-  [0.86, 0.51, 0.42, 0.6, 0.1], // the swell that carries the sea
-  [0.62, 0.78, 0.85, -0.72, 0.028], // a shorter one a few degrees off it
-  [1, 0, 0.62, 0.9, 0.04],
-  [0.273, 0.962, 0.842, -0.7, 0.032],
-  [0.707, 0.707, 1.938, 1.3, 0.018],
+  [0.86, 0.51, 0.55, 0.6, 0.105], // the swell that carries the sea
+  [0.62, 0.78, 0.95, -0.75, 0.048], // a shorter one a few degrees off it
+  [1, 0, 0.62, 0.9, 0.05],
+  [0.273, 0.962, 0.842, -0.7, 0.045],
+  [-0.5, 0.87, 1.45, 0.95, 0.022],
+  [0.707, 0.707, 1.938, 1.3, 0.028],
 ];
 
 /**
@@ -168,12 +169,14 @@ function seaMaterial(uniforms: SeaUniforms): MeshStandardMaterial {
   const rgb = (c: Color) => `vec3(${c.r.toFixed(5)}, ${c.g.toFixed(5)}, ${c.b.toFixed(5)})`;
   const f = (n: number) => n.toFixed(5);
   // The same rows swell() sums, unrolled: no loop, no uniform array, and the compiler folds every constant
-  // but the fade, which needs the live facet size. `amp` accumulates what is left of the train after the
-  // fades, so the foam threshold below tracks the crest the water can actually reach at this zoom.
+  // but the fade, which needs the live facet size. `power` accumulates the variance the rows contribute, so
+  // the crest and trough thresholds below can be set in standard deviations of the surface at this zoom.
+  // Adding them up instead would give the height of every row peaking at once, which six waves never do: the
+  // thresholds would sit above anything the water reaches and the foam would wash out to nothing.
   const train = WAVES.map(([dx, dz, k, speed, a]) => `
         amp = ${f(a)} * smoothstep(2.0, 4.0, ${f((2 * Math.PI) / k)} / uCell);
         wave += sin((p.x * ${f(dx)} + p.y * ${f(dz)}) * ${f(k)} + uTime * ${f(speed)}) * amp;
-        reach += amp;`).join("");
+        power += amp * amp * 0.5;`).join("");
   m.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms);
     shader.vertexShader = shader.vertexShader
@@ -187,7 +190,7 @@ function seaMaterial(uniforms: SeaUniforms): MeshStandardMaterial {
         vec2 p = vec2(position.x, position.z);
         float wave = 0.0;
         float amp = 0.0;
-        float reach = 0.0;${train}
+        float power = 0.0;${train}
         transformed.y += wave;
         // the water deepens away from the archipelago, which is what gives a screen of flat colour a middle
         float depth = clamp(length(p - uFocus) / uFar, 0.0, 1.0);
@@ -195,12 +198,13 @@ function seaMaterial(uniforms: SeaUniforms): MeshStandardMaterial {
         // Foam, and the reason the waves are visible at all: from this camera a tenth of a unit of height is
         // almost nothing, but the colour breaking on the crests reads from across the room. Only the top of a
         // crest catches it, so the sea stays pale and calm between them rather than going stormy.
-        // Thresholds off a real crest, not the theoretical one: five sines only all peak together about
-        // never, so the full height of the train is one the water does not reach, and foaming from there is
-        // foam nobody sees.
-        reach = max(reach, 0.001);
-        float crest = smoothstep(reach * 0.48, reach * 0.68, wave);
-        vSeaTint = mix(tint, ${rgb(FOAM)}, crest * 0.42);`);
+        // Foam, and the reason the waves are visible at all: from this camera a tenth of a unit of height is
+        // almost nothing, but the colour breaking along the crest lines reads from across the room. The
+        // troughs darken by the same measure -- half the sense of a swell is the shadow between the crests.
+        float sigma = sqrt(max(power, 1e-8));
+        float crest = smoothstep(sigma * 0.9, sigma * 1.8, wave);
+        float trough = smoothstep(-sigma * 0.7, -sigma * 1.7, wave);
+        vSeaTint = mix(tint * (1.0 - trough * 0.14), ${rgb(FOAM)}, crest * 0.5);`);
     shader.fragmentShader = shader.fragmentShader
       .replace("#include <common>", "#include <common>\nvarying vec3 vSeaTint;")
       .replace("#include <color_fragment>", "#include <color_fragment>\ndiffuseColor.rgb *= vSeaTint;");
