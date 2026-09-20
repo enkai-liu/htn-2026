@@ -13,10 +13,6 @@ const REPLAY_ONLY = process.env.NEXT_PUBLIC_REPLAY_ONLY === "1";
 
 const EXAMPLES: { label: string; text: string }[] = [
   {
-    label: "An originality checker (ours)",
-    text: "Whitespace checks how original your hackathon idea is before you build it. You paste a pitch, and a team of AI agents searches hundreds of thousands of past hackathon projects, startups and repos for prior art, argues about whether it is really the same idea, verifies every claim against its source, and then suggests concrete changes that move your idea into emptier territory, re-scoring each suggestion live.",
-  },
-  {
     label: "An AI study buddy",
     text: "StudyPal is an AI study buddy for university students. Upload your lecture slides and notes, and it uses a large language model to generate flashcards, practice quizzes and short summaries for every chapter. A chat tutor answers questions about the material at any hour, tracks which topics you keep getting wrong, and builds a personalised revision schedule before each exam.",
   },
