@@ -7,7 +7,7 @@
 import {
   BufferGeometry, CanvasTexture, CircleGeometry, Color, CylinderGeometry, DirectionalLight, Group, HemisphereLight, Line,
   LineBasicMaterial, LineDashedMaterial, LineLoop, Mesh, MeshBasicMaterial, MeshStandardMaterial, OrthographicCamera,
-  QuadraticBezierCurve3, Raycaster, RingGeometry, Scene, Sprite, SpriteMaterial, Vector2, Vector3, WebGLRenderer,
+  PlaneGeometry, QuadraticBezierCurve3, Raycaster, RingGeometry, Scene, Sprite, SpriteMaterial, Vector2, Vector3, WebGLRenderer,
 } from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { layoutExtent, ringRadius, type IslandPlacement, type LayoutState } from "@/lib/islandLayout";
@@ -87,6 +87,39 @@ function glowTexture(): CanvasTexture {
   return new CanvasTexture(c);
 }
 
+/**
+ * The lighthouse beam, drawn once into a texture that lies flat on the water: a wedge that is brightest at
+ * its leading edge and trails off behind, so rotating the plane reads as a sweep rather than a spinning
+ * triangle. Fades out radially too, so the beam dissolves before it reaches the edge of the plane.
+ */
+function sweepTexture(): CanvasTexture {
+  const S = 256;
+  const c = document.createElement("canvas");
+  c.width = c.height = S;
+  const ctx = c.getContext("2d")!;
+  const mid = S / 2;
+  const SWEEP = Math.PI / 3.2; // width of the lit wedge
+  const STEPS = 90;
+  // lay the tail down one thin slice at a time: alpha ramps to full at the leading edge
+  for (let s = 0; s < STEPS; s++) {
+    const t = s / (STEPS - 1);
+    const a0 = -SWEEP * (1 - t);
+    const a1 = -SWEEP * (1 - (s + 1.6) / (STEPS - 1));
+    const g = ctx.createRadialGradient(mid, mid, 0, mid, mid, mid);
+    const peak = 0.5 * t * t;
+    g.addColorStop(0, `rgba(244,185,66,${(peak * 0.9).toFixed(3)})`);
+    g.addColorStop(0.55, `rgba(244,185,66,${(peak * 0.55).toFixed(3)})`);
+    g.addColorStop(1, "rgba(244,185,66,0)");
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.moveTo(mid, mid);
+    ctx.arc(mid, mid, mid, a0, a1);
+    ctx.closePath();
+    ctx.fill();
+  }
+  return new CanvasTexture(c);
+}
+
 export class IslandScene {
   private renderer: WebGLRenderer;
   private scene = new Scene();
@@ -105,6 +138,7 @@ export class IslandScene {
   private hitGeo = new CylinderGeometry(1.1, 0.95, 1.8, 10);
   private hitMat = new MeshBasicMaterial({ visible: false });
   private halo: Sprite;
+  private sweep: Mesh;
   private rings = new Group();
   private links: SceneLink[] = [];
   private pointer = new Vector2();
@@ -127,6 +161,8 @@ export class IslandScene {
   private tmp = new Vector3();
   private focus = new Vector3();
   private shift = new Vector3();
+  private beam = new Vector3();
+  private eye = new Vector3();
 
   constructor(private canvas: HTMLCanvasElement, private cb: SceneCallbacks, private opts: SceneOptions) {
     this.renderer = new WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: "high-performance" });
@@ -149,6 +185,11 @@ export class IslandScene {
     this.halo = new Sprite(new SpriteMaterial({ map: glowTexture(), transparent: true, depthWrite: false, opacity: 0 }));
     this.halo.scale.setScalar(7);
     this.scene.add(this.halo);
+
+    this.sweep = new Mesh(new PlaneGeometry(1, 1), new MeshBasicMaterial({ map: sweepTexture(), transparent: true, depthWrite: false, opacity: 0 }));
+    this.sweep.rotation.x = -Math.PI / 2; // lie flat on the water
+    this.sweep.renderOrder = -1; // under the islands, over the rings
+    this.scene.add(this.sweep);
 
     this.controls = new OrbitControls(this.camera, canvas);
     this.controls.enableDamping = true;
@@ -484,8 +525,27 @@ export class IslandScene {
     if (idea) {
       this.halo.position.copy(idea.group.position).y += idea.datum.p.size * LANTERN_AT * idea.group.scale.y;
       const born = idea.bornAt === -Infinity ? 1 : clamp01((now - idea.bornAt) / POP_MS);
-      (this.halo.material as SpriteMaterial).opacity = born * (still ? 0.6 : 0.52 + Math.sin(now * 0.0016) * 0.12);
-    } else (this.halo.material as SpriteMaterial).opacity = 0;
+      // the beam sweeps the neighbourhood it actually searched, so it reaches the furthest island on the map
+      const reach = Math.max(6, ...[...this.islands.values()].map((i) => Math.hypot(i.group.position.x, i.group.position.z) + i.datum.p.size));
+      this.sweep.position.set(idea.group.position.x, FLOOR_Y + 0.02, idea.group.position.z);
+      this.sweep.scale.setScalar(reach * 2.1);
+      this.sweep.rotation.z = still ? 0 : -now * 0.00042; // z, because the plane is laid flat by rotation.x
+      (this.sweep.material as MeshBasicMaterial).opacity = still ? 0 : born * 0.5;
+
+      // a real lighthouse flashes as the beam comes round to face you: brighten the lantern when the
+      // wedge's leading edge points at the camera, so the glow and the sweep read as one light source
+      let flash = 0;
+      if (!still) {
+        this.beam.set(1, 0, 0).applyQuaternion(this.sweep.quaternion).setY(0).normalize();
+        this.eye.copy(this.camera.position).sub(this.controls.target).setY(0).normalize();
+        flash = Math.max(0, this.beam.dot(this.eye)) ** 6;
+      }
+      (this.halo.material as SpriteMaterial).opacity = born * (still ? 0.6 : 0.46 + Math.sin(now * 0.0016) * 0.08 + flash * 0.5);
+      this.halo.scale.setScalar(7 * (1 + flash * 0.22));
+    } else {
+      (this.halo.material as SpriteMaterial).opacity = 0;
+      (this.sweep.material as MeshBasicMaterial).opacity = 0;
+    }
 
     for (let r = this.ripples.length - 1; r >= 0; r--) {
       const rp = this.ripples[r];
@@ -627,6 +687,9 @@ export class IslandScene {
     this.hitMat.dispose();
     (this.halo.material as SpriteMaterial).map?.dispose();
     (this.halo.material as SpriteMaterial).dispose();
+    (this.sweep.material as MeshBasicMaterial).map?.dispose();
+    (this.sweep.material as MeshBasicMaterial).dispose();
+    this.sweep.geometry.dispose();
     this.material.dispose();
     this.renderer.dispose();
   }
