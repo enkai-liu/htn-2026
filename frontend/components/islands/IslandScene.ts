@@ -7,7 +7,7 @@
 import {
   BufferGeometry, CanvasTexture, CircleGeometry, Color, CylinderGeometry, DirectionalLight, DoubleSide, Float32BufferAttribute, Group, HemisphereLight, Line,
   LineBasicMaterial, LineDashedMaterial, LineLoop, Mesh, MeshBasicMaterial, MeshStandardMaterial, OrthographicCamera,
-  PlaneGeometry, QuadraticBezierCurve3, Raycaster, RingGeometry, Scene, Sprite, SpriteMaterial, Vector2, Vector3, WebGLRenderer,
+  QuadraticBezierCurve3, Raycaster, RingGeometry, Scene, Sprite, SpriteMaterial, Vector2, Vector3, WebGLRenderer,
 } from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { layoutExtent, ringRadius, type IslandPlacement, type LayoutState } from "@/lib/islandLayout";
@@ -92,22 +92,6 @@ function glowTexture(): CanvasTexture {
   return new CanvasTexture(c);
 }
 
-/** Where the shaft lands: a soft oval of warm light on the water, its long axis along the beam. */
-function poolTexture(): CanvasTexture {
-  const c = document.createElement("canvas");
-  c.width = 256;
-  c.height = 128;
-  const ctx = c.getContext("2d")!;
-  ctx.scale(2, 1); // a circular gradient, stretched into an oval
-  const g = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
-  g.addColorStop(0, "rgba(250,200,90,0.5)");
-  g.addColorStop(0.45, "rgba(250,200,90,0.2)");
-  g.addColorStop(1, "rgba(250,200,90,0)");
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, 128, 128);
-  return new CanvasTexture(c);
-}
-
 /**
  * The lighthouse beam: a real shaft of light leaving the lantern, not a decal on the water.
  *
@@ -155,8 +139,6 @@ export class IslandScene {
   private halo: Sprite;
   private beacon = new Group();
   private shells: Mesh[] = [];
-  /** the spot the shaft throws on the water, kept flat while the beacon itself rakes down */
-  private pool: Mesh;
   private rings = new Group();
   private links: SceneLink[] = [];
   private pointer = new Vector2();
@@ -226,14 +208,6 @@ export class IslandScene {
     this.beacon.rotation.order = "YZX"; // sweep about Y first, then the fixed downward tilt
     this.beacon.rotation.z = -0.13; // rake down toward the water rather than out to the horizon
     this.scene.add(this.beacon);
-
-    // The shaft dies over open water, but when it locks onto an island it ends on one -- so the far end gets a
-    // spot on the sea. Its own object rather than a child of the beacon, so the rake never tips it off the water.
-    const oval = new PlaneGeometry(1, 1);
-    oval.rotateX(-Math.PI / 2);
-    this.pool = new Mesh(oval, new MeshBasicMaterial({ map: poolTexture(), transparent: true, depthWrite: false, opacity: 0 }));
-    this.pool.renderOrder = -1; // under the islands, over the rings
-    this.scene.add(this.pool);
 
     this.controls = new OrbitControls(this.camera, canvas);
     this.controls.enableDamping = true;
@@ -654,26 +628,12 @@ export class IslandScene {
         // outer bloom as hard would just fatten the shaft into a slab instead of tightening it to a spot
         const BOOST = [0.95, 0.4, 0.18];
         this.shells.forEach((m, n) => { (m.material as MeshBasicMaterial).opacity = born * (0.7 + flash * 0.28 + locked * BOOST[n]); });
-
-        // the spot sits just short of the shaft's end, and grows with it; faint on the idle sweep, bright when
-        // the light is holding on a find, which is the moment it is actually landing on something
-        const reachX = Math.cos(this.beaconAngle), reachZ = -Math.sin(this.beaconAngle);
-        this.pool.position.set(
-          this.beacon.position.x + reachX * this.beamLen * 0.92,
-          FLOOR_Y + 0.02,
-          this.beacon.position.z + reachZ * this.beamLen * 0.92,
-        );
-        this.pool.rotation.y = this.beaconAngle;
-        this.pool.scale.set(this.beamLen * 0.5, 1, this.beamLen * 0.2);
-        (this.pool.material as MeshBasicMaterial).opacity = born * (0.3 + locked * 0.65);
       }
-      this.pool.visible = this.beacon.visible;
       (this.halo.material as SpriteMaterial).opacity = born * (still ? 0.6 : 0.46 + Math.sin(now * 0.0016) * 0.08 + flash * 0.5);
       this.halo.scale.setScalar(7 * (1 + flash * 0.22));
     } else {
       (this.halo.material as SpriteMaterial).opacity = 0;
       this.beacon.visible = false;
-      this.pool.visible = false;
     }
 
     for (let r = this.ripples.length - 1; r >= 0; r--) {
@@ -817,9 +777,6 @@ export class IslandScene {
     (this.halo.material as SpriteMaterial).map?.dispose();
     (this.halo.material as SpriteMaterial).dispose();
     for (const m of this.shells) { m.geometry.dispose(); (m.material as MeshBasicMaterial).dispose(); }
-    (this.pool.material as MeshBasicMaterial).map?.dispose();
-    (this.pool.material as MeshBasicMaterial).dispose();
-    this.pool.geometry.dispose();
     this.material.dispose();
     this.renderer.dispose();
   }
