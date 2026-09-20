@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { applyGraphPatch, emptyGraph, type GraphState } from "../lib/graphReducer";
-import { emptyLayout, foldLayout, GAP, R_MIN, R_SPAN, ringRadius, sectorFor, simScale, type LayoutState } from "../lib/islandLayout";
+import { emptyLayout, foldLayout, footprint, GAP, layoutExtent, R_MIN, R_SPAN, ringRadius, sectorFor, simScale, wedgeAt, type LayoutState } from "../lib/islandLayout";
 import { parseJsonl } from "../lib/replay";
 import { initialRunState, runReducer } from "../lib/runReducer";
 import type { GraphNode } from "../lib/types";
@@ -94,13 +94,25 @@ describe("islandLayout", () => {
     for (let i = 0; i < ps.length; i++) {
       for (let j = i + 1; j < ps.length; j++) {
         const d = Math.hypot(ps[i].x - ps[j].x, ps[i].z - ps[j].z);
-        expect(d, `${ps[i].id} vs ${ps[j].id}`).toBeGreaterThanOrEqual(ps[i].size + ps[j].size + GAP - 1e-9);
+        // the shore as it is drawn, not the turf: beaches reach past `size`, and two of them must not meet
+        expect(d, `${ps[i].id} vs ${ps[j].id}`).toBeGreaterThanOrEqual(footprint(ps[i]) + footprint(ps[j]) + GAP - 1e-9);
       }
     }
   };
 
   it("never overlaps two islands, or an island and a boat, even in a crowded neighbourhood", () => {
     expectClearWater(build(all, true).layout);
+  });
+
+  it("finds clear water for a source that outgrows its wedge, without drifting far from its ring", () => {
+    // live web search brings back 40-odd near-identical scores: the wedge gives way before the islands stack
+    const web = Array.from({ length: 46 }, (_, i) => node(`ent:w${i}`, "entity", 0.9 + (i % 10) / 100, "web"));
+    const { layout } = build([...all, ...web], true);
+    expectClearWater(layout);
+    // and it stays an archipelago, not a comet tail: the islands (with their clear water) fill a third of the disc they span
+    const ps = layout.order.map((id) => layout.byId[id]);
+    const water = ps.reduce((sum, p) => sum + (footprint(p) + GAP / 2) ** 2, 0);
+    expect(water / layoutExtent(layout) ** 2).toBeGreaterThan(1 / 3);
   });
 
   it("never berths a re-scored boat inside an island: it steps out along its bearing to clear water", () => {
@@ -124,7 +136,9 @@ describe("islandLayout", () => {
       const p = layout.byId[id];
       if (p.kind !== "entity") continue;
       const { centre, half } = sectorFor("entity", graph.nodes[id].source);
-      expect(Math.abs(p.angle - centre)).toBeLessThanOrEqual(half + 1e-9);
+      // its own wedge, which only gives way once the rings near its similarity are full
+      expect(Math.abs(p.angle - centre)).toBeLessThanOrEqual(wedgeAt(half, p.nudge) + 1e-9);
+      if (p.nudge <= 6) expect(Math.abs(p.angle - centre)).toBeLessThanOrEqual(half + 1e-9);
       expect(p.nudge).toBeGreaterThanOrEqual(0);
       expect(p.radius).toBeCloseTo(ringRadius(graph.nodes[id].similarity, layout.scale) + p.nudge, 9);
     }

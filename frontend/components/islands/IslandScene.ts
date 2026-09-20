@@ -10,9 +10,9 @@ import {
   QuadraticBezierCurve3, Raycaster, RingGeometry, Scene, Sprite, SpriteMaterial, Vector2, Vector3, WebGLRenderer,
 } from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { layoutExtent, type IslandPlacement, type LayoutState } from "@/lib/islandLayout";
+import { BOAT_REACH, layoutExtent, SHORE_REACH, type IslandPlacement, type LayoutState } from "@/lib/islandLayout";
 import { keepOffShores, stepScout, type Scout, type Shore } from "@/lib/scoutSteer";
-import { buildIslandGeometry, LANTERN_AT, lookKey, SHORE_REACH, waterline, type IslandLook } from "./islandGeometry";
+import { buildIslandGeometry, LANTERN_AT, lookKey, waterline, type IslandLook } from "./islandGeometry";
 
 export interface IslandDatum {
   id: string;
@@ -36,8 +36,6 @@ export interface SceneOptions {
 const SEA_Y = 0;
 /** the scouts are small: a mutation's hull at about two thirds the size */
 const SCOUT_SIZE = 0.52;
-/** how far a moored boat reaches from its middle, in boat sizes: the half length of the hull */
-const BOAT_REACH = 0.85;
 /** water a scout keeps between its own middle and anything it passes: its half length, so it clears bow-on too */
 const SCOUT_BERTH = SCOUT_SIZE * 0.82 + 0.1;
 const POP_MS = 720;

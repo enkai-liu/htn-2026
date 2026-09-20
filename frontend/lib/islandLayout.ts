@@ -13,12 +13,19 @@ import type { GraphNode } from "./types";
 
 export const R_MIN = 5.6;
 export const R_SPAN = 16;
-/** clear water kept between two islands */
-export const GAP = 0.62;
+/** clear water kept between two shores */
+export const GAP = 0.45;
+/** How far an island's beach can reach from its middle at the waterline, in island sizes: the beach's width there
+ *  (between 1.03 and 1.2) at the furthest the coast is roughened out (1.16). Boats keep outside this. */
+export const SHORE_REACH = 1.12 * 1.16;
+/** how far a moored boat reaches from its middle, in boat sizes: the half length of the hull */
+export const BOAT_REACH = 0.85;
 const RADIUS_STEP = 1.1;
-// The wider rings and clearance above need more room to resolve a crowded neighbourhood: at 14 steps the
-// packer ran out of outward nudge and left islands overlapping (caught by the no-overlap test).
-const MAX_RADIUS_STEPS = 26;
+/** Rings an island may be pushed out inside its own wedge before the wedge starts to give way. */
+const SPILL_AFTER = 6;
+/** How much wider the wedge gets with every ring after that. A source that outgrows its wedge (live web search
+ *  brings 40 islands to a run) takes its neighbours' water rather than drifting rings away from its similarity. */
+const SPILL_RATE = 7 * (Math.PI / 180);
 
 export type IslandKind = "idea" | "entity" | "prior" | "mutation";
 
@@ -101,15 +108,16 @@ export function ringRadius(sim: number | null | undefined, scale: SimScale | nul
   return R_MIN + (1 - closeness) * R_SPAN;
 }
 
-// Fixed wedges, clockwise from the front of the map. Unequal on purpose: Devpost and YC dominate the corpus.
+// Fixed wedges, clockwise from the front of the map. Unequal on purpose, after what real runs bring back: live web
+// search finds 35 to 45 projects a run, Devpost up to 30, the others 10 to 17 each.
 const SECTORS: { key: string; width: number }[] = [
-  { key: "devpost", width: 110 },
-  { key: "yc", width: 55 },
-  { key: "github", width: 55 },
-  { key: "hn", width: 45 },
-  { key: "prior", width: 35 },
-  { key: "web", width: 30 },
-  { key: "arxiv", width: 30 },
+  { key: "devpost", width: 75 },
+  { key: "yc", width: 50 },
+  { key: "github", width: 45 },
+  { key: "hn", width: 40 },
+  { key: "prior", width: 30 },
+  { key: "web", width: 105 },
+  { key: "arxiv", width: 15 },
 ];
 const SECTOR_START = 35 * DEG;
 const SECTOR_PAD = 4 * DEG;
@@ -158,13 +166,19 @@ export function widestGap(angles: number[]): number {
 
 const isIsland = (k: string): k is IslandKind => k === "idea" || k === "entity" || k === "prior" || k === "mutation";
 
+/** What an island keeps clear around its middle: the shore as it is drawn, which is wider than the turf. */
+export const footprint = (p: Pick<IslandPlacement, "kind" | "size">) => p.size * (p.kind === "mutation" ? BOAT_REACH : SHORE_REACH);
+
 function withPosition(p: Omit<IslandPlacement, "x" | "z">): IslandPlacement {
   return { ...p, x: Math.cos(p.angle) * p.radius, z: Math.sin(p.angle) * p.radius };
 }
 
-function collides(x: number, z: number, size: number, placed: IslandPlacement[]): boolean {
+/** Half-width of a wedge for an island pushed `nudge` off its ring: its own until the near rings are full, then wider. */
+export const wedgeAt = (half: number, nudge: number) => Math.min(Math.PI, half + Math.max(0, Math.round(nudge / RADIUS_STEP) - SPILL_AFTER) * SPILL_RATE);
+
+function collides(x: number, z: number, reach: number, placed: IslandPlacement[]): boolean {
   for (const o of placed) {
-    const min = size + o.size + GAP;
+    const min = reach + footprint(o) + GAP;
     const dx = x - o.x;
     const dz = z - o.z;
     if (dx * dx + dz * dz < min * min) return true;
@@ -172,20 +186,20 @@ function collides(x: number, z: number, size: number, placed: IslandPlacement[])
   return false;
 }
 
-/** Find a free spot: sweep the wedge at the target ring, then step the ring outward and sweep again. */
-function place(target: number, size: number, start: number, centre: number, half: number, placed: IslandPlacement[]): { angle: number; nudge: number } {
-  for (let step = 0; step <= MAX_RADIUS_STEPS; step++) {
+/** Find a free spot: sweep the wedge at the target ring, then step the ring outward and sweep again. It always finds
+ *  one: the wedge widens once the rings near the target are full, and beyond the outermost island all water is clear. */
+function place(target: number, reach: number, start: number, centre: number, half: number, placed: IslandPlacement[]): { angle: number; nudge: number } {
+  for (let step = 0; ; step++) {
     const r = target + step * RADIUS_STEP;
-    const dA = (2 * size + GAP) / r / 2;
-    const max = Math.ceil((2 * half) / dA) + 1;
+    const open = wedgeAt(half, r - target);
+    const dA = (2 * reach + GAP) / r / 2;
+    const max = Math.ceil((2 * open) / dA) + 1;
     for (let k = 0; k <= max; k++) {
       const a = start + (k % 2 ? 1 : -1) * Math.ceil(k / 2) * dA;
-      if (Math.abs(a - centre) > half) continue;
-      if (!collides(Math.cos(a) * r, Math.sin(a) * r, size, placed)) return { angle: a, nudge: r - target };
+      if (Math.abs(a - centre) > open) continue;
+      if (!collides(Math.cos(a) * r, Math.sin(a) * r, reach, placed)) return { angle: a, nudge: r - target };
     }
   }
-  // the wedge is full at every ring we are willing to try: accept an overlap rather than loop forever
-  return { angle: start, nudge: 0 };
 }
 
 export function foldLayout(prev: LayoutState, graph: GraphState, ctx: LayoutCtx): LayoutState {
@@ -218,11 +232,12 @@ export function foldLayout(prev: LayoutState, graph: GraphState, ctx: LayoutCtx)
     const p = byId[id];
     if (p.kind === "idea") continue;
     const others = order.filter((o) => o !== id).map((o) => byId[o]);
-    if (!collides(p.x, p.z, p.size, others)) continue;
+    const reach = footprint(p);
+    if (!collides(p.x, p.z, reach, others)) continue;
     const target = p.radius - p.nudge;
-    for (let step = 0; step <= MAX_RADIUS_STEPS; step++) {
+    for (let step = 0; ; step++) {
       const r = target + step * RADIUS_STEP;
-      if (collides(Math.cos(p.angle) * r, Math.sin(p.angle) * r, p.size, others)) continue;
+      if (collides(Math.cos(p.angle) * r, Math.sin(p.angle) * r, reach, others)) continue;
       byId[id] = withPosition({ ...p, radius: r, nudge: r - target });
       break;
     }
@@ -249,13 +264,13 @@ export function foldLayout(prev: LayoutState, graph: GraphState, ctx: LayoutCtx)
       const base = fi >= 0 ? -Math.PI / 2 + (fi * TAU) / FACET_KEYS.length : rnd() * TAU;
       const siblings = placed.filter((o) => o.kind === "mutation" && Math.abs(o.angle - base) < 0.5).length;
       const target = ringRadius(node.similarity, scale);
-      const berth = place(target, size, base + siblings * 0.34, base, MUTATION_HALF, placed);
+      const berth = place(target, footprint({ kind: "mutation", size }), base + siblings * 0.34, base, MUTATION_HALF, placed);
       p = withPosition({ id, kind: "mutation", angle: berth.angle, radius: target + berth.nudge, nudge: berth.nudge, y: 0, size, seed });
     } else {
       const { centre, half } = sectorFor(node.kind, node.source);
       const start = centre + (rnd() * 2 - 1) * half * 0.8;
       const target = ringRadius(node.similarity, scale);
-      const spot = place(target, size, start, centre, half, placed);
+      const spot = place(target, footprint({ kind: node.kind, size }), start, centre, half, placed);
       p = withPosition({ id, kind: node.kind, angle: spot.angle, radius: target + spot.nudge, nudge: spot.nudge, y: rnd() * 0.05, size, seed });
     }
     byId[id] = p;
