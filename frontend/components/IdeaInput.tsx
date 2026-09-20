@@ -70,7 +70,7 @@ export function IdeaInput() {
           onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") void submit(); }}
           rows={7}
           spellCheck
-          placeholder="What does it do, for whom, and how? Write it the way you would pitch it to a judge."
+          placeholder="Write your pitch!"
           className="block w-full resize-y bg-transparent font-display text-[21px] leading-[1.4] text-bone outline-none placeholder:text-faint placeholder:italic"
         />
 
@@ -83,7 +83,7 @@ export function IdeaInput() {
             <span className={voiceReady ? "text-teal" : "text-amber"}>
               {chars.toLocaleString("en-US")} <span className="text-mute">/ {VOICE_MIN_CHARS} characters</span>
             </span>
-            {!voiceReady && searchReady && <span className="text-right text-mute">Shorter pitches still run; Voice abstains under {VOICE_MIN_CHARS}.</span>}
+            {!voiceReady && searchReady && <span className="text-right text-mute">Voice API requires {VOICE_MIN_CHARS} characters</span>}
           </div>
         </div>
 
