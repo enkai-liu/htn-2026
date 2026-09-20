@@ -1,6 +1,6 @@
 "use client";
 import clsx from "clsx";
-import { FileText, Lightbulb, Map as MapIcon, MessagesSquare, Users, type LucideIcon } from "lucide-react";
+import { FileText, Lightbulb, Map as MapIcon, MessagesSquare, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { useSelectedLayoutSegment } from "next/navigation";
 import type { Phase } from "@/lib/types";
@@ -11,7 +11,6 @@ const TABS: { segment: RunSegment; label: string; icon: LucideIcon }[] = [
   { segment: "debate", label: "Debate", icon: MessagesSquare },
   { segment: "coach", label: "Coach", icon: Lightbulb },
   { segment: "report", label: "Report", icon: FileText },
-  { segment: "swarm", label: "Swarm", icon: Users },
 ];
 
 /** Where the swarm is working right now: that tab gets a small pulse instead of the page switching under you. */
@@ -48,7 +47,6 @@ export function TabBar() {
               {!!n && <span className="absolute -right-3.5 -top-1.5 min-w-[16px] rounded-full bg-ink-800 px-1 text-center font-mono text-[9px] leading-[14px] text-bone-dim">{n}</span>}
               {segment === "report" && state.report && <span className="absolute -right-1.5 -top-0.5 size-[6px] rounded-full bg-teal" />}
               {busy === segment && !on && <span className="absolute -left-1.5 -top-0.5 size-[6px] animate-beacon rounded-full bg-amber text-amber" />}
-              {segment === "swarm" && streaming && !state.finished && <span className="absolute -right-1.5 -top-0.5 size-[6px] animate-beacon rounded-full bg-vermilion text-vermilion" />}
             </span>
             {label}
           </Link>

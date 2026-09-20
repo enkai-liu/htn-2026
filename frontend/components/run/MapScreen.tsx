@@ -77,7 +77,7 @@ export function MapScreen() {
         </>
       )}
 
-      {/* one quiet line about the swarm; the whole story is on the Swarm page */}
+      {/* one quiet line about the swarm: the latest thing an agent did */}
       {caption && (
         <p key={caption.seq} className="pointer-events-none absolute inset-x-0 bottom-4 mx-auto flex w-fit max-w-[min(620px,calc(100vw-40px))] animate-rise items-center gap-2 truncate rounded-full bg-ink-900/85 px-3.5 py-1 text-[12.5px] text-bone-dim shadow-[0_0_0_1px_var(--color-line)] backdrop-blur" aria-live="off">
           <span className="font-mono text-[11px]" style={{ color: agentColor(caption.agent) }}>{caption.agent}</span>

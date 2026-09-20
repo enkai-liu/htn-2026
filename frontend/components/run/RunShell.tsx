@@ -5,13 +5,12 @@ import clsx from "clsx";
 import { TriangleAlert } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { fmtUsd } from "@/lib/format";
-import { selectSpend } from "@/lib/selectors";
 import type { RunStatus } from "@/lib/useRunEvents";
 import { ReplayControls } from "../ReplayControls";
 import { Wordmark } from "../SiteNav";
 import { useRun } from "./RunProvider";
 import { ScoreChip } from "./ScoreChip";
+import { SpendPill } from "./SpendPill";
 import { TabBar } from "./TabBar";
 
 const STATUS: Record<RunStatus, { label: string; color: string; pulse?: boolean }> = {
@@ -37,9 +36,8 @@ function StatusDot({ status }: { status: RunStatus }) {
 }
 
 export function RunShell({ children }: { children: ReactNode }) {
-  const { run, isReplay, hrefFor } = useRun();
+  const { run, isReplay } = useRun();
   const { state, status, controls } = run;
-  const spend = selectSpend(state);
   const fatalErrors = state.errors.filter((e) => !e.recoverable);
 
   return (
@@ -58,19 +56,11 @@ export function RunShell({ children }: { children: ReactNode }) {
 
       <header className="relative z-30 flex h-[60px] flex-none items-center justify-between gap-4 px-5 sm:px-7">
         <Wordmark className="flex-none" />
-        {/* one cluster, one centre line: status, spend, then the score pill, whose edge the map's own button sits under */}
-        <div className="flex flex-none items-center gap-4 sm:gap-5">
+        {/* one cluster, one centre line: status, then the two pills — spend and score — whose edge the map's own button sits under */}
+        <div className="flex flex-none items-center gap-2.5 sm:gap-3">
           {/* a recording's state is already on the transport in the bottom bar */}
           {!isReplay && <StatusDot status={status} />}
-          <Link
-            href={hrefFor("swarm")}
-            className="hidden items-center gap-1.5 text-[12.5px] leading-none tabular-nums text-mute transition-colors hover:text-bone sm:flex"
-            title={spend.degraded ? "Budget pressure: the conductor degraded the run. Details on the Swarm page." : "Spend so far. Per-model detail on the Swarm page."}
-          >
-            {spend.degraded && <span className="size-[6px] rounded-full bg-vermilion" />}
-            {fmtUsd(spend.usd)} · {spend.calls} calls
-            {spend.degraded && <span className="text-vermilion">· degraded</span>}
-          </Link>
+          <SpendPill state={state} />
           <ScoreChip scores={state.scores} />
         </div>
       </header>

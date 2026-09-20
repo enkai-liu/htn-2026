@@ -6,12 +6,12 @@ import { useSearchParams } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import { ApiError, coachSay, rescoreMutation, runAction } from "@/lib/api";
 import type { ActionState } from "@/lib/runReducer";
-import { selectEvidenceCards, selectLedger, selectSourceStatus, type EvidenceCardModel } from "@/lib/selectors";
+import { selectEvidenceCards, type EvidenceCardModel } from "@/lib/selectors";
 import { useRunEvents, type RunEvents } from "@/lib/useRunEvents";
 import { ToastProvider, useToast } from "../ui";
 import { RunShell } from "./RunShell";
 
-export type RunSegment = "" | "debate" | "coach" | "report" | "swarm";
+export type RunSegment = "" | "debate" | "coach" | "report";
 
 /** Camera pose of the islands map, remembered while another tab is showing. */
 export interface CameraMemo { position: [number, number, number]; target: [number, number, number]; zoom: number; userMoved: boolean }
@@ -32,8 +32,6 @@ export interface RunContextValue {
   coachBusy: boolean;
   pendingSay: string | null;
   cards: EvidenceCardModel[];
-  ledger: ReturnType<typeof selectLedger>;
-  sourceStatus: ReturnType<typeof selectSourceStatus>;
   /** islands that have already popped in, so returning to the Map tab does not replay the animation */
   seenIslands: RefObject<Set<string>>;
   cameraMemo: RefObject<CameraMemo | null>;
@@ -69,8 +67,6 @@ function RunProviderInner({ runId, replay, speed, mapMode, children }: { runId: 
   useEffect(() => { seenIslands.current.clear(); }, [epoch]);
 
   const cards = useMemo(() => selectEvidenceCards(state), [state]);
-  const ledger = useMemo(() => selectLedger(state), [state]);
-  const sourceStatus = useMemo(() => selectSourceStatus(state), [state]);
   const streaming = status === "live" || status === "replaying" || status === "reconnecting";
 
   const replayNotice = useCallback(() => toast({ title: "Replay mode: actions are disabled", body: "This is a recording, so nothing is sent to the backend. Start a live investigation to arm a watch, draft a pitch or write back.", tone: "amber" }), [toast]);
@@ -163,8 +159,8 @@ function RunProviderInner({ runId, replay, speed, mapMode, children }: { runId: 
 
   const value = useMemo<RunContextValue>(() => ({
     runId, run, isReplay, streaming, selectedId, select: setSelectedId,
-    busyAction, busyMid, onAct, onRescore, onCoachSay, coachBusy, pendingSay: pendingText, cards, ledger, sourceStatus, seenIslands, cameraMemo, hrefFor, mapMode,
-  }), [runId, run, isReplay, streaming, selectedId, busyAction, busyMid, onAct, onRescore, onCoachSay, coachBusy, pendingText, cards, ledger, sourceStatus, hrefFor, mapMode]);
+    busyAction, busyMid, onAct, onRescore, onCoachSay, coachBusy, pendingSay: pendingText, cards, seenIslands, cameraMemo, hrefFor, mapMode,
+  }), [runId, run, isReplay, streaming, selectedId, busyAction, busyMid, onAct, onRescore, onCoachSay, coachBusy, pendingText, cards, hrefFor, mapMode]);
 
   return (
     <RunContext.Provider value={value}>
