@@ -10,13 +10,6 @@ const SEARCH_MIN_CHARS = 1; // backend RunRequest.idea_text min_length
 const MAX_CHARS = 5000;
 const REPLAY_ONLY = process.env.NEXT_PUBLIC_REPLAY_ONLY === "1";
 
-const EXAMPLES: { label: string; text: string }[] = [
-  {
-    label: "An AI study buddy",
-    text: "StudyPal is an AI study buddy for university students. Upload your lecture slides and notes, and it uses a large language model to generate flashcards, practice quizzes and short summaries for every chapter. A chat tutor answers questions about the material at any hour, tracks which topics you keep getting wrong, and builds a personalised revision schedule before each exam.",
-  },
-];
-
 export function IdeaInput() {
   const router = useRouter();
   const [text, setText] = useState("");
@@ -50,13 +43,6 @@ export function IdeaInput() {
     <form onSubmit={submit} className="plate animate-rise p-0" style={{ animationDelay: "0.25s" }}>
       <div className="plate-head">
         <span className="ttl">Your pitch</span>
-        <span className="ml-auto flex items-center gap-1.5 normal-case tracking-normal">
-          {EXAMPLES.map((ex) => (
-            <button key={ex.label} type="button" className="chip cursor-pointer hover:text-bone" data-tone="mute" onClick={() => { setText(ex.text); setError(null); }}>
-              {ex.label}
-            </button>
-          ))}
-        </span>
       </div>
 
       <div className="p-4 sm:p-5">
