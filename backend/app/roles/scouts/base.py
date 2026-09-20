@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Awaitable
 
 from app.orchestration.host import Ctx, error, result
 from app.roles.base import BaseRole, eid_for
@@ -23,6 +24,14 @@ class ScoutRole(BaseRole):
     async def search(self, query: str, n: int) -> list[SourceRecord]:  # pragma: no cover
         raise NotImplementedError
 
+    def extra(self, payload: dict, ctx: Ctx, phase: str) -> list[tuple[str, Awaitable[list[SourceRecord]]]]:
+        """Searches beside the queries, as (label, job): a scout whose source has more than one way in."""
+        return []
+
+    def collapse(self, new: list[SourceRecord], ctx: Ctx) -> list[SourceRecord]:
+        """Scored hits, before they become evidence: a scout whose source lists one thing several times folds them here."""
+        return new
+
     async def _one(self, q: str, ctx: Ctx, phase: str) -> list[SourceRecord]:
         await ctx.emit("tool.call", {"tool": self.tool, "args_summary": q[:120]}, phase=phase)
         hits = await self.search(q, self.per_query)
@@ -40,8 +49,10 @@ class ScoutRole(BaseRole):
         found: dict[str, SourceRecord] = {}
         failed: str | None = None
         # The queries are independent, so they go out together: a scout costs its slowest query, not the sum of them.
-        outcomes = await asyncio.gather(*(self._one(q, ctx, phase) for q in queries), return_exceptions=True)
-        for q, hits in zip(queries, outcomes):  # merged in query order, so the result does not depend on which came back first
+        extra = self.extra(p, ctx, phase)
+        outcomes = await asyncio.gather(*(self._one(q, ctx, phase) for q in queries), *(job for _, job in extra), return_exceptions=True)
+        labels = queries + [label for label, _ in extra]
+        for q, hits in zip(labels, outcomes):  # merged in query order, so the result does not depend on which came back first
             if isinstance(hits, SourceError):
                 if failed is None:  # said once per scout; whatever the other queries returned is still real evidence
                     failed = str(hits)
@@ -70,6 +81,7 @@ class ScoutRole(BaseRole):
             scores, calibrated = await rerank(ctx.board.idea_text, [r.pitch or r.title for r in new])
             for r, sc in zip(new, scores):
                 r.retrieval |= {"rerank_score": round(sc, 4), "leg": "live"} | ({} if calibrated else {"uncalibrated": True})
+        new = self.collapse(new, ctx)
         new.sort(key=lambda r: -float(r.retrieval.get("rerank_score") or 0))
         for r in new:
             ctx.board.put("records", self.id, r.rid, r)

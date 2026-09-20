@@ -3,12 +3,14 @@ from __future__ import annotations
 
 import re
 from itertools import combinations
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 from app.schemas import SourceRecord
 
 _GENERIC_HOSTS = {"github.com", "devpost.com", "youtube.com", "youtu.be", "news.ycombinator.com", "twitter.com", "x.com",
                   "linkedin.com", "figma.com", "docs.google.com", "drive.google.com", "vercel.app", "netlify.app", "herokuapp.com"}
+
+_ID_IN_QUERY = {("news.ycombinator.com", "/item"): "id", ("youtube.com", "/watch"): "v"}
 
 
 def norm_url(url: str) -> str | None:
@@ -28,6 +30,11 @@ def norm_url(url: str) -> str | None:
         path = "/" + "/".join(parts[:2]).removesuffix(".git")
     if host in _GENERIC_HOSTS and not path:
         return None
+    if (host, path) in _ID_IN_QUERY:  # the page IS its query string: without it every HN story was one key, and one entity
+        ident = parse_qs(u.query).get(_ID_IN_QUERY[host, path])
+        if not ident:
+            return None
+        path += f"?{_ID_IN_QUERY[host, path]}={ident[0]}"
     return host + path
 
 

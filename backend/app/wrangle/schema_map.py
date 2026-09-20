@@ -85,12 +85,16 @@ def from_web(hit: dict[str, Any]) -> SourceRecord:
     published = _parse_dt(hit.get("publishedDate"))
     body = clean(hit.get("text"))
     title = clean(hit.get("title")) or (norm_url(url) or url)[:80]
+    # Exa's summary of the page, not the page's own words: it leads the pitch because a homepage's first 1,500
+    # characters are slogans and navigation, and it is marked imputed so nobody takes it for the site's copy.
+    summary = clean(hit.get("summary"), 500) or None
     return SourceRecord(
         rid="web:" + hashlib.sha1((norm_url(url) or url).encode()).hexdigest()[:12], source="web", url=url, title=title,
-        description=body[:4000], pitch=_pitch(title, body), year=published.year if published else None,
+        tagline=summary, description=body[:4000], pitch=_pitch(title, summary, body), year=published.year if published else None,
         date=published.date() if published else None, date_precision="day" if published else None,
         traction={"author": hit["author"]} if hit.get("author") else {},
-        field_provenance={"title": "source", "description": "normalized"} | ({"date": "source"} if published else {}),
+        field_provenance={"title": "source", "description": "normalized"} | ({"date": "source"} if published else {})
+        | ({"tagline": "imputed"} if summary else {}),
     )
 
 

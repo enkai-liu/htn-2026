@@ -245,7 +245,7 @@ async def test_web_scout_joins_when_a_key_is_set(offline, monkeypatch):
 
     asked: list[str] = []
 
-    async def exa_search(query, *, n=5):
+    async def exa_search(query, *, n=5, category=None):
         asked.append(query)
         return [from_web({"url": "https://pitchprobe.example.com", "title": "PitchProbe", "publishedDate": "2024-02-01T00:00:00Z",
                           "text": "PitchProbe tells founders whether their startup idea already exists."})]

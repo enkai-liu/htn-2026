@@ -46,7 +46,7 @@ class Critic(BaseRole):
 
     async def handle(self, msg: dict, ctx: Ctx) -> dict:
         board = ctx.board
-        claims = await self._critique(ctx, board.top_entities(8), allow_followups=True)
+        claims = await self._critique(ctx, self._bench(board), allow_followups=True)
         return result(cids=[c.cid for c in claims], summary=f"{len(claims)} 'already exists' claims")
 
     async def _critique(self, ctx: Ctx, entities: list[Entity], *, allow_followups: bool) -> list[Claim]:
@@ -81,7 +81,9 @@ class Critic(BaseRole):
             await ctx.emit("claim.proposed", {"claim": claim.model_dump(mode="json"), "evidence": [ev.model_dump(mode="json")],
                                               "facets": c.facets}, **res.meta())
 
-        followups = [fu for fu in crit.followups if fu.scout in scouts][:MAX_FOLLOWUPS] if allow_followups else []
+        # a model that fills `query` with the scout's name sent GitHub searching for "scout.github": not a search
+        followups = [fu for fu in crit.followups if fu.scout in scouts and fu.query.strip() and not fu.query.strip().startswith("scout.")
+                     ][:MAX_FOLLOWUPS] if allow_followups else []
         if followups and not ctx.budget.low():
             async def ask(fu: FollowUp) -> list[str]:
                 await ctx.emit("requery.issued", {"reason": fu.reason, "facet": fu.facet, "query": fu.query, "to": fu.scout}, to=fu.scout)
@@ -94,6 +96,16 @@ class Critic(BaseRole):
                 fresh = [e for e in board.top_entities(12) if set(e.records) & set(new_rids)]
                 out += await self._critique(ctx, fresh[:4], allow_followups=False)
         return out
+
+    @staticmethod
+    def _bench(board) -> list[Entity]:
+        """The eight nearest entities, plus up to three players the web scout looked up by name. The reranker is
+        literal -- it put Nvidia at 0.02 for "chipmaker for ai" because its page says GPU, not chip -- so the
+        incumbents a reader expects to see argued would otherwise never reach a model that knows better."""
+        top = board.top_entities(8)
+        named = [e for e in board.top_entities(len(board.entities)) if e not in top and any(
+            str(board.records[r].retrieval.get("query", "")).startswith("lookup:") for r in e.records if r in board.records)]
+        return top + named[:3]
 
     @staticmethod
     def _text(ctx: Ctx, ent: Entity) -> str:

@@ -20,7 +20,7 @@ SCOUT_PURPOSE = {
     "scout.yc": "YC companies (Elasticsearch hybrid search)",
     "scout.github": "live GitHub repository search",
     "scout.hn": "live Hacker News search",
-    "scout.web": "the open web: shipped products, startups and launch posts (Exa neural search, page text attached)",
+    "scout.web": "the open web: companies, shipped products and launch posts of any kind, hardware and services included (Exa neural search, page text attached)",
 }
 SEMANTIC_SCOUTS = ("scout.devpost", "scout.yc", "scout.web")  # these take natural-language queries; the rest want keywords
 DEBATE_TEAM = ["resolver", "critic", "advocate", "judge", "verifier", "synthesizer", "mutator", "actuator"]
@@ -34,6 +34,10 @@ class Plan(BaseModel):
                                         "solves it: it finds work that attacked the same problem a different way")
     writeup: clipped(600) = Field(default="", description="2-3 plain sentences describing a project that ALREADY built this idea, as its own "
                                   "project page would ('A tool that ...'): no invented names, numbers or awards")
+    known_players: list[str] = Field(default_factory=list, description="up to 8 real companies, products or projects that already do this "
+                                     "or something close: the names a domain expert would say at once, the large incumbents and the "
+                                     "specialist startups alike. Bare names only, no asides. Each is looked up on the web and dropped if no page is found, so leave out "
+                                     "anything you are not sure exists")
     is_research: bool = Field(default=False, description="true only if the idea is a research contribution rather than a product")
 
 
@@ -49,6 +53,15 @@ def semantic_queries(plan: Plan) -> list[str]:
         if q and q.lower() not in {o.lower() for o in out}:
             out.append(q)
     return out
+
+
+def web_queries(plan: Plan, idea: str) -> list[str]:
+    """The open web is searched in the author's own words first, when they are short enough to be a search. The
+    planner's rewrites are longer and more particular than what was typed: Exa answered a judge's four words,
+    "chipmaker for ai", with Cerebras at the top, and the rewrites with nothing anyone had heard of."""
+    own = " ".join(dict.fromkeys(line.strip() for line in idea.splitlines() if line.strip()))
+    out = [own] if 0 < len(own) <= 200 else []
+    return out + [q for q in semantic_queries(plan) if q.lower() != own.lower()]
 
 
 class Conductor(BaseRole):
@@ -117,7 +130,10 @@ class Conductor(BaseRole):
     async def _plan(self, ctx: Ctx) -> Plan:
         system = (HOUSE_RULES + "Role: planner. Decompose the idea into facets: purpose (the goal, for whom), mechanism (how it works), "
                   "audience, data (what it consumes), twist (what the author thinks is new), domain (2-3 words), keywords. "
-                  "Facet values are short noun phrases in plain words. Then write the search queries, the problem_query and the writeup.")
+                  "Facet values are short noun phrases in plain words. Then write the search queries, the problem_query and the writeup, "
+                  "and name the known_players. The idea can be anything -- software, hardware, a physical product, a service, a "
+                  "business, research: describe it as what it is and never assume it is an app. However thin the idea is, do not "
+                  "comment on it: the writeup describes a project, it is not feedback to the author.")
         page = ctx.board.self_page
         user = f"IDEA: {ctx.board.idea_text}" + (f"\n\n{page.context()}" if page else "")
         plan, res = await self.llm.structured(role=self.id, system=system, user=user, schema=Plan,
@@ -160,10 +176,13 @@ class Conductor(BaseRole):
 
     # -- scout -------------------------------------------------------------------------------------------
     async def _scout(self, ctx: Ctx, plan: Plan, scouts: list[str]) -> None:
-        def queries(sid: str) -> list[str]:
-            return (semantic_queries(plan) if sid in SEMANTIC_SCOUTS else plan.keyword_queries[:3]) or [ctx.board.idea_text[:200]]
+        def brief(sid: str) -> dict:
+            if sid == "scout.web":  # the only scout that can look a name up, so the planner's known players go to it
+                return {"queries": web_queries(plan, ctx.board.idea_text) or [ctx.board.idea_text[:200]],
+                        "lookups": [n.strip() for n in plan.known_players if n.strip()], "hint": plan.facets.domain}
+            return {"queries": (semantic_queries(plan) if sid in SEMANTIC_SCOUTS else plan.keyword_queries[:3]) or [ctx.board.idea_text[:200]]}
 
-        replies = await asyncio.gather(*(ctx.send(s, task(queries=queries(s)), timeout=45) for s in scouts))
+        replies = await asyncio.gather(*(ctx.send(s, task(**brief(s)), timeout=45) for s in scouts))
         for sid, reply in zip(scouts, replies):
             if reply.get("type") != "ERROR":
                 continue

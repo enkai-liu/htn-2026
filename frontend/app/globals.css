@@ -355,7 +355,8 @@ body {
 }
 .island-label[data-on="1"] { color: var(--color-ink-900); background: var(--color-bone); box-shadow: none; z-index: 2; }
 .island-label[data-kind="idea"] { color: #ffffff; background: var(--color-accent); box-shadow: none; font-weight: 600; }
-.island-label[data-kind="mutation"] { color: var(--color-teal); }
+/* teal marks a mutation at rest; once it is hovered or selected it wears the same dark pill as every other label */
+.island-label[data-kind="mutation"]:not([data-on="1"]) { color: var(--color-teal); }
 
 /* the map's loading state. It fades in late, so a scene that is ready within a frame or two never flashes it. */
 .island-loader {

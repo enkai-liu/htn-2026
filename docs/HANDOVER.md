@@ -74,12 +74,27 @@ it. Every turn restarts the run's retention window. Verified live on Baseten + E
 23 -> 44 -> 54 over two author moves. UI: `frontend/components/coach/CoachPanel.tsx` (the old `MutationPanel` is still
 used by `/classic`). A backend started before this change has no `/coach` route: restart it.
 
+**The open web is a first-class source (Sun ~01:30).** Two judges on Sat 19:00 typed "ai grading for teachers" and
+"chipmaker for ai" and saw neither VibeGrade nor Cerebras, and mostly software. Cause: those runs had no web scout at
+all (it landed at 23:35 and the backend on :8000 had been up since 17:18 -- **a backend started before a change does
+not have it: restart it**), and Devpost/YC/GitHub/HN are all software catalogues. `scout.web` (Exa) now has three ways
+in: the queries as pages -- led by the author's own words when the pitch is <= 200 chars, which beat the planner's
+rewrites -- the first two again with `category: company`, and a lookup of each `known_players` name the planner gives
+(a lead, not evidence: kept only if the name is in the hit's title or address). Each hit carries Exa's two-sentence
+summary at the head of its pitch (`tagline`, provenance `imputed`), because ranked on homepage text alone Cerebras came
+47th. A site's pages fold into its homepage; looked-up players get a seat with the critic (`Critic._bench`) because the
+Jina reranker is literal (Nvidia scores 0.02 for "chipmaker for ai": its page says GPU). Also fixed: every HN story
+shared the URL key `news.ycombinator.com/item`, so the resolver merged them all into one entity. Verified live: VibeGrade
+is the top entity for "vibegrading for teachers", Cerebras/Nvidia/Etched show for "chipmaker for ai", and a bicycle
+sourdough bakery gets real bakeries. Cost: ~12-16 Exa calls a run (~$0.15). Not tried: making the summary prompt
+idea-aware -- it would lift similarity for whatever the idea says, so it was left idea-independent on purpose.
+
 ## Verify the state
 
 ```bash
-cd backend && .venv/bin/pytest -q -p no:warnings            # expect 305 passed, 3 skipped
-cd backend && .venv-jiuwen/bin/pytest -q -p no:warnings tests/test_pipeline_offline.py   # expect 7 passed (openjiuwen host)
-cd frontend && pnpm test && pnpm typecheck && pnpm lint      # expect 30 passed, clean
+cd backend && .venv/bin/pytest -q -p no:warnings            # expect 419 passed, 6 skipped
+cd backend && .venv-jiuwen/bin/pytest -q -p no:warnings tests/test_pipeline_offline.py   # expect 13 passed (openjiuwen host)
+cd frontend && pnpm test && pnpm typecheck && pnpm lint      # expect 55 passed, clean
 bash scripts/validate_swarm_skill.sh                         # official Swarm Skill validator: [PASS] 0 warning(s), 0 error(s)
 backend/.venv/bin/python elastic/apply.py --dry-run          # 17-step plan, sends nothing
 bash scripts/smoke_all.sh                                    # SKIPs without keys, exit 0
