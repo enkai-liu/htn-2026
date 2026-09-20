@@ -17,7 +17,7 @@ export function Wordmark({ className }: { className?: string }) {
     <Link href="/" className={clsx("group inline-flex items-center gap-2 text-bone", className)} aria-label="Whitespace home">
       <StarGlyph className="text-amber transition-transform duration-500 group-hover:-translate-y-0.5" />
       <span className="font-display text-[22px] leading-none">
-        White<span className="ml-[0.2em] italic tracking-[0.14em] text-bone-dim">space</span>
+        White<span className="text-bone-dim">space</span>
       </span>
     </Link>
   );
