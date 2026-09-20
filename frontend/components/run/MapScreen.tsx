@@ -1,7 +1,7 @@
 "use client";
 // The home tab: the map and almost nothing else. One line says what the swarm is doing; the rest is on other pages.
-import { LocateFixed } from "lucide-react";
-import { useMemo, useState } from "react";
+import { LocateFixed, Play, Square } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { agentColor } from "@/lib/agents";
 import { IdeaGraph } from "../IdeaGraph";
 import { IslandMap } from "../islands/IslandMap";
@@ -10,11 +10,64 @@ import { DetailCard } from "./DetailCard";
 import { MapLegend } from "./MapLegend";
 import { useRun } from "./RunProvider";
 
+/** Demo mode: how many islands the tour visits, and how long it lingers on each. */
+const TOUR_STOPS = 3;
+const TOUR_MS = 5000;
+
 export function MapScreen() {
   const { run, streaming, selectedId, select, seenIslands, cameraMemo, mapMode } = useRun();
   const { state, layout } = run;
   const { graph } = state;
   const [recenterTick, setRecenterTick] = useState(0);
+  const [touring, setTouring] = useState(false);
+  const [at, setAt] = useState(0);
+
+  // The nearest neighbours, as the map draws them: only islands that have actually been placed, best match first.
+  const tour = useMemo(() => {
+    const ranked = layout.order
+      .map((id) => graph.nodes[id])
+      .filter((n) => n && n.kind === "entity" && n.similarity != null)
+      .sort((a, b) => (b.similarity ?? 0) - (a.similarity ?? 0));
+    return ranked.slice(0, TOUR_STOPS).map((n) => n.id);
+  }, [graph, layout]);
+
+  // read at each step rather than closed over, so islands arriving mid-run join the tour without restarting it
+  const tourRef = useRef(tour);
+  useEffect(() => { tourRef.current = tour; }, [tour]);
+  /** the island the tour last asked for: anything else in `selectedId` is the author taking the wheel */
+  const drivingTo = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!touring) return;
+    let i = 0;
+    const go = () => {
+      const stops = tourRef.current;
+      if (stops.length === 0) return; // nothing placed yet: wait for the next beat
+      const n = i++ % stops.length;
+      setAt(n);
+      drivingTo.current = stops[n];
+      select(stops[n]);
+    };
+    go();
+    const t = setInterval(go, TOUR_MS);
+    return () => clearInterval(t);
+  }, [touring, select]);
+
+  // Touching the map yourself ends the tour, wherever the camera happens to be. It is the *change* that ends it,
+  // not the mismatch: on the beat the tour asks for an island, `selectedId` is still the one before it.
+  const lastSeen = useRef<string | null>(null);
+  useEffect(() => {
+    const changed = selectedId !== lastSeen.current;
+    lastSeen.current = selectedId;
+    if (touring && changed && selectedId !== drivingTo.current) setTouring(false);
+  }, [touring, selectedId]);
+
+  const toggleTour = () => {
+    if (!touring) { setTouring(true); return; }
+    setTouring(false);
+    drivingTo.current = null;
+    select(null); // back out to the whole archipelago
+  };
 
   const stats = useMemo(() => {
     const counts = { entity: 0, prior: 0, mutation: 0 };
@@ -66,6 +119,22 @@ export function MapScreen() {
                 sameAs={graph.links.some((l) => l.kind === "possible_same_as")}
               />
             </div>
+          )}
+
+          {tour.length > 0 && (
+            <button
+              type="button" onClick={toggleTour} aria-pressed={touring}
+              className="absolute left-5 top-1 flex h-9 items-center gap-2 rounded-full border border-line bg-ink-900 px-3.5 text-[12.5px] text-bone-dim transition-colors hover:text-bone sm:left-7"
+              title={touring ? "Stop the tour" : `Fly the ${tour.length} nearest islands, five seconds each`}
+            >
+              {touring ? <Square size={11} className="fill-current" /> : <Play size={11} className="fill-current" />}
+              <span>{touring ? "Stop tour" : `Tour the top ${tour.length}`}</span>
+              {touring && (
+                <span className="flex items-center gap-1" aria-hidden>
+                  {tour.map((id, i) => <span key={id} className={`size-[5px] rounded-full ${i === at ? "bg-amber" : "bg-line"}`} />)}
+                </span>
+              )}
+            </button>
           )}
 
           {!empty && !selected && (

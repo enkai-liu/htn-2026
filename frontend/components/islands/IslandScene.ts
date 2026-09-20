@@ -759,7 +759,11 @@ export class IslandScene {
         this.controls.target.add(this.shift);
         this.camera.position.add(this.shift);
       }
-    } else if (!this.userMoved && !this.opts.ambient) {
+    } else if (!this.userMoved && !this.selectedId && !this.opts.ambient) {
+      // Nothing is selected, so the camera is free to follow the archipelago as it grows. A selection holds it
+      // where the fly left it: a click does that by flagging userMoved on its own pointerdown, but a selection
+      // made in code (the map tour, focusing a mutation from another tab) never touches the pointer, and without
+      // this the camera would slide off the island a second after arriving.
       // slide target and camera together so the viewing angle never changes
       this.shift.copy(this.focus).sub(this.controls.target);
       if (this.shift.lengthSq() > 1e-6) {
