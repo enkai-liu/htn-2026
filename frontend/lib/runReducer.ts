@@ -183,7 +183,7 @@ export interface RunState {
   orchestrator: string | null;
   /** run.started.data.replay: the backend itself is replaying a recording */
   recorded: boolean;
-  /** run.started.data.mock: fictional fixture data, must be bannered */
+  /** run.started.data.mock: fictional fixture data. Only the classic dashboard still banners it */
   mock: boolean;
   facets: Facets | null;
   roster: { order: string[]; agents: Record<string, AgentInfo> };

@@ -37,6 +37,9 @@
   --color-src-arxiv: #15803d;
   --color-src-web: #0e7490;
 
+  /* open water: the map and the landing page sit on it, so it has to match the scene's SEA colour */
+  --color-sea: #a8d3e3;
+
   --color-canvas: var(--color-ink-950);
   --color-surface: var(--color-ink-900);
   --color-text: var(--color-bone);

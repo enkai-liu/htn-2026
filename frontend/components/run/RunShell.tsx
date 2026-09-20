@@ -1,5 +1,5 @@
 "use client";
-// The chrome around every run page: a quiet header (idea, spend, score, status), the honesty banners, and the
+// The chrome around every run page: a quiet header (idea, spend, score, status), the replay and error banners, and the
 // bottom bar with the tabs. Pages render in between and own nothing but their content.
 import clsx from "clsx";
 import { TriangleAlert } from "lucide-react";
@@ -43,17 +43,10 @@ export function RunShell({ children }: { children: ReactNode }) {
   const { state, status, controls } = run;
   const spend = selectSpend(state);
   const fatalErrors = state.errors.filter((e) => !e.recoverable);
-  const simulatedCount = state.claimOrder.filter((c) => state.claims[c].simulated).length;
 
   return (
     <div className="flex h-dvh flex-col overflow-hidden">
-      {/* honesty banners */}
-      {state.mock && (
-        <div className="hazard flex h-[24px] flex-none items-center justify-center gap-3 border-x-0 border-t-0 px-3 font-mono text-[10px] uppercase tracking-[0.18em]" role="note">
-          Recorded mock run: fictional fixture data
-          {simulatedCount > 0 && <span className="hidden md:inline">· includes {simulatedCount} simulated fire-drill claim{simulatedCount === 1 ? "" : "s"}, labelled where shown</span>}
-        </div>
-      )}
+      {/* banners. A mock run is not bannered here any more; simulated claims are still labelled where they are shown */}
       {!state.mock && isReplay && (
         <div className="flex h-[22px] flex-none items-center justify-center border-b border-line bg-ink-800 px-3 font-mono text-[9.5px] uppercase tracking-[0.18em] text-mute" role="note">
           Replay of recorded run “{run.replayName}” · actions are disabled
@@ -95,7 +88,8 @@ export function RunShell({ children }: { children: ReactNode }) {
       ) : (
         <>
           <main className="relative min-h-0 flex-1">{children}</main>
-          <footer className="relative z-30 flex h-[68px] flex-none items-center border-t border-line bg-ink-900 px-4">
+          {/* see-through: on the map tab the sea runs on underneath it */}
+          <footer className="relative z-30 flex h-[68px] flex-none items-center border-t border-line bg-ink-900/70 px-4 backdrop-blur-md">
             <div className="hidden min-w-0 flex-1 lg:block">{isReplay && controls && <ReplayControls controls={controls} snapshot={run.replay} />}</div>
             <TabBar />
             <div className="hidden flex-1 lg:block" />

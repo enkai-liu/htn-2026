@@ -1,17 +1,17 @@
-// The floating-islands map, as a plain three.js scene with no React in it. React pushes data in with setData();
-// the scene diffs by id and animates the difference: a new island rises and pops, an absorbed island flies into
+// The islands map, as a plain three.js scene with no React in it. React pushes data in with setData();
+// the scene diffs by id and animates the difference: a new island rises out of the sea and pops, an absorbed island flies into
 // the one that swallowed it, a re-scored mutation drifts along its bearing.
 //
 // Plain three.js rather than @react-three/fiber on purpose: Next's App Router runs its own vendored React canary,
 // and r3f's reconciler is pinned to the public React minor.
 import {
-  BufferGeometry, CanvasTexture, CircleGeometry, Color, CylinderGeometry, DirectionalLight, DoubleSide, Float32BufferAttribute, Group, HemisphereLight, Line,
-  LineBasicMaterial, LineDashedMaterial, LineLoop, Mesh, MeshBasicMaterial, MeshStandardMaterial, OrthographicCamera,
-  QuadraticBezierCurve3, Raycaster, RingGeometry, Scene, Sprite, SpriteMaterial, Vector2, Vector3, WebGLRenderer,
+  BufferGeometry, CanvasTexture, Color, CylinderGeometry, DirectionalLight, DoubleSide, Float32BufferAttribute, Group, HemisphereLight, Line,
+  LineBasicMaterial, LineDashedMaterial, Mesh, MeshBasicMaterial, MeshStandardMaterial, OrthographicCamera,
+  PlaneGeometry, QuadraticBezierCurve3, Raycaster, RingGeometry, Scene, Sprite, SpriteMaterial, Vector2, Vector3, WebGLRenderer,
 } from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { layoutExtent, ringRadius, type IslandPlacement, type LayoutState } from "@/lib/islandLayout";
-import { buildIslandGeometry, LANTERN_AT, lookKey, type IslandLook } from "./islandGeometry";
+import { layoutExtent, type IslandPlacement, type LayoutState } from "@/lib/islandLayout";
+import { buildIslandGeometry, LANTERN_AT, lookKey, waterline, type IslandLook } from "./islandGeometry";
 
 export interface IslandDatum {
   id: string;
@@ -24,9 +24,15 @@ export interface IslandDatum {
 export interface SceneLink { a: string; b: string; kind: "similar" | "possible_same_as" | "mutation_of" }
 export interface CameraPose { position: [number, number, number]; target: [number, number, number]; zoom: number; userMoved: boolean }
 export interface SceneCallbacks { onHover(id: string | null): void; onSelect(id: string | null): void; onContextLost(): void; /** the first frame is on screen */ onReady?(): void }
-export interface SceneOptions { reducedMotion: boolean; ambient?: boolean; seen: Set<string>; camera: CameraPose | null; labelLayer: HTMLElement | null }
+export interface SceneOptions {
+  reducedMotion: boolean; ambient?: boolean;
+  /** where across a wide canvas the middle of the map sits, 0..1: the landing page keeps its islands clear of the form */
+  anchorX?: number;
+  seen: Set<string>; camera: CameraPose | null; labelLayer: HTMLElement | null;
+}
 
-const FLOOR_Y = -2.5;
+/** sea level: everything on the map stands in, or sails on, this plane */
+const SEA_Y = 0;
 const POP_MS = 720;
 const MOVE_MS = 1400;
 const MERGE_MS = 620;
@@ -34,6 +40,9 @@ const VIEW = 10; // half-height of the orthographic frustum at zoom 1
 const INK = new Color("#16181d");
 const AMBER = new Color("#e9a23b");
 const TEAL = new Color("#0f766e");
+const FOAM = new Color("#ffffff");
+const SEA = new Color("#b6e7f5");
+const SEA_DEEP = new Color("#93d3ec");
 
 /** idle beam sweep, rad/ms — a full turn in about 11s */
 const IDLE_SWEEP = 0.00058;
@@ -50,7 +59,6 @@ interface Island {
   group: Group;
   mesh: Mesh;
   hit: Mesh;
-  shadow: Mesh;
   look: string;
   bornAt: number;
   from: Vector3;
@@ -66,17 +74,33 @@ interface Island {
 interface Arc { key: string; a: string; b: string; kind: SceneLink["kind"]; line: Line; bornAt: number }
 interface Ripple { mesh: Mesh; at: number; size: number }
 
-function blobTexture(): CanvasTexture {
-  const c = document.createElement("canvas");
-  c.width = c.height = 128;
-  const ctx = c.getContext("2d")!;
-  const g = ctx.createRadialGradient(64, 64, 4, 64, 64, 64);
-  g.addColorStop(0, "rgba(22,24,29,0.34)");
-  g.addColorStop(0.55, "rgba(22,24,29,0.13)");
-  g.addColorStop(1, "rgba(22,24,29,0)");
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, 128, 128);
-  return new CanvasTexture(c);
+const SEA_CELLS = 96;
+/** the finest facet, in map units; the sheet doubles it each time the view outgrows the water */
+const SEA_CELL = 0.7;
+
+/**
+ * The sea: one sheet of low-poly water that always fills the view. There is no edge to it: every frame the sheet
+ * is laid back down under the camera, snapped to its own grid, and every vertex takes its jitter, swell and depth
+ * from where it is on the map. So panning slides the view over still water instead of dragging the facets along.
+ */
+function seaGeometry(): PlaneGeometry {
+  const g = new PlaneGeometry(1, 1, SEA_CELLS, SEA_CELLS);
+  g.rotateX(-Math.PI / 2);
+  const col = new Float32BufferAttribute(new Float32Array(g.getAttribute("position").count * 4), 4);
+  for (let i = 0; i < col.count; i++) col.setXYZW(i, SEA.r, SEA.g, SEA.b, 0.88);
+  g.setAttribute("color", col);
+  return g;
+}
+
+/** -0.5..0.5 for a grid point: the same point always gets the same nudge, whichever vertex lands on it */
+function jitter(i: number, j: number): number {
+  const n = Math.sin(i * 127.1 + j * 311.7) * 43758.5453;
+  return n - Math.floor(n) - 0.5;
+}
+
+/** The height of the swell at a point on the map. Boats ask too, so they ride the same water they are drawn on. */
+function swell(x: number, z: number, t: number): number {
+  return Math.sin(x * 0.62 + t * 0.9) * 0.06 + Math.sin(z * 0.81 - t * 0.7 + x * 0.23) * 0.05 + Math.sin((x + z) * 1.37 + t * 1.3) * 0.025;
 }
 
 function glowTexture(): CanvasTexture {
@@ -130,8 +154,9 @@ export class IslandScene {
   private ripples: Ripple[] = [];
   private labels = new Map<string, HTMLElement>();
   private material = new MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.92, metalness: 0 });
-  private shadowMat: MeshBasicMaterial;
-  private shadowGeo = new CircleGeometry(1, 28);
+  private sea: Mesh;
+  /** the facet size the water is drawn at right now */
+  private seaCell = SEA_CELL;
   private rippleGeo = new RingGeometry(0.94, 1, 56);
   /** a generous invisible cylinder around each island: what the pointer actually hits */
   private hitGeo = new CylinderGeometry(1.1, 0.95, 1.8, 10);
@@ -141,7 +166,6 @@ export class IslandScene {
   private halo: Sprite;
   private beacon = new Group();
   private shells: Mesh[] = [];
-  private rings = new Group();
   private links: SceneLink[] = [];
   private pointer = new Vector2();
   private pointerDirty = false;
@@ -167,6 +191,8 @@ export class IslandScene {
   private shift = new Vector3();
   private beam = new Vector3();
   private eye = new Vector3();
+  private ground = new Vector3();
+  private look = new Vector3();
   /** the beam's own bearing, integrated by hand so it can be steered off the idle sweep and back */
   private beaconAngle = 0;
   /** angular velocity, so swinging onto a target ramps up and settles instead of snapping */
@@ -192,9 +218,13 @@ export class IslandScene {
     sun.position.set(-14, 26, 9);
     this.scene.add(sun);
 
-    this.shadowMat = new MeshBasicMaterial({ map: blobTexture(), transparent: true, depthWrite: false });
-    this.scene.add(this.rings);
-    this.buildRings();
+    // The water is translucent and writes no depth: the shoals under each island show through it as shallows,
+    // and everything drawn on the surface (rings, ripples, the beam) simply goes over it.
+    this.sea = new Mesh(seaGeometry(), new MeshStandardMaterial({ vertexColors: true, flatShading: true, transparent: true, depthWrite: false, roughness: 0.5, metalness: 0 }));
+    this.sea.position.y = SEA_Y;
+    this.sea.renderOrder = -2;
+    this.sea.frustumCulled = false;
+    this.scene.add(this.sea);
 
     this.halo = new Sprite(new SpriteMaterial({ map: glowTexture(), transparent: true, depthWrite: false, opacity: 0 }));
     this.halo.scale.setScalar(7);
@@ -208,7 +238,7 @@ export class IslandScene {
       this.beacon.add(m);
     }
     this.beacon.rotation.order = "YZX"; // sweep about Y first, then the fixed downward tilt
-    this.beacon.rotation.z = -0.13; // rake down toward the water rather than out to the horizon
+    this.beacon.rotation.z = -0.085; // rake down toward the water rather than out to the horizon
     this.scene.add(this.beacon);
 
     // Boats out working the water. The same hull the mutations use, so they belong to the same world, but
@@ -301,7 +331,6 @@ export class IslandScene {
         cur.mesh.geometry.dispose();
         cur.mesh.geometry = buildIslandGeometry(look);
         cur.look = lookKey(look);
-        cur.shadow.scale.setScalar(d.p.size * 1.5);
         cur.hit.scale.setScalar(d.p.size);
         cur.hit.position.y = -0.05 * d.p.size;
       }
@@ -359,13 +388,9 @@ export class IslandScene {
     hit.userData.id = d.id;
     const group = new Group();
     group.add(mesh, hit);
-    const shadow = new Mesh(this.shadowGeo, this.shadowMat);
-    shadow.rotation.x = -Math.PI / 2;
-    shadow.scale.setScalar(d.p.size * 1.5);
-    shadow.renderOrder = -1;
-    this.scene.add(group, shadow);
+    this.scene.add(group);
     const to = new Vector3(d.p.x, d.p.y, d.p.z);
-    const island: Island = { datum: d, group, mesh, hit, shadow, look: lookKey(look), bornAt, from: to.clone(), to, moveAt: -Infinity, origin: null, lift: 0, dying: null, phase: (d.p.seed % 1000) / 159 };
+    const island: Island = { datum: d, group, mesh, hit, look: lookKey(look), bornAt, from: to.clone(), to, moveAt: -Infinity, origin: null, lift: 0, dying: null, phase: (d.p.seed % 1000) / 159 };
     this.islands.set(d.id, island);
     if (bornAt > 0 && d.p.kind !== "prior") this.ripple(to, d.p.size, bornAt);
     // a fresh arrival is something the swarm just found: send the light over to look at it. Keep only the
@@ -377,9 +402,9 @@ export class IslandScene {
   }
 
   private ripple(at: Vector3, size: number, when: number) {
-    const mesh = new Mesh(this.rippleGeo, new MeshBasicMaterial({ color: INK, transparent: true, opacity: 0, depthWrite: false }));
+    const mesh = new Mesh(this.rippleGeo, new MeshBasicMaterial({ color: FOAM, transparent: true, opacity: 0, depthWrite: false }));
     mesh.rotation.x = -Math.PI / 2;
-    mesh.position.set(at.x, FLOOR_Y + 0.01, at.z);
+    mesh.position.set(at.x, SEA_Y + 0.12, at.z); // clear of the crests
     this.scene.add(mesh);
     this.ripples.push({ mesh, at: when, size });
   }
@@ -454,26 +479,59 @@ export class IslandScene {
     }
   }
 
-  // --- range rings ----------------------------------------------------------------------------------------------------
+  // --- sea ------------------------------------------------------------------------------------------------------------
 
-  private buildRings() {
-    for (const sim of [0.75, 0.5, 0.25]) {
-      const r = ringRadius(sim);
-      const pts = Array.from({ length: 128 }, (_, i) => new Vector3(Math.cos((i / 128) * Math.PI * 2) * r, FLOOR_Y, Math.sin((i / 128) * Math.PI * 2) * r));
-      const loop = new LineLoop(new BufferGeometry().setFromPoints(pts), new LineBasicMaterial({ color: INK, transparent: true, opacity: 0.09 }));
-      this.rings.add(loop);
+  private laySea(t: number) {
+    // where the middle of the screen meets the water, and how much water the view takes in around it
+    this.camera.updateMatrixWorld();
+    this.camera.getWorldDirection(this.look);
+    this.ground.set(0, 0, -1).unproject(this.camera);
+    this.ground.addScaledVector(this.look, (SEA_Y - this.ground.y) / this.look.y);
+    const halfW = (this.camera.right - this.camera.left) / 2;
+    const reach = (Math.hypot(halfW, VIEW / Math.max(0.3, -this.look.y)) / this.camera.zoom) * 1.12;
+
+    // coarser facets when zoomed out, finer again on the way back in; the slack stops it flickering at a boundary
+    while (2 * reach > SEA_CELLS * this.seaCell) this.seaCell *= 2;
+    while (this.seaCell > SEA_CELL && 2 * reach < SEA_CELLS * this.seaCell * 0.42) this.seaCell /= 2;
+    const c = this.seaCell;
+    const i0 = Math.round(this.ground.x / c) - SEA_CELLS / 2;
+    const j0 = Math.round(this.ground.z / c) - SEA_CELLS / 2;
+
+    // the water deepens away from the archipelago, which is what gives a screen of flat colour a middle
+    const far = this.extent * 1.5 + 8;
+    const pos = this.sea.geometry.getAttribute("position").array as Float32Array;
+    const col = this.sea.geometry.getAttribute("color").array as Float32Array;
+    for (let j = 0, v = 0; j <= SEA_CELLS; j++) {
+      for (let i = 0; i <= SEA_CELLS; i++, v++) {
+        const x = (i0 + i + jitter(i0 + i, j0 + j) * 0.6) * c;
+        const z = (j0 + j + jitter(j0 + j, i0 + i + 57) * 0.6) * c;
+        pos[v * 3] = x; pos[v * 3 + 1] = swell(x, z, t); pos[v * 3 + 2] = z;
+        const d = clamp01(Math.hypot(x - this.focus.x, z - this.focus.z) / far);
+        const k = d * d * (3 - 2 * d);
+        col[v * 4] = SEA.r + (SEA_DEEP.r - SEA.r) * k; col[v * 4 + 1] = SEA.g + (SEA_DEEP.g - SEA.g) * k; col[v * 4 + 2] = SEA.b + (SEA_DEEP.b - SEA.b) * k;
+      }
     }
+    this.sea.geometry.getAttribute("position").needsUpdate = true;
+    this.sea.geometry.getAttribute("color").needsUpdate = true;
   }
 
   // --- camera ---------------------------------------------------------------------------------------------------------
+
+  /** where the middle of the map sits across the canvas: off-centre only when there is the width to spare */
+  private anchor(): number {
+    return this.w / Math.max(1, this.h) > 1.25 ? this.opts.anchorX ?? 0.5 : 0.5;
+  }
 
   private fitZoom(): number {
     const aspect = this.w / Math.max(1, this.h);
     const need = this.extent + 1.2;
     // the ground circle keeps its width on screen and is squashed vertically by the camera's elevation
     const elev = Math.atan2(this.camera.position.y - this.controls.target.y, Math.hypot(this.camera.position.x - this.controls.target.x, this.camera.position.z - this.controls.target.z));
-    const zx = (VIEW * aspect) / need;
-    const zy = VIEW / (need * Math.sin(elev) + 3.2);
+    const u = this.anchor();
+    // off-centre, the map gets the room from its anchor back to the middle of the canvas (the other half belongs
+    // to whatever pushed it aside) and may run off the near edge
+    const zx = (VIEW * aspect * 2 * (u === 0.5 ? 0.5 : Math.abs(u - 0.5) * 0.95)) / need;
+    const zy = VIEW / (need * Math.sin(elev) + 2.4);
     return Math.max(this.controls.minZoom, Math.min(1.9, Math.min(zx, zy)));
   }
 
@@ -500,6 +558,10 @@ export class IslandScene {
     this.w = w; this.h = h;
     const aspect = w / h;
     this.camera.left = -VIEW * aspect; this.camera.right = VIEW * aspect;
+    // a view offset rather than a lopsided frustum: zoom scales the frustum about its own middle, which would drag an
+    // off-centre map back toward the centre of the canvas as it zoomed out
+    const u = this.anchor();
+    if (u === 0.5) this.camera.clearViewOffset(); else this.camera.setViewOffset(w, h, (0.5 - u) * w, 0, w, h);
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(w, h, false);
     if (!this.userMoved) this.fit(first);
@@ -553,34 +615,40 @@ export class IslandScene {
     if (this.pointerDirty) this.pick();
 
     const still = this.opts.reducedMotion;
+    const t = still ? 0 : now * 0.001;
+
+    this.laySea(t);
+
     for (const [id, i] of this.islands) {
       const p = this.current(i, now, i.group.position);
       const born = i.bornAt === -Infinity ? 1 : clamp01((now - i.bornAt) / POP_MS);
       let scale = born <= 0 ? 0 : easeOutBack(born);
       p.y += (1 - easeOutCubic(born)) * -2.2;
-      if (!still) p.y += Math.sin(now * 0.0011 + i.phase) * 0.07;
+      // land stands still; only a boat rides the swell
+      const afloat = i.datum.p.kind === "mutation";
+      if (afloat) p.y += swell(p.x, p.z, t);
 
-      const wantLift = id === this.selectedId ? 0.42 : id === this.hoverId ? 0.22 : 0;
+      const wantLift = id === this.selectedId ? 0.16 : id === this.hoverId ? 0.08 : 0;
       i.lift += (wantLift - i.lift) * (still ? 1 : 0.16);
       p.y += i.lift;
-      scale *= 1 + i.lift * 0.18;
+      scale *= 1 + i.lift * 0.5;
 
       const pulseAt = i.group.userData.pulseAt as number | undefined;
       if (pulseAt && now > pulseAt) {
-        const t = (now - pulseAt) / 520;
-        if (t < 1) scale *= 1 + Math.sin(t * Math.PI) * 0.16; else i.group.userData.pulseAt = undefined;
+        const u = (now - pulseAt) / 520;
+        if (u < 1) scale *= 1 + Math.sin(u * Math.PI) * 0.16; else i.group.userData.pulseAt = undefined;
       }
 
       if (i.dying) {
-        const t = clamp01((now - i.dying.at) / MERGE_MS);
-        if (i.dying.into) p.lerp(i.dying.into, easeInOutCubic(t)); else p.y -= t * 2;
-        scale *= 1 - easeInOutCubic(t);
-        if (t >= 1) { this.drop(id); continue; }
+        const u = clamp01((now - i.dying.at) / MERGE_MS);
+        if (i.dying.into) p.lerp(i.dying.into, easeInOutCubic(u)); else p.y -= u * 2; // nowhere to go: it sinks
+        scale *= 1 - easeInOutCubic(u);
+        if (u >= 1) { this.drop(id); continue; }
       }
+      // placements are heights above the sea; the group's origin is the turf, so stand it on its waterline
+      p.y += SEA_Y + waterline(i.datum.p.kind, i.datum.p.size) * Math.min(1, scale);
+      if (afloat && !still) i.mesh.rotation.z = Math.sin(now * 0.0011 + i.phase) * 0.04; // roll with the swell
       i.group.scale.setScalar(Math.max(0.0001, scale));
-      i.shadow.position.set(p.x, FLOOR_Y, p.z);
-      i.shadow.visible = scale > 0.05;
-      i.shadow.scale.setScalar(i.datum.p.size * 1.5 * Math.min(1, scale));
     }
 
     // sail the scouts: a wandering orbit, heading taken from where the next step actually puts them
@@ -592,7 +660,7 @@ export class IslandScene {
         return { x: Math.cos(a) * r, z: Math.sin(a) * r };
       };
       const p = at(now), q = at(now + 240);
-      b.mesh.position.set(p.x, FLOOR_Y + 0.12 + Math.sin(now * 0.0013 + b.bob) * 0.06, p.z);
+      b.mesh.position.set(p.x, SEA_Y + waterline("mutation", 0.52) + swell(p.x, p.z, t), p.z);
       b.mesh.rotation.y = Math.atan2(q.x - p.x, q.z - p.z);
       b.mesh.rotation.z = Math.sin(now * 0.0011 + b.bob) * 0.05; // roll with the swell
     }
@@ -687,7 +755,7 @@ export class IslandScene {
   private drop(id: string) {
     const i = this.islands.get(id);
     if (!i) return;
-    this.scene.remove(i.group, i.shadow);
+    this.scene.remove(i.group);
     i.mesh.geometry.dispose();
     this.islands.delete(id);
     this.syncArcs(performance.now());
@@ -799,10 +867,8 @@ export class IslandScene {
     for (const i of this.islands.values()) i.mesh.geometry.dispose();
     for (const a of this.arcs.values()) { a.line.geometry.dispose(); (a.line.material as LineBasicMaterial).dispose(); }
     for (const r of this.ripples) (r.mesh.material as MeshBasicMaterial).dispose();
-    for (const ring of this.rings.children) { (ring as LineLoop).geometry.dispose(); ((ring as LineLoop).material as LineBasicMaterial).dispose(); }
-    this.shadowMat.map?.dispose();
-    this.shadowMat.dispose();
-    this.shadowGeo.dispose();
+    this.sea.geometry.dispose();
+    (this.sea.material as MeshStandardMaterial).dispose();
     this.rippleGeo.dispose();
     this.hitGeo.dispose();
     this.hitMat.dispose();

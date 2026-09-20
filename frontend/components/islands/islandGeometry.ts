@@ -5,6 +5,9 @@
 //   your idea    a lighthouse          prior art    a hill with a flag in the colour of its source (gold: a winner)
 //   LLM prior    bare rock, unclaimed  mutation     a boat leaving your island, bow pointing away from it
 // How much there is of a project is the size of its island, and nothing else.
+//
+// Land stands in the sea: turf on top, a lip of beach at the waterline, and a shoal spreading out underneath that
+// shows through the water as the pale shallows around the coast.
 import { BufferAttribute, BufferGeometry, Color, ConeGeometry, CylinderGeometry } from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { mulberry32 } from "@/lib/seeded";
@@ -13,6 +16,11 @@ import type { IslandKind } from "@/lib/islandLayout";
 const PAPER = new Color("#ece9e2");
 const ROCK_TOP = new Color("#c4bdb0");
 const ROCK_TIP = new Color("#8f887c");
+const SAND = new Color("#efe3c6");
+const SEABED = new Color("#b6e7f5");
+/** how far down the shoal goes: shallow and wide, so it reads as pale water round the coast and not as a plinth,
+ *  but deeper than a selected island is ever lifted, so its foot never leaves the water */
+const SHOAL_DEPTH = 0.42;
 const TREE = new Color("#6f9b6c");
 const TREE_DARK = new Color("#557f58");
 const GOLD = new Color("#e0a422");
@@ -27,6 +35,12 @@ const LANTERN_H = 0.13;
 
 /** Height of the lighthouse lantern above an idea island's turf, in island sizes: where the scene hangs the glow. */
 export const LANTERN_AT = 0.1 + 0.3 + 0.18 + 0.32 + 0.035 + LANTERN_H / 2;
+
+const slabHeight = (size: number) => 0.16 * size + 0.06;
+const beachHeight = (size: number) => 0.08 * size + 0.05;
+
+/** Where the sea meets an island, measured down from its turf: halfway up the beach. A boat draws a little water. */
+export const waterline = (kind: IslandKind, size: number) => (kind === "mutation" ? 0.05 * size : slabHeight(size) + beachHeight(size) / 2);
 
 export interface IslandLook {
   seed: number;
@@ -91,27 +105,30 @@ export function buildIslandGeometry(look: IslandLook): BufferGeometry {
   const parts: BufferGeometry[] = [];
 
   // the turf
-  const slabH = 0.26 * size + 0.08;
+  const slabH = slabHeight(size);
   const ground = kind === "prior" ? new Color("#d5d2ca") : tint.clone().lerp(PAPER, kind === "idea" ? 0.45 : 0.68);
   const land = kind !== "mutation"; // a boat has no land under it
   if (land) {
-    const slab = new CylinderGeometry(size, size * 0.9, slabH, sides, 1);
+    const slab = new CylinderGeometry(size, size * 0.96, slabH, sides, 1);
     roughen(slab, coast, 0.16);
     slab.translate(0, -slabH / 2, 0);
     parts.push(paint(slab, flat(ground)));
-  }
 
-  // the rock underneath: a shallow keel rather than a spike, so the island reads as land first
-  const rockH = size * (0.5 + rnd() * 0.25);
-  const rockX = (rnd() - 0.5) * 0.1 * size;
-  const rockZ = (rnd() - 0.5) * 0.1 * size;
-  if (land) {
-    const rock = new ConeGeometry(size * 0.88, rockH, sides, 2);
-    roughen(rock, coast, 0.16);
-    rock.rotateX(Math.PI);
-    rock.translate(rockX, -slabH - rockH / 2, rockZ);
-    const tip = new Color();
-    parts.push(paint(rock, (_x, y) => tip.copy(ROCK_TOP).lerp(ROCK_TIP, Math.min(1, (-y - slabH) / rockH))));
+    // the beach the sea laps at, then the shoal running out under the water. Bare rock has no sand on it.
+    const shore = kind === "prior" ? ROCK_TOP : SAND;
+    const beachH = beachHeight(size);
+    const beach = new CylinderGeometry(size * 1.03, size * 1.2, beachH, sides, 1);
+    roughen(beach, coast, 0.16);
+    beach.translate(0, -slabH - beachH / 2, 0);
+    parts.push(paint(beach, flat(shore)));
+
+    const shoal = new CylinderGeometry(size * 1.2, size * 1.62 + 0.25, SHOAL_DEPTH, sides, 3, true);
+    roughen(shoal, coast, 0.16);
+    shoal.translate(0, -slabH - beachH - SHOAL_DEPTH / 2, 0);
+    const deep = new Color();
+    const from = kind === "prior" ? ROCK_TIP : shore;
+    // the sand gives way to the colour of the water well before the foot, so the shoal has no outline
+    parts.push(paint(shoal, (_x, y) => deep.copy(from).lerp(SEABED, Math.min(1, ((-y - slabH - beachH) / SHOAL_DEPTH) * 2.2))));
   }
 
   // Nothing below is decoration: each kind carries exactly one object, and it says what the island is.

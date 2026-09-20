@@ -48,9 +48,10 @@ export function MapScreen() {
 
   return (
     <div className="absolute inset-0">
+      {/* fixed, not absolute: the sea fills the window and runs under the header and the tab bar, which sit over it */}
       {mapMode === "2d" ? flat : (
         <IslandMap
-          graph={graph} layout={layout} selectedId={selectedId} onSelect={select}
+          graph={graph} layout={layout} selectedId={selectedId} onSelect={select} frameClassName="fixed inset-0 bg-sea"
           seen={seenIslands.current} cameraMemo={cameraMemo} recenterTick={recenterTick} fallback={flat} pending={empty}
         />
       )}
