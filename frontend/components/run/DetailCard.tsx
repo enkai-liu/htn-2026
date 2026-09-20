@@ -3,7 +3,7 @@
 import { ArrowUpRight, ChevronDown, LoaderCircle, X } from "lucide-react";
 import Link from "next/link";
 import { FACET_KEYS } from "@/lib/islandLayout";
-import { fmtSim, safeHref, shortModel } from "@/lib/format";
+import { fmtSim, safeHref, shortModel, splitEnumerated } from "@/lib/format";
 import type { GraphNode } from "@/lib/types";
 import { EvidenceDetail, listingLabel } from "../EvidenceDetail";
 import { Chip, InferredTag, SourceMark } from "../ui";
@@ -15,6 +15,50 @@ function SimilarityBar({ value }: { value: number | null | undefined }) {
     <div className="mt-3">
       <div className="flex items-baseline justify-between text-[12px] text-mute"><span>Similarity to your idea</span><span className="font-mono text-bone">{fmtSim(value)}</span></div>
       <div className="mt-1 h-[5px] overflow-hidden rounded-full bg-ink-700"><div className="h-full rounded-full bg-bone transition-[width] duration-700" style={{ width: `${Math.max(0, Math.min(1, value)) * 100}%` }} /></div>
+    </div>
+  );
+}
+
+/**
+ * Facets the conductor returns as enumerations rather than prose. `mechanism` is an ordered pipeline,
+ * so it gets step numerals; the other two are unordered sets. `twist`, `purpose` and `audience` stay
+ * prose — `twist` in particular often ends in a contrastive ", rather than …" that a split would sever.
+ */
+const STEP_FACETS = new Set(["mechanism"]);
+const SET_FACETS = new Set(["data", "domain"]);
+
+function FacetRow({ label, value }: { label: string; value: string }) {
+  const ordered = STEP_FACETS.has(label);
+  const items = ordered || SET_FACETS.has(label) ? splitEnumerated(value) : [];
+  // Three or more is where a comma-spliced value stops reading as a sentence. Below that, prose is
+  // clearer and safer: a lone comma is as likely to join a compound phrase as to separate two items.
+  const asList = items.length > 2;
+  const List = ordered ? "ol" : "ul";
+  return (
+    <div className="border-b border-line py-2.5 last:border-b-0">
+      <dt className="font-mono text-[9.5px] uppercase tracking-[0.14em] text-faint">{label}</dt>
+      <dd className="mt-1.5 text-[13px] leading-snug text-bone">
+        {asList ? (
+          // One gutter for both kinds, so the facets line up down the card: numerals where the order is
+          // the point, a bullet where it is not. Separators between inline items dangle at line ends.
+          <List className="space-y-1">
+            {items.map((it, i) => (
+              <li key={it} className="flex gap-2">
+                {ordered ? (
+                  <span className="flex-none select-none font-mono text-[9.5px] leading-[1.45] tabular-nums text-amber">{String(i + 1).padStart(2, "0")}</span>
+                ) : (
+                  // shares the text's line box so it sits on the same baseline; muted, because the marker
+                  // carries no meaning here — amber is reserved for the steps, where the order is the point
+                  <span className="w-[14px] flex-none select-none text-center leading-snug text-line-strong">·</span>
+                )}
+                <span className="min-w-0">{it}</span>
+              </li>
+            ))}
+          </List>
+        ) : (
+          value
+        )}
+      </dd>
     </div>
   );
 }
@@ -33,10 +77,13 @@ export function DetailCard({ node }: { node: GraphNode }) {
     title = "The centre of the map";
     body = (
       <>
-        <p className="font-display text-[17px] italic leading-snug text-bone-dim">“{state.ideaText}”</p>
+        <p className="line-clamp-3 font-display text-[14.5px] italic leading-snug text-mute">“{state.ideaText}”</p>
         {state.facets && (
-          <dl className="mt-3 grid grid-cols-[84px_minmax(0,1fr)] gap-x-2 gap-y-1 text-[12.5px]">
-            {FACET_KEYS.map((k) => state.facets?.[k] ? [<dt key={`${k}t`} className="capitalize text-mute">{k}</dt>, <dd key={`${k}d`} className="text-bone">{state.facets[k]}</dd>] : null)}
+          <dl className="mt-4 border-t border-line">
+            {FACET_KEYS.map((k) => {
+              const v = state.facets?.[k];
+              return v ? <FacetRow key={k} label={k} value={String(v)} /> : null;
+            })}
           </dl>
         )}
       </>

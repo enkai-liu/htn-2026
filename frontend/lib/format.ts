@@ -37,6 +37,31 @@ export function truncate(s: string | null | undefined, n: number): string {
   return s.length > n ? `${s.slice(0, n - 1).trimEnd()}…` : s;
 }
 
+/**
+ * Split an enumerated facet ("a, b (x, y), c") into its items.
+ *
+ * Only commas at bracket depth 0 separate items, so parenthesised asides stay whole. This is applied
+ * per facet key rather than by sniffing the text: `mechanism`/`data`/`domain` are enumerations, while
+ * `twist` is prose that often carries a contrastive ", rather than …" clause that must not be cut.
+ */
+export function splitEnumerated(s: string | null | undefined): string[] {
+  if (!s) return [];
+  const out: string[] = [];
+  let depth = 0;
+  let start = 0;
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (ch === "(" || ch === "[") depth++;
+    else if (ch === ")" || ch === "]") depth = Math.max(0, depth - 1);
+    else if (ch === "," && depth === 0) {
+      out.push(s.slice(start, i));
+      start = i + 1;
+    }
+  }
+  out.push(s.slice(start));
+  return out.map((p) => p.trim()).filter(Boolean);
+}
+
 /** Values in fused fields and conflicts are `unknown`: render them without ever producing "[object Object]". */
 export function fmtValue(v: unknown): string {
   if (v == null) return "–";
