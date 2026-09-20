@@ -36,6 +36,17 @@ describe("runReducer on the mock run", () => {
     expect(final.ideaText.length).toBeGreaterThan(250);
   });
 
+  it("keeps the author's link when run.started carries one, and stays null when it does not", () => {
+    const started = (url?: string | null) => foldEvents([{
+      seq: 1, run_id: "t", ts: 0, agent: "conductor", phase: "plan", type: "run.started",
+      data: { idea_text: "an idea", orchestrator: "asyncio", ...(url === undefined ? {} : { url }) },
+    } as unknown as AgentEvent]);
+    expect(started("https://devpost.com/software/hackanalyzer").ideaUrl).toBe("https://devpost.com/software/hackanalyzer");
+    expect(started(null).ideaUrl).toBeNull();
+    expect(started().ideaUrl).toBeNull();   // recordings made before the field existed
+    expect(final.ideaUrl).toBeNull();       // the mock run was started without a link
+  });
+
   it("keeps the graph consistent: no link points at a missing node", () => {
     expect(danglingLinks(final.graph)).toEqual([]);
     expect(final.graph.pending).toEqual([]);

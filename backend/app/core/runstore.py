@@ -106,7 +106,7 @@ def keep_alive(run: Run) -> None:
 
 async def _drive(run: Run, warning: str | None) -> None:
     bus = run.bus
-    await bus.emit("conductor", "plan", "run.started", {"idea_text": run.idea_text, "orchestrator": run.host.name, "replay": False})
+    await bus.emit("conductor", "plan", "run.started", {"idea_text": run.idea_text, "url": run.url, "orchestrator": run.host.name, "replay": False})
     if warning:
         await bus.emit("conductor", "plan", "error", {"message": warning, "recoverable": True})
     try:

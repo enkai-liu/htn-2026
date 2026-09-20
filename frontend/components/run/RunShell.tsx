@@ -5,11 +5,12 @@ import clsx from "clsx";
 import { TriangleAlert } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { fmtUsd, truncate } from "@/lib/format";
+import { fmtUsd } from "@/lib/format";
 import { selectSpend } from "@/lib/selectors";
 import type { RunStatus } from "@/lib/useRunEvents";
 import { ReplayControls } from "../ReplayControls";
 import { Wordmark } from "../SiteNav";
+import { PitchDisclosure } from "./PitchDisclosure";
 import { useRun } from "./RunProvider";
 import { ScoreChip } from "./ScoreChip";
 import { TabBar } from "./TabBar";
@@ -66,10 +67,7 @@ export function RunShell({ children }: { children: ReactNode }) {
 
       <header className="relative z-30 flex h-[60px] flex-none items-center gap-4 px-5 sm:px-7">
         <Wordmark className="flex-none" />
-        <p className="hidden min-w-0 flex-1 truncate font-display text-[17px] italic text-bone-dim md:block" title={state.ideaText}>
-          {state.ideaText ? `“${truncate(state.ideaText, 140)}”` : "Waiting for the run to start…"}
-        </p>
-        <span className="flex-1 md:hidden" />
+        <PitchDisclosure text={state.ideaText} url={state.ideaUrl} />
         <Link
           href={hrefFor("swarm")}
           className="hidden flex-none items-center gap-1.5 text-[12.5px] tabular-nums text-mute transition-colors hover:text-bone sm:flex"

@@ -40,7 +40,7 @@ type AgentEvent = {
 
 | type | data | UI |
 |---|---|---|
-| `run.started` | `{idea_text, orchestrator: "asyncio"\|"jiuwen", replay?: bool, mock?: bool}` | header; `mock` = fictional fixture data → persistent banner |
+| `run.started` | `{idea_text, url?: string\|null, orchestrator: "asyncio"\|"jiuwen", replay?: bool, mock?: bool}` | header; `url` = the author's own link (read for context, excluded from prior art); `mock` = fictional fixture data → persistent banner |
 | `facets.extracted` | `{facets: Facets}` | facet chips; facet nodes in graph |
 | `team.formed` | `{team: [{agent, purpose}], skipped: [{agent, why}]}` | SwarmTimeline roster (skipped shown greyed with reason) |
 | `agent.started` | `{purpose?}` | timeline row goes active |

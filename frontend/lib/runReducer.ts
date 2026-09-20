@@ -178,6 +178,8 @@ export interface RunState {
   lastTs: number | null;
   phase: Phase | null;
   ideaText: string;
+  /** the author's own link, if they gave one: read for context and excluded from the prior art */
+  ideaUrl: string | null;
   orchestrator: string | null;
   /** run.started.data.replay: the backend itself is replaying a recording */
   recorded: boolean;
@@ -230,6 +232,7 @@ export const initialRunState: RunState = {
   lastTs: null,
   phase: null,
   ideaText: "",
+  ideaUrl: null,
   orchestrator: null,
   recorded: false,
   mock: false,
@@ -424,7 +427,7 @@ function fold(state: RunState, ev: AgentEvent, t: number): RunState {
   switch (ev.type) {
     case "run.started": {
       const data = d as RunStartedData;
-      set({ ideaText: data.idea_text ?? next.ideaText, orchestrator: data.orchestrator ?? null, recorded: !!data.replay, mock: !!data.mock });
+      set({ ideaText: data.idea_text ?? next.ideaText, ideaUrl: data.url ?? next.ideaUrl, orchestrator: data.orchestrator ?? null, recorded: !!data.replay, mock: !!data.mock });
       touch(ev.agent);
       row({ title: "Run started", detail: data.orchestrator ? `orchestrator: ${data.orchestrator}` : undefined, tone: "muted" });
       break;

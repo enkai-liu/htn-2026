@@ -4,7 +4,7 @@ import type {
   Claim, ClaimStatus, CoachMessage, CoachPitch, Conflict, Entity, Facets, GraphPatch, JurorVote, MergeVerdict, Mutation, Report, Scores,
   SourceRecord, Voice, Evidence } from "./types";
 
-export interface RunStartedData { idea_text: string; orchestrator?: "asyncio" | "jiuwen" | string; replay?: boolean; mock?: boolean }
+export interface RunStartedData { idea_text: string; url?: string | null; orchestrator?: "asyncio" | "jiuwen" | string; replay?: boolean; mock?: boolean }
 export interface FacetsExtractedData { facets: Facets }
 export interface TeamFormedData { team: { agent: string; purpose: string }[]; skipped: { agent: string; why: string }[] }
 export interface AgentStartedData { purpose?: string }
