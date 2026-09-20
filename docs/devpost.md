@@ -8,6 +8,7 @@ Two moments: the **initial submission by Sat 14:00 EDT** (team, badge IDs and sp
 - [ ] Name, tagline and the short description below pasted in (placeholders are fine, the opt-ins are what lock)
 - [ ] Prizes opted into: **GPTZero · Baseten · Huawei openJiuwen · Rox · Elastic · Browserbase · GoDaddy Registry (MLH domain)**
 - [x] **RBC: decided — not opted in** (it is a financial-data Q&A benchmark on RBC's own MCP server, a different project). Sponsor prizes locked at initial submission: GPTZero, Elastic, Baseten, Rox, Huawei openJiuwen, GoDaddy, Browserbase.
+- [x] Live demo: **https://slop.compare** (GoDaddy Registry domain via MLH; Next.js + FastAPI on Railway). Fallback that needs no backend: https://enkai-liu.github.io/htn-2026/
 - [ ] Repo link: `github.com/enkai-liu/htn-2026` (private until `scripts/secret_scan.sh` is clean on Sunday morning)
 - [ ] Booth answers written down: Rox (separate write-up or deadline?), Huawei (does agent-core + a validated Swarm Skill count?)
 
