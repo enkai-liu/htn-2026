@@ -1,4 +1,6 @@
-# Whitespace
+# S.L.O.P.
+
+*Similarity Lookup for Originality Prediction*
 
 > How original is your idea — with receipts — and how do you make it more original?
 

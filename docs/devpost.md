@@ -13,13 +13,13 @@ Two moments: the **initial submission by Sat 14:00 EDT** (team, badge IDs and sp
 
 ## Name and tagline
 
-**Whitespace** — *How original is your idea? With receipts.*
+**S.L.O.P.** — *Similarity Lookup for Originality Prediction. How original is your idea? With receipts.*
 
 Alternative taglines: "Find out if it's been done before you build it." · "An agent team that argues about your idea, then proves it."
 
 ## Short description (initial submission, ~90 words)
 
-Whitespace tells you how original a hackathon or startup idea is before you spend a weekend on it. Paste a pitch and a team of AI agents searches past hackathon projects, startups, code and discussions, merges the duplicates, and argues it out: a critic claims "already done" with verbatim quotes, an advocate has to concede or name what differs, a jury of different model families scores the overlap, and a verifier strikes any claim whose quote or citation does not check out. You get scores you can trace to evidence, an honest "insufficient evidence" when there is not enough, and coached variations that are re-scored against the corpus.
+S.L.O.P. tells you how original a hackathon or startup idea is before you spend a weekend on it. Paste a pitch and a team of AI agents searches past hackathon projects, startups, code and discussions, merges the duplicates, and argues it out: a critic claims "already done" with verbatim quotes, an advocate has to concede or name what differs, a jury of different model families scores the overlap, and a verifier strikes any claim whose quote or citation does not check out. You get scores you can trace to evidence, an honest "insufficient evidence" when there is not enough, and coached variations that are re-scored against the corpus.
 
 ## Inspiration
 

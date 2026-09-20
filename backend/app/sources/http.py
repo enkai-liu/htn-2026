@@ -7,7 +7,7 @@ from __future__ import annotations
 import httpx
 from tenacity import AsyncRetrying, retry_if_exception, stop_after_attempt, wait_exponential
 
-USER_AGENT = "WhitespaceHTN2026/0.1 (hackathon research project; github.com/enkai-liu/htn-2026)"
+USER_AGENT = "SlopHTN2026/0.1 (hackathon research project; github.com/enkai-liu/htn-2026)"
 TIMEOUT = httpx.Timeout(8.0, connect=4.0)
 
 _client: httpx.AsyncClient | None = None

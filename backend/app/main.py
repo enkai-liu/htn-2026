@@ -19,7 +19,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     await close_client()
 
 
-app = FastAPI(title="Whitespace", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="S.L.O.P.", version="0.1.0", lifespan=lifespan)
 # Demo API with no cookies or auth: open CORS keeps the replay site and localhost both working.
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"], expose_headers=["*"])
 app.include_router(runs.router)

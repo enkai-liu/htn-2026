@@ -5,7 +5,7 @@ Paste the block below into a fresh Claude Code session opened in `/Users/enkaili
 ---
 
 ```text
-You are continuing a Hack the North 2026 build called "Whitespace": a multi-agent tool that scores how original a
+You are continuing a Hack the North 2026 build called "S.L.O.P." (Similarity Lookup for Originality Prediction): a multi-agent tool that scores how original a
 hackathon/startup idea is (retrieval-grounded, with verified citations) and coaches the author toward a more original
 version. Repo: /Users/enkailiu/Projects/htn-2026 (remote github.com/enkai-liu/htn-2026, private, branch main).
 

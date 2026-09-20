@@ -1,4 +1,4 @@
-# Whitespace: frontend
+# S.L.O.P.: frontend
 
 Next.js (App Router) + Tailwind v4 + `react-force-graph-2d` + Recharts. It renders a swarm investigation from **one event
 stream** (`docs/events.md`), live over SSE or replayed from a JSONL file with no backend at all.

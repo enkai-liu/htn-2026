@@ -14,10 +14,10 @@ export function StarGlyph({ size = 18, className }: { size?: number; className?:
 
 export function Wordmark({ className }: { className?: string }) {
   return (
-    <Link href="/" className={clsx("group inline-flex items-center gap-2 text-bone", className)} aria-label="Whitespace home">
+    <Link href="/" className={clsx("group inline-flex items-center gap-2 text-bone", className)} aria-label="S.L.O.P. home">
       <StarGlyph className="text-amber transition-transform duration-500 group-hover:-translate-y-0.5" />
       <span className="font-display text-[22px] leading-none">
-        White<span className="text-bone-dim">space</span>
+        S.L.O.<span className="text-bone-dim">P.</span>
       </span>
     </Link>
   );

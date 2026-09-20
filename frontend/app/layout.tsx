@@ -35,7 +35,7 @@ const mono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: { default: "Whitespace: how original is your idea?", template: "%s · Whitespace" },
+  title: { default: "S.L.O.P.: how original is your idea?", template: "%s · S.L.O.P." },
   description: "A swarm of AI agents charts the prior art around your idea, verifies every claim against its source, and coaches you toward the empty regions of the map.",
 };
 
