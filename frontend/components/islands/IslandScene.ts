@@ -35,7 +35,10 @@ export interface SceneOptions {
 const SEA_Y = 0;
 const POP_MS = 720;
 const MOVE_MS = 1400;
-const MERGE_MS = 620;
+// Slow on purpose: this is the resolver's decision becoming visible -- two listings of one project sailing
+// together into a single island. At 620ms it was over before anyone could follow what had happened.
+const MERGE_MS = 1500;
+const MERGE_PULSE_MS = 620; // the absorber's answering swell, once the other island lands
 const VIEW = 10; // half-height of the orthographic frustum at zoom 1
 const INK = new Color("#16181d");
 const AMBER = new Color("#e9a23b");
@@ -653,7 +656,7 @@ export class IslandScene {
 
       const pulseAt = i.group.userData.pulseAt as number | undefined;
       if (pulseAt && now > pulseAt) {
-        const u = (now - pulseAt) / 520;
+        const u = (now - pulseAt) / MERGE_PULSE_MS;
         if (u < 1) scale *= 1 + Math.sin(u * Math.PI) * 0.16; else i.group.userData.pulseAt = undefined;
       }
 
