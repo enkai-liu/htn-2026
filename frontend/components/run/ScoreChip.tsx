@@ -26,7 +26,7 @@ export function ScoreChip({ scores }: { scores: Scores | null }) {
   }, [visible]);
 
   // one reading of the headline for the whole app: see lib/headline.ts
-  const { value: headline, suffix, interval, abstain } = headlineParts(scores);
+  const { value: headline, suffix, interval, range, abstain } = headlineParts(scores);
 
   return (
     <div ref={ref} className="relative flex-none">
@@ -35,7 +35,7 @@ export function ScoreChip({ scores }: { scores: Scores | null }) {
         onClick={() => { setOpenedAt(pathname); setOpen(!visible); }}
         aria-expanded={visible}
         className={clsx("flex h-9 items-center gap-1.5 rounded-full border bg-ink-900 px-3.5 transition-colors", visible ? "border-line-strong" : "border-line hover:border-line-strong")}
-        title="Percentile rank against real hackathon projects scored the same way. Click for the axes behind it."
+        title={`Percentile rank against real hackathon projects scored the same way${range ? `: ${range}` : ""}. Click for the axes behind it.`}
       >
         <span className={clsx("font-display text-[24px] leading-none tabular-nums", headline == null ? "text-faint" : "text-bone")}>{headline == null ? "–" : `${Math.round(headline)}${suffix}`}</span>
         <span className="text-[12.5px] leading-none text-mute">{abstain ? "abstained" : interval}</span>

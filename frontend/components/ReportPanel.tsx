@@ -36,6 +36,7 @@ function Answer({ scores, verifiedClaims }: { scores: Scores | null; verifiedCla
       <div className={styles.scoreContext}>
         {h.interval && <p className={styles.interval}>{h.interval}</p>}
         <div className={styles.metadata}>
+          {h.range && <span>{h.range}</span>}
           {h.confidence != null && <span>{h.confidenceLabel} confidence · {Math.round(h.confidence * 100)}%</span>}
           <span>{verifiedClaims} verified {verifiedClaims === 1 ? "claim" : "claims"}</span>
         </div>
