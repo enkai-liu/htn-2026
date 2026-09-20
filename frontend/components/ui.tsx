@@ -92,9 +92,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           <div
             key={t.id}
             className="pointer-events-auto rounded-xl border bg-ink-900/95 px-3.5 py-2.5 shadow-[0_12px_40px_rgb(0_0_0/0.14)] backdrop-blur"
-            style={{ animation: "toast-in 0.28s cubic-bezier(0.2,0.7,0.2,1) both", borderColor: t.tone === "red" ? "var(--color-vermilion)" : t.tone === "teal" ? "var(--color-teal)" : "var(--color-amber)" }}
+            style={{ animation: "toast-in 0.28s cubic-bezier(0.2,0.7,0.2,1) both", borderColor: t.tone === "red" ? "var(--color-vermilion)" : t.tone === "teal" ? "var(--color-teal)" : t.tone === "amber" ? "var(--color-amber)" : "var(--color-accent)" }}
           >
-            <div className="font-mono text-[10.5px] uppercase tracking-[0.16em]" style={{ color: t.tone === "red" ? "var(--color-vermilion)" : t.tone === "teal" ? "var(--color-teal)" : "var(--color-amber)" }}>
+            <div className="font-mono text-[10.5px] uppercase tracking-[0.16em]" style={{ color: t.tone === "red" ? "var(--color-vermilion)" : t.tone === "teal" ? "var(--color-teal)" : t.tone === "amber" ? "var(--color-amber)" : "var(--color-accent)" }}>
               {t.title}
             </div>
             {t.body && <div className="mt-1 text-[12.5px] leading-snug text-bone-dim">{t.body}</div>}

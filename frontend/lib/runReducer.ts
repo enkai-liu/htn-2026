@@ -9,12 +9,12 @@ import type {
   ActionDoneData, ActionProposedData, AgentFinishedData, AgentStartedData, BudgetUpdatedData, ClaimChallengedData,
   ClaimProposedData, ClaimResolvedData, ConflictDetectedData, EntityMergedData, ErrorData, EvidenceFoundData,
   CoachMessageData, CoachPitchData, FacetsExtractedData, JuryVoteData, MessageSentData, MutationProposedData, MutationScoredData, PriorSampleData,
-  RequeryIssuedData, RunFinishedData, RunStartedData, SourceFailedData, TeamFormedData, ToolCallData, ToolResultData,
+  RequeryIssuedData, RunFinishedData, RunStartedData, SiteCheckedData, SourceFailedData, TeamFormedData, ToolCallData, ToolResultData,
   VerifyResultData,
 } from "./payloads";
 import type {
   AgentEvent, Claim, ClaimStatus, CoachMessage, CoachPitch, Conflict, Entity, EventType, Evidence, Facets, GraphPatch, JurorVote, Mutation, Phase,
-  Report, Scores, SourceRecord, Voice,
+  Report, Scores, SiteCheck, SourceRecord, Voice,
 } from "./types";
 
 /** A jury whose scores spread at least this much counts as "split" and triggers a re-query. Mirrors SPLIT in backend/app/roles/judge.py. */
@@ -197,6 +197,8 @@ export interface RunState {
   /** rid -> eid, filled by entity.merged and by the final report */
   recordEntity: Record<string, string>;
   conflicts: ConflictRow[];
+  /** eid -> what the inspector's cloud browser found at the product's own site */
+  sites: Record<string, SiteCheck>;
   failedSources: Record<string, FailedSource>;
   claims: Record<string, ClaimState>;
   claimOrder: string[];
@@ -247,6 +249,7 @@ export const initialRunState: RunState = {
   entityOrder: [],
   recordEntity: {},
   conflicts: [],
+  sites: {},
   failedSources: {},
   claims: {},
   claimOrder: [],
@@ -382,6 +385,9 @@ function mergeReport(state: RunState, report: Report, seq: number): RunState {
     for (const rid of ent.records ?? []) recordEntity[rid] = ent.eid;
   }
 
+  const sites = { ...state.sites };
+  for (const s of report.sites ?? []) sites[s.eid] ??= s;
+
   const mutations = { ...state.mutations };
   const mutationOrder = [...state.mutationOrder];
   for (const m of report.mutations ?? []) {
@@ -392,7 +398,7 @@ function mergeReport(state: RunState, report: Report, seq: number): RunState {
 
   return {
     ...state,
-    claims, claimOrder, debateFeed, evidence, entities, entityOrder, recordEntity, mutations, mutationOrder,
+    claims, claimOrder, debateFeed, evidence, entities, entityOrder, recordEntity, sites, mutations, mutationOrder,
     report,
     finished: true,
     ideaText: state.ideaText || report.idea_text || "",
@@ -566,6 +572,17 @@ function fold(state: RunState, ev: AgentEvent, t: number): RunState {
       if (data.conflict) {
         set({ conflicts: [...next.conflicts, { eid: data.eid, conflict: data.conflict, seq: ev.seq }] });
         row({ title: `${data.conflict.field}: sources disagree → ${String(data.conflict.resolution)}`, detail: data.conflict.rule, tag: "conflict", tone: "warn" });
+      }
+      touch(ev.agent);
+      break;
+    }
+    case "site.checked": {
+      const data = d as SiteCheckedData;
+      if (data.site?.eid) {
+        const s = data.site;
+        set({ sites: { ...next.sites, [s.eid]: s } });
+        const host = s.url.replace(/^https?:\/\/(www\.)?/, "").split("/")[0];
+        row({ title: `${host}: ${s.status}`, detail: s.why, tag: "live site", tone: s.status === "alive" ? "good" : "warn" });
       }
       touch(ev.agent);
       break;

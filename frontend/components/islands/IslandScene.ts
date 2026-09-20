@@ -7,11 +7,12 @@
 import {
   BufferGeometry, CanvasTexture, Color, CylinderGeometry, DirectionalLight, DoubleSide, Float32BufferAttribute, Group, HemisphereLight, Line,
   LineBasicMaterial, LineDashedMaterial, Mesh, MeshBasicMaterial, MeshStandardMaterial, OrthographicCamera,
-  PlaneGeometry, QuadraticBezierCurve3, Raycaster, RingGeometry, Scene, Sprite, SpriteMaterial, Vector2, Vector3, WebGLRenderer,
+  QuadraticBezierCurve3, Raycaster, RingGeometry, Scene, Sprite, SpriteMaterial, Vector2, Vector3, WebGLRenderer,
 } from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { layoutExtent, type IslandPlacement, type LayoutState } from "@/lib/islandLayout";
-import { buildIslandGeometry, LANTERN_AT, lookKey, waterline, type IslandLook } from "./islandGeometry";
+import { keepOffShores, stepScout, type Scout, type Shore } from "@/lib/scoutSteer";
+import { buildIslandGeometry, LANTERN_AT, lookKey, SHORE_REACH, waterline, type IslandLook } from "./islandGeometry";
 
 export interface IslandDatum {
   id: string;
@@ -33,12 +34,18 @@ export interface SceneOptions {
 
 /** sea level: everything on the map stands in, or sails on, this plane */
 const SEA_Y = 0;
+/** the scouts are small: a mutation's hull at about two thirds the size */
+const SCOUT_SIZE = 0.52;
+/** how far a moored boat reaches from its middle, in boat sizes: the half length of the hull */
+const BOAT_REACH = 0.85;
+/** water a scout keeps between its own middle and anything it passes: its half length, so it clears bow-on too */
+const SCOUT_BERTH = SCOUT_SIZE * 0.82 + 0.1;
 const POP_MS = 720;
 const MOVE_MS = 1400;
 const MERGE_MS = 620;
 const VIEW = 10; // half-height of the orthographic frustum at zoom 1
 const INK = new Color("#16181d");
-const AMBER = new Color("#e9a23b");
+const AMBER = new Color("#d9ab2f");
 const TEAL = new Color("#0f766e");
 const FOAM = new Color("#ffffff");
 const SEA = new Color("#b6e7f5");
@@ -74,33 +81,165 @@ interface Island {
 interface Arc { key: string; a: string; b: string; kind: SceneLink["kind"]; line: Line; bornAt: number }
 interface Ripple { mesh: Mesh; at: number; size: number }
 
-const SEA_CELLS = 96;
-/** the finest facet, in map units; the sheet doubles it each time the view outgrows the water */
-const SEA_CELL = 0.7;
+const SEA_CELLS = 104;
+/** the finest facet, in map units; the sheet steps it up each time the view outgrows the water */
+const SEA_CELL = 0.2;
+/**
+ * How much water the waves are sized against: the view's reach over this is how far the trains are stretched.
+ * The waves keep their size on the screen, not on the map. A map of five islands and a map of fifty get the
+ * same sea, the pattern holds still while the camera zooms, and it never gets finer than the facets drawing it.
+ */
+const SEA_SPAN = 48;
+
+/**
+ * The wave trains, as [bearing, length, height]. A prevailing sea running toward the default camera, and two
+ * sets crossing it from either side, none of them much the biggest: a sea with one direction to it looks ruled.
+ * Bearing is the way a train travels, in degrees from +x toward +z; periods follow deep water, slowed right
+ * down. The heights are small on purpose: the sea must not climb the beaches.
+ *
+ * No train runs straight, either. Each is laid over water that has been pushed about (`bend`: how far, and the
+ * wavenumber and phase of the push along each axis), a different push for each, so its crests curve, close up
+ * and open out, and the three cross at a different angle in every part of the map.
+ */
+const WAVES = ([[66, 11, 0.07], [14, 8.5, 0.055], [112, 6, 0.035]] as const).map(([bearing, length, amp], n) => {
+  const k = (Math.PI * 2) / length;
+  const a = (bearing * Math.PI) / 180;
+  // the push turns a crest by up to reach * q radians, about 22 degrees, over three or four wavelengths
+  const bend = [0, 1].map((axis) => { const q = (Math.PI * 2) / (length * (3.1 + 0.9 * ((n + axis) % 2)) + 3 * axis); return { q, reach: 0.38 / q, phase: n * 2.3 + axis * 4.1 }; });
+  // `glint` is how white the crests go
+  return { kx: Math.cos(a) * k, kz: Math.sin(a) * k, k, w: Math.sqrt(k) * 0.95, amp, length, bend, glint: amp / 0.07 };
+});
+/** how much of the second harmonic goes in: it lifts and sharpens the crests and flattens the troughs */
+const PEAK = 0.22;
+const SWELL_MAX = WAVES.reduce((s, w) => s + w.amp * (1 + PEAK), 0);
+/** the slope that counts as a face turned fully into, or away from, the sun */
+const SLOPE_MAX = WAVES.reduce((s, w) => s + w.amp * w.k, 0) * 0.5;
+const SUN = new Vector3(-14, 26, 9);
+/** how fast the bends in the trains, and the stretches of crest that are breaking, wander: radians a second */
+const DRIFT = 0.11;
+
+/**
+ * The height of the swell at a point on the map, for the boats, so they ride the same water they are drawn on.
+ * The sheet itself works this out on the GPU (seaMaterial): keep the two in step.
+ */
+function swell(x: number, z: number, t: number, scale: number): number {
+  x /= scale; z /= scale;
+  const drift = t * DRIFT;
+  let h = 0;
+  for (const w of WAVES) {
+    const [bx, bz] = w.bend;
+    const px = x + bx.reach * Math.sin(bx.q * z + bx.phase + drift);
+    const pz = z + bz.reach * Math.sin(bz.q * x + bz.phase - drift);
+    const s = Math.sin(w.kx * px + w.kz * pz - w.w * t);
+    h += w.amp * (s - PEAK * (1 - 2 * s * s));
+  }
+  return h * Math.min(1, scale);
+}
 
 /**
  * The sea: one sheet of low-poly water that always fills the view. There is no edge to it: every frame the sheet
  * is laid back down under the camera, snapped to its own grid, and every vertex takes its jitter, swell and depth
  * from where it is on the map. So panning slides the view over still water instead of dragging the facets along.
+ * A vertex carries only its place in the grid; the vertex shader puts it on the map.
  */
-function seaGeometry(): PlaneGeometry {
-  const g = new PlaneGeometry(1, 1, SEA_CELLS, SEA_CELLS);
-  g.rotateX(-Math.PI / 2);
-  const col = new Float32BufferAttribute(new Float32Array(g.getAttribute("position").count * 4), 4);
-  for (let i = 0; i < col.count; i++) col.setXYZW(i, SEA.r, SEA.g, SEA.b, 0.88);
-  g.setAttribute("color", col);
+function seaGeometry(): BufferGeometry {
+  // Loose triangles, sharing no corners: a facet is painted one flat colour, worked out at its middle, so every
+  // corner of a triangle is told where the other two are. The diagonal turns with every cell, or the whole sea
+  // would be hatched one way.
+  const n = SEA_CELLS * SEA_CELLS * 6;
+  const at = new Float32Array(n * 3);
+  const next = new Float32Array(n * 2);
+  const last = new Float32Array(n * 2);
+  let v = 0;
+  for (let j = 0; j < SEA_CELLS; j++) {
+    for (let i = 0; i < SEA_CELLS; i++) {
+      const a = [i, j], b = [i + 1, j], d = [i, j + 1], e = [i + 1, j + 1];
+      for (const tri of (i + j) % 2 ? [[a, d, e], [a, e, b]] : [[a, d, b], [b, d, e]]) {
+        for (let k = 0; k < 3; k++, v++) {
+          at[v * 3] = tri[k][0]; at[v * 3 + 2] = tri[k][1];
+          next.set(tri[(k + 1) % 3], v * 2);
+          last.set(tri[(k + 2) % 3], v * 2);
+        }
+      }
+    }
+  }
+  const g = new BufferGeometry();
+  g.setAttribute("position", new Float32BufferAttribute(at, 3));
+  g.setAttribute("seaNext", new Float32BufferAttribute(next, 2));
+  g.setAttribute("seaLast", new Float32BufferAttribute(last, 2));
   return g;
 }
 
-/** -0.5..0.5 for a grid point: the same point always gets the same nudge, whichever vertex lands on it */
-function jitter(i: number, j: number): number {
-  const n = Math.sin(i * 127.1 + j * 311.7) * 43758.5453;
-  return n - Math.floor(n) - 0.5;
-}
+const f = (n: number) => n.toFixed(5);
 
-/** The height of the swell at a point on the map. Boats ask too, so they ride the same water they are drawn on. */
-function swell(x: number, z: number, t: number): number {
-  return Math.sin(x * 0.62 + t * 0.9) * 0.06 + Math.sin(z * 0.81 - t * 0.7 + x * 0.23) * 0.05 + Math.sin((x + z) * 1.37 + t * 1.3) * 0.025;
+/**
+ * The water's material: the scene's own lit, flat-shaded standard material, with the waves worked into it.
+ * The heights are too small to shade themselves, so the facets are painted instead: a face leaning into the sun
+ * is lighter and its lee darker, which is what turns a sheet of triangles into trains of waves, and the faces on
+ * a breaking crest go pale, so the crests glint as they pass.
+ */
+function seaMaterial(uniforms: Record<string, { value: unknown }>): MeshStandardMaterial {
+  const m = new MeshStandardMaterial({ flatShading: true, transparent: true, opacity: 0.88, depthWrite: false, roughness: 0.5, metalness: 0 });
+  const trains = WAVES.map((w, n) => {
+    const [bx, bz] = w.bend;
+    return `{
+    // a train needs a good few facets to a wavelength: on fewer it fades out, rather than alias into a chequerboard
+    float fit = clamp((${f(w.length)} * cells - 4.5) / 4.5, 0.0, 1.0);
+    // the pushed-about water this train is laid over, and how the push turns the train's slope
+    float ax = ${f(bx.q)} * p.y + ${f(bx.phase)} + uDrift;
+    float az = ${f(bz.q)} * p.x + ${f(bz.phase)} - uDrift;
+    vec2 b = p + vec2(${f(bx.reach)} * sin(ax), ${f(bz.reach)} * sin(az));
+    vec2 turn = vec2(${f(bz.reach * bz.q)} * cos(az), ${f(bx.reach * bx.q)} * cos(ax));
+    float th = dot(b, vec2(${f(w.kx)}, ${f(w.kz)})) - uPhase[${n}];
+    float s = sin(th);
+    float c = cos(th);
+    h += fit * ${f(w.amp)} * (s - ${f(PEAK)} * (1.0 - 2.0 * s * s));
+    slope += fit * ${f(w.amp)} * (c + ${f(PEAK * 4)} * s * c) * (vec2(${f(w.kx)}, ${f(w.kz)}) + vec2(${f(w.kz)}, ${f(w.kx)}) * turn);
+    // only the top of the crest, and only along the stretches where it is breaking, which wander slowly
+    float along = sin(dot(b, vec2(${f(-w.kz / w.k)}, ${f(w.kx / w.k)})) * ${f(w.k / 2.1)} + uDrift + ${f(n * 1.9)}) + 0.5 * sin(dot(b, vec2(${f(w.kx)}, ${f(w.kz)})) * 0.13 + ${f(n)});
+    float s2 = s * s;
+    glint += fit * ${f(w.glint)} * step(0.0, s) * s2 * s2 * s2 * clamp(along * 1.1 - 0.45, 0.0, 1.0);
+  }`;
+  }).join("\n");
+  m.onBeforeCompile = (shader) => {
+    Object.assign(shader.uniforms, uniforms);
+    shader.vertexShader = shader.vertexShader
+      .replace("#include <common>", `#include <common>
+attribute vec2 seaNext; attribute vec2 seaLast;
+uniform vec2 uOrigin; uniform float uCell; uniform float uScale; uniform vec4 uPhase; uniform float uDrift; uniform vec2 uFocus; uniform float uFar; uniform vec2 uSun;
+varying float vDeep; flat varying float vLean; flat varying float vGlint;
+// -0.5..0.5 for a grid point: the same point always gets the same nudge, whichever vertex lands on it
+float nudge(vec2 g) { vec3 q = fract(vec3(mod(g, 1024.0).xyx) * 0.1031); q += dot(q, q.yzx + 33.33); return fract((q.x + q.y) * q.z) - 0.5; }
+// where a point of the grid is on the map
+vec2 place(vec2 g) { g += uOrigin; return (g + vec2(nudge(g), nudge(g.yx + 57.0)) * 0.6) * uCell; }
+// the height of the swell; how far the water there leans toward the sun, -1..1; how much of a breaking crest it is on
+float swell(vec2 at, out float lean, out float glint) {
+  vec2 p = at / uScale;
+  float cells = uScale / uCell;
+  float h = 0.0;
+  vec2 slope = vec2(0.0);
+  glint = 0.0;
+  ${trains}
+  lean = clamp(-dot(slope, uSun) / ${f(SLOPE_MAX)}, -1.0, 1.0);
+  return h * min(1.0, uScale);
+}`)
+      .replace("#include <begin_vertex>", `vec2 seaAt = place(position.xz);
+float leanHere, glintHere;
+vec3 transformed = vec3(seaAt.x, swell(seaAt, leanHere, glintHere), seaAt.y);
+// the face is painted by what the water is doing at its middle
+swell((seaAt + place(seaNext) + place(seaLast)) / 3.0, vLean, vGlint);
+// the water deepens away from the archipelago, which is what gives a screen of flat colour a middle
+vDeep = smoothstep(0.0, 1.0, distance(seaAt, uFocus) / uFar);`);
+    shader.fragmentShader = shader.fragmentShader
+      .replace("#include <common>", `#include <common>
+uniform vec3 uSea; uniform vec3 uSeaDeep; uniform vec3 uFoam;
+varying float vDeep; flat varying float vLean; flat varying float vGlint;`)
+      .replace("#include <color_fragment>", `diffuseColor.rgb = mix(uSea, uSeaDeep, vDeep) * (1.0 + vLean * (vLean > 0.0 ? 0.1 : 0.15));
+// the foam comes on gently, facet by facet, so a crest is a pale stretch of water and not a drawn line
+diffuseColor.rgb = mix(diffuseColor.rgb, uFoam, smoothstep(0.04, 0.85, vGlint) * 0.3);`);
+  };
+  m.customProgramCacheKey = () => "sea";
+  return m;
 }
 
 function glowTexture(): CanvasTexture {
@@ -108,9 +247,9 @@ function glowTexture(): CanvasTexture {
   c.width = c.height = 128;
   const ctx = c.getContext("2d")!;
   const g = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
-  g.addColorStop(0, "rgba(244,185,66,0.85)");
-  g.addColorStop(0.4, "rgba(244,185,66,0.28)");
-  g.addColorStop(1, "rgba(244,185,66,0)");
+  g.addColorStop(0, "rgba(255,214,102,0.85)");
+  g.addColorStop(0.4, "rgba(255,214,102,0.28)");
+  g.addColorStop(1, "rgba(255,214,102,0)");
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, 128, 128);
   return new CanvasTexture(c);
@@ -164,12 +303,21 @@ export class IslandScene {
   private sea: Mesh;
   /** the facet size the water is drawn at right now */
   private seaCell = SEA_CELL;
+  /** how far the wave trains are stretched for the view right now: see SEA_SPAN */
+  private seaScale = 1;
+  private seaUniforms = {
+    uOrigin: { value: new Vector2() }, uCell: { value: SEA_CELL }, uScale: { value: 1 }, uPhase: { value: [0, 0, 0, 0] } /* a vec4: room for one more train */, uDrift: { value: 0 },
+    uFocus: { value: new Vector2() }, uFar: { value: 1 }, uSun: { value: new Vector2(SUN.x, SUN.z).normalize() },
+    uSea: { value: SEA }, uSeaDeep: { value: SEA_DEEP }, uFoam: { value: FOAM },
+  };
   private rippleGeo = new RingGeometry(0.94, 1, 56);
   /** a generous invisible cylinder around each island: what the pointer actually hits */
   private hitGeo = new CylinderGeometry(1.1, 0.95, 1.8, 10);
   private hitMat = new MeshBasicMaterial({ visible: false });
-  /** scout boats working the water: decoration, on their own wandering orbits */
-  private boats: { mesh: Mesh; r: number; spd: number; ph: number; wob: number; bob: number }[] = [];
+  /** scout boats working the water: decoration, each chasing a mark on its own wandering orbit */
+  private boats: { mesh: Mesh; r: number; spd: number; ph: number; wob: number; bob: number; a: number; at: Scout | null }[] = [];
+  /** every shore a scout has to keep off this frame; the objects are reused */
+  private shores: Shore[] = [];
   private halo: Sprite;
   private beacon = new Group();
   private shells: Mesh[] = [];
@@ -226,12 +374,12 @@ export class IslandScene {
 
     this.scene.add(new HemisphereLight(0xffffff, 0xd9d3c6, 1.35));
     const sun = new DirectionalLight(0xfff6e8, 2.1);
-    sun.position.set(-14, 26, 9);
+    sun.position.copy(SUN);
     this.scene.add(sun);
 
     // The water is translucent and writes no depth: the shoals under each island show through it as shallows,
     // and everything drawn on the surface (rings, ripples, the beam) simply goes over it.
-    this.sea = new Mesh(seaGeometry(), new MeshStandardMaterial({ vertexColors: true, flatShading: true, transparent: true, depthWrite: false, roughness: 0.5, metalness: 0 }));
+    this.sea = new Mesh(seaGeometry(), seaMaterial(this.seaUniforms));
     this.sea.position.y = SEA_Y;
     this.sea.renderOrder = -2;
     this.sea.frustumCulled = false;
@@ -257,9 +405,9 @@ export class IslandScene {
     // Radii are fractions of the map's extent, so they keep their station as the neighbourhood grows.
     if (!opts.reducedMotion) {
       for (let i = 0; i < 5; i++) {
-        const mesh = new Mesh(buildIslandGeometry({ seed: 9001 + i * 137, size: 0.52, kind: "mutation", tint: "#8d929c", winner: false, heading: 0 }), this.material);
+        const mesh = new Mesh(buildIslandGeometry({ seed: 9001 + i * 137, size: SCOUT_SIZE, kind: "mutation", tint: "#8d929c", winner: false, heading: 0 }), this.material);
         mesh.frustumCulled = false;
-        this.boats.push({ mesh, r: 0.42 + i * 0.16, spd: (i % 2 ? -1 : 1) * (0.000035 + (i % 3) * 0.000012), ph: i * 1.27, wob: 0.06 + (i % 3) * 0.03, bob: i * 0.9 });
+        this.boats.push({ mesh, r: 0.42 + i * 0.16, spd: (i % 2 ? -1 : 1) * (0.000035 + (i % 3) * 0.000012), ph: i * 1.27, wob: 0.06 + (i % 3) * 0.03, bob: i * 0.9, a: i * 1.27, at: null });
         this.scene.add(mesh);
       }
     }
@@ -418,7 +566,7 @@ export class IslandScene {
   private ripple(at: Vector3, size: number, when: number) {
     const mesh = new Mesh(this.rippleGeo, new MeshBasicMaterial({ color: FOAM, transparent: true, opacity: 0, depthWrite: false }));
     mesh.rotation.x = -Math.PI / 2;
-    mesh.position.set(at.x, SEA_Y + 0.12, at.z); // clear of the crests
+    mesh.position.set(at.x, SEA_Y + SWELL_MAX + 0.02, at.z); // clear of the crests
     this.scene.add(mesh);
     this.ripples.push({ mesh, at: when, size });
   }
@@ -505,28 +653,21 @@ export class IslandScene {
     const reach = (Math.hypot(halfW, VIEW / Math.max(0.3, -this.look.y)) / this.camera.zoom) * 1.12;
 
     // coarser facets when zoomed out, finer again on the way back in; the slack stops it flickering at a boundary
-    while (2 * reach > SEA_CELLS * this.seaCell) this.seaCell *= 2;
-    while (this.seaCell > SEA_CELL && 2 * reach < SEA_CELLS * this.seaCell * 0.42) this.seaCell /= 2;
+    // (small steps, so a facet stays much the same size on screen whatever the zoom)
+    while (2 * reach > SEA_CELLS * this.seaCell) this.seaCell *= Math.SQRT2;
+    while (this.seaCell > SEA_CELL && 2 * reach < SEA_CELLS * this.seaCell * 0.6) this.seaCell /= Math.SQRT2;
     const c = this.seaCell;
-    const i0 = Math.round(this.ground.x / c) - SEA_CELLS / 2;
-    const j0 = Math.round(this.ground.z / c) - SEA_CELLS / 2;
+    const scale = (this.seaScale = reach / SEA_SPAN);
 
-    // the water deepens away from the archipelago, which is what gives a screen of flat colour a middle
-    const far = this.extent * 1.5 + 8;
-    const pos = this.sea.geometry.getAttribute("position").array as Float32Array;
-    const col = this.sea.geometry.getAttribute("color").array as Float32Array;
-    for (let j = 0, v = 0; j <= SEA_CELLS; j++) {
-      for (let i = 0; i <= SEA_CELLS; i++, v++) {
-        const x = (i0 + i + jitter(i0 + i, j0 + j) * 0.6) * c;
-        const z = (j0 + j + jitter(j0 + j, i0 + i + 57) * 0.6) * c;
-        pos[v * 3] = x; pos[v * 3 + 1] = swell(x, z, t); pos[v * 3 + 2] = z;
-        const d = clamp01(Math.hypot(x - this.focus.x, z - this.focus.z) / far);
-        const k = d * d * (3 - 2 * d);
-        col[v * 4] = SEA.r + (SEA_DEEP.r - SEA.r) * k; col[v * 4 + 1] = SEA.g + (SEA_DEEP.g - SEA.g) * k; col[v * 4 + 2] = SEA.b + (SEA_DEEP.b - SEA.b) * k;
-      }
-    }
-    this.sea.geometry.getAttribute("position").needsUpdate = true;
-    this.sea.geometry.getAttribute("color").needsUpdate = true;
+    const u = this.seaUniforms;
+    u.uOrigin.value.set(Math.round(this.ground.x / c) - SEA_CELLS / 2, Math.round(this.ground.z / c) - SEA_CELLS / 2);
+    u.uCell.value = c;
+    u.uScale.value = scale;
+    // phases are wrapped here, in doubles: a page left open for a day would run a float out of precision
+    WAVES.forEach((w, n) => { u.uPhase.value[n] = (w.w * t) % (Math.PI * 2); });
+    u.uDrift.value = (t * DRIFT) % (Math.PI * 2);
+    u.uFocus.value.set(this.focus.x, this.focus.z);
+    u.uFar.value = this.extent * 1.5 + 8;
   }
 
   // --- camera ---------------------------------------------------------------------------------------------------------
@@ -634,6 +775,8 @@ export class IslandScene {
 
     const still = this.opts.reducedMotion;
     const t = still ? 0 : now * 0.001;
+    const dt = this.lastNow ? Math.max(0, Math.min(64, now - this.lastNow)) : 16;
+    this.lastNow = now;
 
     this.laySea(t);
 
@@ -644,7 +787,7 @@ export class IslandScene {
       p.y += (1 - easeOutCubic(born)) * -2.2;
       // land stands still; only a boat rides the swell
       const afloat = i.datum.p.kind === "mutation";
-      if (afloat) p.y += swell(p.x, p.z, t);
+      if (afloat) p.y += swell(p.x, p.z, t, this.seaScale);
 
       const wantLift = id === this.selectedId ? 0.16 : id === this.hoverId ? 0.08 : 0;
       i.lift += (wantLift - i.lift) * (still ? 1 : 0.16);
@@ -669,17 +812,39 @@ export class IslandScene {
       i.group.scale.setScalar(Math.max(0.0001, scale));
     }
 
-    // sail the scouts: a wandering orbit, heading taken from where the next step actually puts them
+    // Sail the scouts. The orbit is only a mark to chase: it runs straight through the islands, so the boat
+    // steers for it and goes round whatever is in the way. The mark advances by frame time, not the clock, so a
+    // tab that was hidden for an hour does not come back to five boats racing across the map.
+    if (this.boats.length) {
+      let n = 0;
+      for (const i of this.islands.values()) {
+        const grown = Math.min(1, i.group.scale.x);
+        if (grown < 0.05) continue;
+        const { kind, size } = i.datum.p;
+        const o = this.shores[n] ?? (this.shores[n] = { x: 0, z: 0, r: 0 });
+        o.x = i.group.position.x;
+        o.z = i.group.position.z;
+        o.r = (size * (kind === "mutation" ? BOAT_REACH : SHORE_REACH) + SCOUT_BERTH) * grown;
+        n++;
+      }
+      this.shores.length = n;
+    }
     for (const b of this.boats) {
       const span = Math.max(6, this.extent);
-      const at = (t: number) => {
-        const a = b.ph + t * b.spd;
+      const at = (a: number) => {
         const r = span * (b.r + Math.sin(a * 2.3 + b.ph) * b.wob);
         return { x: Math.cos(a) * r, z: Math.sin(a) * r };
       };
-      const p = at(now), q = at(now + 240);
-      b.mesh.position.set(p.x, SEA_Y + waterline("mutation", 0.52) + swell(p.x, p.z, t), p.z);
-      b.mesh.rotation.y = Math.atan2(q.x - p.x, q.z - p.z);
+      b.a += b.spd * dt;
+      const mark = at(b.a), ahead = at(b.a + b.spd * 240);
+      const dir = { x: ahead.x - mark.x, z: ahead.z - mark.z };
+      if (!b.at) {
+        b.at = { x: mark.x, z: mark.z, heading: Math.atan2(dir.x, dir.z), side: 0 };
+        keepOffShores(b.at, this.shores);
+      }
+      stepScout(b.at, mark, Math.hypot(dir.x, dir.z) / 240, dir, this.shores, dt);
+      b.mesh.position.set(b.at.x, SEA_Y + waterline("mutation", SCOUT_SIZE) + swell(b.at.x, b.at.z, t, this.seaScale), b.at.z);
+      b.mesh.rotation.y = b.at.heading;
       b.mesh.rotation.z = Math.sin(now * 0.0011 + b.bob) * 0.05; // roll with the swell
     }
 
@@ -697,8 +862,6 @@ export class IslandScene {
       // Steering. Idle is a slow sweep; an arrival pulls the light off it, holds a beat on the island, then
       // hands back. The hold shortens when arrivals are stacked up, so a busy run still feels like scanning
       // rather than a queue being worked through.
-      const dt = this.lastNow ? Math.min(64, now - this.lastNow) : 16;
-      this.lastNow = now;
       let locked = 0;
       let wantLen = reach * 1.15;
       if (!still) {

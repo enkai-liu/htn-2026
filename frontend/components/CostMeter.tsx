@@ -21,7 +21,7 @@ export function CostMeter({ state }: { state: RunState }) {
         aria-expanded={open}
         aria-label="Cost and model usage"
       >
-        <span className="text-amber">{fmtUsd(spend.usd)}</span>
+        <span className="text-accent">{fmtUsd(spend.usd)}</span>
         <span className="hidden text-mute xl:inline">{spend.calls} calls</span>
         <span className="text-mute">{fmtTokens(spend.tokens)} tok</span>
         <span className="text-mute">{Math.round(spend.elapsed)}s</span>
@@ -70,7 +70,7 @@ export function CostTable({ state }: { state: RunState }) {
               <td className="py-1 text-right text-bone-dim">{m.events}</td>
               <td className="py-1 text-right text-bone-dim">{fmtTokens(m.tokensIn + m.tokensOut)}</td>
               <td className="py-1 text-right text-bone-dim">{m.latencyN ? `${(m.latencyMs / m.latencyN / 1000).toFixed(1)}s` : "–"}</td>
-              <td className="py-1 text-right text-amber">{fmtUsd(m.usd)}</td>
+              <td className="py-1 text-right text-accent">{fmtUsd(m.usd)}</td>
             </tr>
           ))}
         </tbody>

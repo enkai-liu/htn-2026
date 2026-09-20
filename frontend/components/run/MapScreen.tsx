@@ -19,15 +19,17 @@ export function MapScreen() {
   const stats = useMemo(() => {
     const counts = { entity: 0, prior: 0, mutation: 0 };
     const bySource = new Map<string, number>();
-    for (const id of graph.order) {
+    // count what is on the map: a project with no similarity at all never gets an island
+    for (const id of layout.order) {
       const n = graph.nodes[id];
+      if (!n) continue;
       if (n.kind === "entity") { counts.entity++; if (n.source) bySource.set(n.source, (bySource.get(n.source) ?? 0) + 1); }
       else if (n.kind === "prior") counts.prior++;
       else if (n.kind === "mutation") counts.mutation++;
     }
     const sources = [...bySource].map(([source, count]) => ({ source, count })).sort((a, b) => b.count - a.count);
     return { counts, sources };
-  }, [graph]);
+  }, [graph, layout]);
 
   const caption = useMemo(() => {
     for (let i = state.timeline.length - 1; i >= 0; i--) if (!state.timeline[i].sub) return state.timeline[i];
@@ -77,7 +79,7 @@ export function MapScreen() {
         </>
       )}
 
-      {/* one quiet line about the swarm; the whole story is on the Swarm page */}
+      {/* one quiet line about the swarm: the latest thing an agent did */}
       {caption && (
         <p key={caption.seq} className="pointer-events-none absolute inset-x-0 bottom-4 mx-auto flex w-fit max-w-[min(620px,calc(100vw-40px))] animate-rise items-center gap-2 truncate rounded-full bg-ink-900/85 px-3.5 py-1 text-[12.5px] text-bone-dim shadow-[0_0_0_1px_var(--color-line)] backdrop-blur" aria-live="off">
           <span className="font-mono text-[11px]" style={{ color: agentColor(caption.agent) }}>{caption.agent}</span>

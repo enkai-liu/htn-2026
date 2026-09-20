@@ -55,7 +55,7 @@ function CoachTurn({ m, pitch, onPickVersion }: { m: CoachMessage; pitch?: Coach
 
 function UserTurn({ text, pending, about }: { text: string; pending?: boolean; about?: MutationState }) {
   return (
-    <div className={clsx("ml-auto max-w-[85%] animate-rise rounded-2xl rounded-br-md bg-ink-800 px-3.5 py-2.5", pending && "opacity-60")}>
+    <div className={clsx("ml-auto max-w-[85%] animate-rise rounded-2xl rounded-br-md bg-sea/35 px-3.5 py-2.5", pending && "opacity-60")}>
       {about && <div className={clsx(label, "mb-1")}>about: swapping the {about.facet}</div>}
       <p className="whitespace-pre-wrap text-[14px] leading-[1.5] text-bone">{text}</p>
     </div>
@@ -92,7 +92,7 @@ function Composer({ suggestions, disabled, busy, onSend }: { suggestions: string
   };
 
   return (
-    <div className="sticky bottom-0 -mx-1 bg-gradient-to-t from-ink-950 from-70% to-transparent px-1 pb-3 pt-6">
+    <div className="sticky bottom-0 -mx-1 rounded-b-2xl bg-gradient-to-t from-ink-900 from-70% to-transparent px-1 pb-4 pt-6">
       {suggestions.length > 0 && !busy && (
         <div className="mb-2 flex flex-wrap gap-1.5">
           {suggestions.map((s) => (
@@ -102,7 +102,7 @@ function Composer({ suggestions, disabled, busy, onSend }: { suggestions: string
           ))}
         </div>
       )}
-      <form onSubmit={send} className={clsx(card, "flex items-end gap-2 py-2 pl-3.5 pr-2 shadow-[0_8px_30px_rgb(0_0_0/0.06)] focus-within:border-line-strong")}>
+      <form onSubmit={send} className="flex items-end gap-2 rounded-2xl border border-line-strong bg-ink-850 py-2 pl-3.5 pr-2 focus-within:border-bone-dim">
         <textarea
           ref={ref} rows={1} value={text} onChange={(e) => setText(e.target.value)} onKeyDown={onKey} maxLength={1500}
           placeholder={disabled ? "A recording. Start a live run to talk to the coach." : "Answer, push back, or float a half-formed idea…"}
@@ -265,7 +265,8 @@ export function CoachPanel({ state, footer }: { state: RunState; footer?: ReactN
 
   return (
     <div className="grid gap-x-8 gap-y-5 lg:grid-cols-[minmax(0,1fr)_340px]">
-      <div className="flex min-h-[calc(100dvh-260px)] min-w-0 flex-col">
+      {/* a card like everything else on the water: loose text on the sea is hard to read */}
+      <div className={clsx(card, "flex min-h-[calc(100dvh-260px)] min-w-0 flex-col px-5 pt-5")}>
         <div className="flex flex-1 flex-col gap-6 pb-2" aria-live="polite">
           {isReplay && coach.some((m) => m.role === "user") && <p className={label}>a recorded conversation · the author&apos;s turns are part of the recording</p>}
           {!coach.length && <p className="text-[13.5px] text-mute">{isReplay ? "This recording predates the coaching conversation. The directions on the right are what the coach proposed." : "Tell the coach what you care about in this idea, or pick a direction on the right to talk through."}</p>}

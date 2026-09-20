@@ -20,7 +20,7 @@ function FacetList({ facets }: { facets: Facets }) {
       <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
         {FACET_KEYS.map((k) => (
           <div key={k} className="contents">
-            <dt className="pt-[2px] font-mono text-[10px] uppercase tracking-[0.12em] text-amber-dim">{k}</dt>
+            <dt className="pt-[2px] font-mono text-[10px] uppercase tracking-[0.12em] text-accent">{k}</dt>
             <dd className="text-[12.5px] leading-snug text-bone-dim">{facets[k]}</dd>
           </div>
         ))}
@@ -43,7 +43,7 @@ function Citation({ text, n }: { text: string; n: number }) {
   return (
     <li id={`cite-${n}`} className="scroll-mt-4 text-[11.5px] leading-snug text-bone-dim target:text-bone">
       {body}{" "}
-      {href && <a href={href} target="_blank" rel="noopener noreferrer" className="break-all font-mono text-[10px] text-amber hover:underline">{m![1]}</a>}
+      {href && <a href={href} target="_blank" rel="noopener noreferrer" className="break-all font-mono text-[10px] text-accent hover:underline">{m![1]}</a>}
     </li>
   );
 }

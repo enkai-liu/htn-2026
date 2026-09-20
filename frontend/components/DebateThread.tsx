@@ -57,7 +57,7 @@ export const ClaimCard = memo(function ClaimCard({ claim, evidence }: { claim: C
         return (
           <blockquote key={e.evid} className="mt-1.5 border-l-2 border-line-strong pl-2 text-[11.5px] leading-snug text-bone-dim">
             “{e.quote}”
-            {href && <a href={href} target="_blank" rel="noopener noreferrer" className="ml-1.5 font-mono text-[9.5px] text-amber hover:underline">source ↗</a>}
+            {href && <a href={href} target="_blank" rel="noopener noreferrer" className="ml-1.5 font-mono text-[9.5px] text-accent hover:underline">source ↗</a>}
           </blockquote>
         );
       })}

@@ -14,7 +14,7 @@ import { SimulatedTag } from "./ui";
 
 const STATUS_COLOR: Record<AgentInfo["status"], string> = {
   idle: "var(--color-faint)",
-  active: "var(--color-amber)",
+  active: "var(--color-accent)",
   done: "var(--color-teal)",
   failed: "var(--color-vermilion)",
   recovered: "var(--color-amber)",
@@ -67,8 +67,8 @@ function PhaseRail({ phase, finished }: { phase: Phase | null; finished: boolean
         const state = finished || i < current ? "past" : i === current ? "now" : "next";
         return (
           <li key={p} className="min-w-0 flex-1" title={PHASE_LABEL[p]}>
-            <div className={clsx("h-[3px] transition-colors duration-500", state === "past" ? "bg-teal/70" : state === "now" ? "bg-amber" : "bg-ink-600")} />
-            <div className={clsx("mt-1 truncate font-mono text-[8.5px] uppercase tracking-[0.08em]", state === "now" ? "text-amber" : state === "past" ? "text-mute" : "text-faint")}>{p}</div>
+            <div className={clsx("h-[3px] transition-colors duration-500", state === "past" ? "bg-teal/70" : state === "now" ? "bg-accent" : "bg-ink-600")} />
+            <div className={clsx("mt-1 truncate font-mono text-[8.5px] uppercase tracking-[0.08em]", state === "now" ? "text-accent" : state === "past" ? "text-mute" : "text-faint")}>{p}</div>
           </li>
         );
       })}
@@ -225,9 +225,9 @@ export function SwarmTimeline({ state, streaming }: { state: RunState; streaming
           <div key={ticker.seq} className="min-w-0 animate-rise">
             <div className="flex items-center gap-1.5 text-[10.5px] leading-none">
               <AgentName agent={ticker.from} />
-              <ArrowRight size={11} className={ticker.hot ? "text-amber" : "text-mute"} />
+              <ArrowRight size={11} className={ticker.hot ? "text-accent" : "text-mute"} />
               <AgentName agent={ticker.to} />
-              <span className={clsx("ml-1 font-mono text-[9px] uppercase tracking-[0.12em]", ticker.hot ? "text-amber" : "text-mute")}>{ticker.type}</span>
+              <span className={clsx("ml-1 font-mono text-[9px] uppercase tracking-[0.12em]", ticker.hot ? "text-accent" : "text-mute")}>{ticker.type}</span>
             </div>
             <div className="mt-1 truncate text-[11.5px] leading-none text-bone-dim">{ticker.text}</div>
           </div>
@@ -242,7 +242,7 @@ export function SwarmTimeline({ state, streaming }: { state: RunState; streaming
             {items.map((it) =>
               it.kind === "phase" ? (
                 <li key={`p:${it.phase}`} className="sticky top-0 z-[1] flex items-center gap-2 bg-ink-850/95 py-1.5 pl-[46px] pr-2 backdrop-blur-sm">
-                  <span className="font-mono text-[9.5px] uppercase tracking-[0.24em] text-amber">{PHASE_LABEL[it.phase]}</span>
+                  <span className="font-mono text-[9.5px] uppercase tracking-[0.24em] text-accent">{PHASE_LABEL[it.phase]}</span>
                   <span className="h-px flex-1 bg-line-strong" />
                   <span className="font-mono text-[9px] text-faint">{fmtT(it.t)}</span>
                 </li>
@@ -253,7 +253,7 @@ export function SwarmTimeline({ state, streaming }: { state: RunState; streaming
           </ol>
           {streaming && state.timeline.length > 0 && (
             <div className="flex items-center gap-2 py-2 pl-[46px] font-mono text-[10px] text-faint">
-              <span className="size-1.5 animate-pulse rounded-full bg-amber" />
+              <span className="size-1.5 animate-pulse rounded-full bg-accent" />
               {working > 0 ? `${working} agent${working === 1 ? "" : "s"} working` : "listening"}
             </div>
           )}

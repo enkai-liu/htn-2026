@@ -7,7 +7,7 @@ export const EVENT_TYPES = [
   "run.started", "facets.extracted", "team.formed", "agent.started", "agent.finished", "run.finished", "error",
   "tool.call", "tool.result", "message.sent",
   "source.failed", "evidence.found",
-  "entity.merged", "conflict.detected",
+  "entity.merged", "conflict.detected", "site.checked",
   "claim.proposed", "claim.challenged", "claim.resolved", "requery.issued", "jury.vote", "verify.result",
   "voice.result", "prior.sample",
   "score.updated", "graph.patch",

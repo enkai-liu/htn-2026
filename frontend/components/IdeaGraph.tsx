@@ -53,7 +53,7 @@ export function IdeaGraph(props: IdeaGraphCanvasProps) {
 
       {/* vertical legend in the left margin: the chart is a circle in a wide plate, so the corners are free */}
       <ul className="pointer-events-none absolute bottom-2.5 left-3 flex flex-col gap-1 font-mono text-[9.5px] tracking-[0.04em] text-mute">
-        <li className="flex items-center gap-1.5"><span className="w-[9px] text-center text-[11px] leading-none text-amber">✦</span>your idea</li>
+        <li className="flex items-center gap-1.5"><span className="w-[9px] text-center text-[11px] leading-none text-accent">✦</span>your idea</li>
         {stats.sources.map((s) => (
           <li key={s} className="flex items-center gap-1.5">
             <span className="mx-[1px] size-[7px] rounded-full" style={{ background: sourceColor(s) }} />

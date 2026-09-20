@@ -6,7 +6,7 @@ import { sourceHex, sourceLabel } from "@/lib/format";
 
 // kept in step with islandGeometry.ts: turf is `tint.lerp(PAPER, 0.68)` (0.45 for your idea), bare rock is fixed
 const PAPER = "#ece9e2";
-const IDEA_TINT = "#f4b942";
+const IDEA_TINT = "#e6cd8c";
 const MUTATION_TINT = "#0f9488";
 const ROCK = "#d5d2ca";
 const turf = (hex: string, strength = 32) => `color-mix(in srgb, ${hex} ${strength}%, ${PAPER})`;
@@ -35,14 +35,14 @@ function Flag({ hex }: { hex: string }) {
   );
 }
 
-/** Your idea: a gold island with the lighthouse on it, lantern lit. */
+/** Your idea: a sand island with the blue-banded lighthouse on it, lantern lit. */
 function Lighthouse() {
   return (
     <Island hex={IDEA_TINT} strength={55}>
-      <circle cx="9.5" cy="3.7" r="2.5" fill={IDEA_TINT} opacity="0.3" />
-      <path d="M8 10.2 8.7 4.8h1.6l.7 5.4Z" fill="#faf6ec" stroke="#c9791f" strokeWidth="0.55" strokeLinejoin="round" />
-      <path d="M8.35 7.4h2.3" stroke="#e9a23b" strokeWidth="1.1" />
-      <circle cx="9.5" cy="3.8" r="1.1" fill="#ffd76a" stroke="#c9791f" strokeWidth="0.45" />
+      <circle cx="9.5" cy="3.7" r="2.5" fill="#ffd76a" opacity="0.35" />
+      <path d="M8 10.2 8.7 4.8h1.6l.7 5.4Z" fill="#faf6ec" stroke="#173f96" strokeWidth="0.55" strokeLinejoin="round" />
+      <path d="M8.35 7.4h2.3" stroke="#2a5fd0" strokeWidth="1.1" />
+      <circle cx="9.5" cy="3.8" r="1.1" fill="#ffd76a" stroke="#173f96" strokeWidth="0.45" />
     </Island>
   );
 }

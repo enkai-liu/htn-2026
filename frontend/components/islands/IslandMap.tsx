@@ -13,7 +13,7 @@ import type { IslandDatum, SceneLink } from "./IslandScene";
 // no `loading` here: IslandLoader sits over the canvas and outlives the chunk download, until the first frame is drawn
 const Canvas = dynamic(() => import("./IslandMapCanvas"), { ssr: false });
 
-const IDEA_TINT = "#f4b942";
+const IDEA_TINT = "#e6cd8c"; // sand: the lighthouse, not the ground, is what marks your idea
 const PRIOR_TINT = "#a9adb5";
 const MUTATION_TINT = "#0f9488";
 

@@ -6,7 +6,7 @@ export type EventType =
   | "run.started" | "facets.extracted" | "team.formed" | "agent.started" | "agent.finished" | "run.finished" | "error"
   | "tool.call" | "tool.result" | "message.sent"
   | "source.failed" | "evidence.found"
-  | "entity.merged" | "conflict.detected"
+  | "entity.merged" | "conflict.detected" | "site.checked"
   | "claim.proposed" | "claim.challenged" | "claim.resolved" | "requery.issued" | "jury.vote" | "verify.result"
   | "voice.result" | "prior.sample"
   | "score.updated" | "graph.patch"
@@ -73,6 +73,23 @@ export interface MergeDecision {
   signals: Record<string, unknown>;
   model?: string | null;
   rationale: string;
+}
+
+/** What a cloud browser found at a prior-art product's own site, today. Deterministic: no model judged it. */
+export interface SiteCheck {
+  eid: string;
+  rid: string;
+  url: string;
+  final_url?: string;
+  status: "alive" | "dead" | "parked" | "blocked";
+  why?: string;
+  http_status?: number | null;
+  title?: string;
+  excerpt?: string;
+  /** path under the API, e.g. /api/runs/r1/shots/e1.jpg */
+  screenshot?: string | null;
+  elapsed_ms?: number;
+  conflict?: Conflict | null;
 }
 
 export interface Conflict {
@@ -264,6 +281,7 @@ export interface Report {
   by_year: YearCount[];
   mutations: Mutation[];
   sources: SourceStatus[];
+  sites?: SiteCheck[];
   citations: string[];
   summary_md: string;
 }

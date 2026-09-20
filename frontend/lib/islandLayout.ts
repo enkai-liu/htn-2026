@@ -1,9 +1,12 @@
 // Pure layout for the islands map. No three.js in here, so it runs under Vitest's node environment.
 //
-// The law is the same as the 2D chart: distance from your idea = 1 - similarity. The angle is free (the data has
-// no embedding coordinates), so it is spent on grouping: every source owns a fixed wedge of the circle and its
-// projects form an archipelago there. The fold is incremental and stable: once an island has a bearing it keeps
-// it, so a new arrival never makes the others jump, and a re-scored mutation slides along its own bearing.
+// The law: closer to your idea = more similar. The rings are relative, not absolute: the band of similarities this
+// run actually found is stretched over the whole map, so a run where everything scored low still fills the inner
+// orbits instead of huddling at the rim. The angle is free (the data has no embedding coordinates), so it is spent
+// on grouping: every source owns a fixed wedge of the circle and its projects form an archipelago there.
+// The fold is incremental and stable: while the band holds, an island keeps its bearing, a new arrival never makes
+// the others jump, and a re-scored mutation slides along its own bearing. When the band itself widens, the map is
+// laid out afresh from the same seeds, so the result never depends on the order the patches were folded in.
 import type { GraphState } from "./graphReducer";
 import { hashString, mulberry32 } from "./seeded";
 import type { GraphNode } from "./types";
@@ -37,14 +40,19 @@ export interface IslandPlacement {
   seed: number;
 }
 
+/** The band of similarities the rings are stretched over: `hi` sits on the innermost ring, `lo` on the rim. */
+export interface SimScale { lo: number; hi: number }
+
 export interface LayoutState {
   byId: Record<string, IslandPlacement>;
   order: string[];
   /** the graph revision this layout was folded from */
   graphRev: number;
+  /** the band the radii were computed against; null until a project with a similarity has arrived */
+  scale: SimScale | null;
 }
 
-export const emptyLayout: LayoutState = { byId: {}, order: [], graphRev: -1 };
+export const emptyLayout: LayoutState = { byId: {}, order: [], graphRev: -1, scale: null };
 
 export interface LayoutCtx {
   /** mutation id (without the "mut:" prefix) -> the facet it changes */
@@ -57,8 +65,40 @@ const TAU = Math.PI * 2;
 
 export const FACET_KEYS = ["purpose", "mechanism", "audience", "data", "twist", "domain"] as const;
 
-export function ringRadius(sim: number | null | undefined): number {
-  return R_MIN + (1 - clamp01(typeof sim === "number" && Number.isFinite(sim) ? sim : 0.35)) * R_SPAN;
+/** A project this close to zero reads as "0.00": it has nothing to do with the idea and is left off the map. */
+const ZERO_SIM = 0.005;
+/** The band snaps outward to this step, so it only moves (and the map only re-lays) when a new extreme really is one. */
+const SCALE_STEP = 0.05;
+
+/** Whether a node gets an island at all. Mutations stay whatever they score: a boat that reached 0 is the best one. */
+export function isShown(n: Pick<GraphNode, "kind" | "similarity">): boolean {
+  if (!isIsland(n.kind)) return false;
+  if (n.kind === "idea" || n.kind === "mutation") return true;
+  return !(typeof n.similarity === "number" && n.similarity < ZERO_SIM);
+}
+
+/** The band of similarities among the projects on the map. Mutations are measured against it, they do not stretch it. */
+export function simScale(graph: GraphState): SimScale | null {
+  let lo = Infinity;
+  let hi = -Infinity;
+  for (const id of graph.order) {
+    const n = graph.nodes[id];
+    if (!n || (n.kind !== "entity" && n.kind !== "prior") || !isShown(n)) continue;
+    if (typeof n.similarity !== "number" || !Number.isFinite(n.similarity)) continue;
+    const s = clamp01(n.similarity);
+    if (s < lo) lo = s;
+    if (s > hi) hi = s;
+  }
+  if (lo > hi) return null;
+  return { lo: Math.floor(lo / SCALE_STEP + 1e-9) * SCALE_STEP, hi: Math.ceil(hi / SCALE_STEP - 1e-9) * SCALE_STEP };
+}
+
+/** Ring for a similarity, relative to the band: the most similar project hugs the idea, the least similar sits at the rim. */
+export function ringRadius(sim: number | null | undefined, scale: SimScale | null = null): number {
+  const s = clamp01(typeof sim === "number" && Number.isFinite(sim) ? sim : 0.35);
+  const span = scale ? scale.hi - scale.lo : 0;
+  const closeness = scale && span > 1e-9 ? clamp01((s - scale.lo) / span) : 0.5;
+  return R_MIN + (1 - closeness) * R_SPAN;
 }
 
 // Fixed wedges, clockwise from the front of the map. Unequal on purpose: Devpost and YC dominate the corpus.
@@ -151,20 +191,41 @@ function place(target: number, size: number, start: number, centre: number, half
 export function foldLayout(prev: LayoutState, graph: GraphState, ctx: LayoutCtx): LayoutState {
   if (graph.rev === prev.graphRev) return prev;
 
+  const scale = simScale(graph);
+  // The band moved, so every ring did: lay the map out afresh rather than patch it. Bearings start from the same
+  // per-island seed, so islands land close to where they were and the scene glides them over.
+  if (scale?.lo !== prev.scale?.lo || scale?.hi !== prev.scale?.hi) prev = { ...emptyLayout, scale };
+
   const byId: Record<string, IslandPlacement> = {};
   const order: string[] = [];
   let changed = false;
 
   // 1. islands we already know: keep bearing, height and seed; only the ring follows similarity
+  const resized: string[] = [];
   for (const id of prev.order) {
     const node = graph.nodes[id];
-    if (!node || !isIsland(node.kind)) { changed = true; continue; }
+    if (!node || !isShown(node)) { changed = true; continue; }
     const old = prev.byId[id];
     const size = islandSize(node);
-    const radius = node.kind === "idea" ? 0 : ringRadius(node.similarity) + old.nudge;
+    const radius = node.kind === "idea" ? 0 : ringRadius(node.similarity, scale) + old.nudge;
     if (radius === old.radius && size === old.size) byId[id] = old;
-    else { byId[id] = withPosition({ ...old, radius, size }); changed = true; }
+    else { byId[id] = withPosition({ ...old, radius, size }); resized.push(id); changed = true; }
     order.push(id);
+  }
+  // A re-scored or grown island keeps its bearing, but its new ring may already be taken: a boat must not come to
+  // rest inside a rock. It steps outward along its own bearing until it has clear water, like a new arrival would.
+  for (const id of resized) {
+    const p = byId[id];
+    if (p.kind === "idea") continue;
+    const others = order.filter((o) => o !== id).map((o) => byId[o]);
+    if (!collides(p.x, p.z, p.size, others)) continue;
+    const target = p.radius - p.nudge;
+    for (let step = 0; step <= MAX_RADIUS_STEPS; step++) {
+      const r = target + step * RADIUS_STEP;
+      if (collides(Math.cos(p.angle) * r, Math.sin(p.angle) * r, p.size, others)) continue;
+      byId[id] = withPosition({ ...p, radius: r, nudge: r - target });
+      break;
+    }
   }
 
   // 2. new arrivals, in the order the graph received them
@@ -172,7 +233,7 @@ export function foldLayout(prev: LayoutState, graph: GraphState, ctx: LayoutCtx)
   for (const id of graph.order) {
     if (byId[id]) continue;
     const node = graph.nodes[id];
-    if (!node || !isIsland(node.kind)) continue;
+    if (!node || !isShown(node) || !isIsland(node.kind)) continue;
     const seed = hashString(id);
     const rnd = mulberry32(seed);
     const size = islandSize(node);
@@ -187,13 +248,13 @@ export function foldLayout(prev: LayoutState, graph: GraphState, ctx: LayoutCtx)
       const fi = FACET_KEYS.indexOf(facet as (typeof FACET_KEYS)[number]);
       const base = fi >= 0 ? -Math.PI / 2 + (fi * TAU) / FACET_KEYS.length : rnd() * TAU;
       const siblings = placed.filter((o) => o.kind === "mutation" && Math.abs(o.angle - base) < 0.5).length;
-      const target = ringRadius(node.similarity);
+      const target = ringRadius(node.similarity, scale);
       const berth = place(target, size, base + siblings * 0.34, base, MUTATION_HALF, placed);
       p = withPosition({ id, kind: "mutation", angle: berth.angle, radius: target + berth.nudge, nudge: berth.nudge, y: 0, size, seed });
     } else {
       const { centre, half } = sectorFor(node.kind, node.source);
       const start = centre + (rnd() * 2 - 1) * half * 0.8;
-      const target = ringRadius(node.similarity);
+      const target = ringRadius(node.similarity, scale);
       const spot = place(target, size, start, centre, half, placed);
       p = withPosition({ id, kind: node.kind, angle: spot.angle, radius: target + spot.nudge, nudge: spot.nudge, y: rnd() * 0.05, size, seed });
     }
@@ -204,7 +265,7 @@ export function foldLayout(prev: LayoutState, graph: GraphState, ctx: LayoutCtx)
   }
 
   if (!changed) return { ...prev, graphRev: graph.rev };
-  return { byId, order, graphRev: graph.rev };
+  return { byId, order, graphRev: graph.rev, scale };
 }
 
 /** The farthest any island reaches, for camera fitting. */

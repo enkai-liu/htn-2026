@@ -14,7 +14,7 @@ export function ReplayControls({ controls, snapshot }: { controls: RunControls; 
   return (
     <div className="flex items-center gap-1.5">
       <button type="button" className="btn btn-sm btn-icon" onClick={controls.restart} title="Restart (R)" aria-label="Restart replay"><RotateCcw size={12} /></button>
-      <button type="button" className={clsx("btn btn-sm btn-icon", snapshot?.playing && "border-amber/60 text-amber")} onClick={controls.toggle} title="Play / pause (Space)" aria-label={snapshot?.playing ? "Pause replay" : "Play replay"}>
+      <button type="button" className={clsx("btn btn-sm btn-icon", snapshot?.playing && "border-accent/60 text-accent")} onClick={controls.toggle} title="Play / pause (Space)" aria-label={snapshot?.playing ? "Pause replay" : "Play replay"}>
         {snapshot?.playing ? <Pause size={12} /> : <Play size={12} />}
       </button>
       <button type="button" className="btn btn-sm btn-icon" onClick={controls.step} title="Step one event (→)" aria-label="Step one event"><StepForward size={12} /></button>
@@ -24,7 +24,7 @@ export function ReplayControls({ controls, snapshot }: { controls: RunControls; 
       <label className="relative mx-1 hidden h-[26px] w-[150px] items-center lg:flex" title={`event ${index} of ${total}`}>
         <span className="sr-only">Replay position</span>
         <span className="pointer-events-none absolute inset-x-0 top-1/2 h-[3px] -translate-y-1/2 bg-ink-600" />
-        <span className="pointer-events-none absolute left-0 top-1/2 h-[3px] -translate-y-1/2 bg-amber transition-[width] duration-150" style={{ width: `${pct}%` }} />
+        <span className="pointer-events-none absolute left-0 top-1/2 h-[3px] -translate-y-1/2 bg-accent transition-[width] duration-150" style={{ width: `${pct}%` }} />
         <input
           type="range" min={0} max={total} step={1} value={index}
           onChange={(e) => controls.seek(Number(e.target.value))}

@@ -100,7 +100,7 @@ export function AxisGauges({ scores }: { scores: Scores | null }) {
         ) : (
           <>
             <div className="mt-0.5 flex items-baseline gap-2">
-              <span className={clsx("font-display text-[44px] leading-[0.9]", headline == null ? "text-faint" : lowConfidence ? "text-bone-dim" : "text-amber")}>{headline == null ? "–" : Math.round(headline)}</span>
+              <span className={clsx("font-display text-[44px] leading-[0.9]", headline == null ? "text-faint" : lowConfidence ? "text-bone-dim" : "text-accent")}>{headline == null ? "–" : Math.round(headline)}</span>
               {scores?.band != null && headline != null && <span className="font-mono text-[13px] text-bone-dim" title="Uncertainty band: widens when the jury disagrees">± {scores.band}</span>}
               {headline == null && <span className="text-[10.5px] leading-tight text-faint">scored once the debate<br />and verification settle</span>}
               {headline != null && (
@@ -110,7 +110,7 @@ export function AxisGauges({ scores }: { scores: Scores | null }) {
                 </span>
               )}
             </div>
-            <div className="mt-1"><ScaleBar value={scores?.headline ?? null} band={scores?.band} color="var(--color-amber)" dim={lowConfidence} /></div>
+            <div className="mt-1"><ScaleBar value={scores?.headline ?? null} band={scores?.band} color="var(--color-accent)" dim={lowConfidence} /></div>
             <div className="flex justify-between font-mono text-[8px] uppercase tracking-[0.1em] text-faint"><span>done to death</span><span>open sky</span></div>
             {lowConfidence && <p className="mt-0.5 text-[10.5px] leading-tight text-vermilion">Low confidence: treat the number as a hint.</p>}
           </>

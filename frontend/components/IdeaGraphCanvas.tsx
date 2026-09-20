@@ -51,14 +51,12 @@ const nodeRadius = (n: GraphNode) => (n.kind === "idea" ? 11 : n.kind === "facet
 const now = () => (typeof performance !== "undefined" ? performance.now() : Date.now());
 
 // Canvas `font` strings cannot contain var(): the real family names from next/font are read once on mount.
-const FONT = { serif: "Georgia, serif", mono: "ui-monospace, Menlo, monospace" };
+// one typeface site-wide: `serif` and `mono` survive as roles (names vs. figures), both set in Instrument Sans
+const FONT = { serif: "ui-sans-serif, system-ui, sans-serif", mono: "ui-sans-serif, system-ui, sans-serif" };
 function resolveFonts() {
   if (typeof window === "undefined") return;
-  const css = getComputedStyle(document.documentElement);
-  const serif = css.getPropertyValue("--font-instrument-serif").trim();
-  const mono = css.getPropertyValue("--font-dm-mono").trim();
-  if (serif) FONT.serif = `${serif}, Georgia, serif`;
-  if (mono) FONT.mono = `${mono}, ui-monospace, monospace`;
+  const sans = getComputedStyle(document.documentElement).getPropertyValue("--font-instrument-sans").trim();
+  if (sans) FONT.serif = FONT.mono = `${sans}, ui-sans-serif, system-ui, sans-serif`;
   // make sure the faces the canvas needs are actually fetched (the DOM may not have used them yet)
   void document.fonts?.load(`italic 14px ${FONT.serif}`);
   void document.fonts?.load(`12px ${FONT.mono}`);

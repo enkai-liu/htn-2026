@@ -4,7 +4,7 @@ import { ChevronDown, Trophy } from "lucide-react";
 import { memo, useEffect, useRef, useState } from "react";
 import { fmtSim, sourceColor } from "@/lib/format";
 import type { EvidenceBadge, EvidenceCardModel } from "@/lib/selectors";
-import { EvidenceDetail, listingLabel } from "./EvidenceDetail";
+import { EvidenceDetail, SiteChip, listingLabel } from "./EvidenceDetail";
 import { Chip, SourceMark } from "./ui";
 
 const BADGE: Record<EvidenceBadge, { label: string; tone: "amber" | "teal" | "red" | "mute" | "bone"; title: string }> = {
@@ -29,7 +29,7 @@ export const EvidenceCard = memo(function EvidenceCard({ card, selected, onSelec
   return (
     <article
       ref={ref}
-      className={clsx("animate-rise border bg-ink-800/50 transition-colors duration-300", selected ? "border-amber shadow-[0_0_0_1px_var(--color-amber),0_0_24px_rgb(244_185_66/0.12)]" : "border-line hover:border-line-strong")}
+      className={clsx("animate-rise border bg-ink-800/50 transition-colors duration-300", selected ? "border-accent shadow-[0_0_0_1px_var(--color-accent),0_0_24px_rgb(47_107_230/0.12)]" : "border-line hover:border-line-strong")}
     >
       <button type="button" className="block w-full px-3 pb-2 pt-2.5 text-left" onClick={() => { if (expanded) { setOpen(false); if (selected) onSelect(null); } else { setOpen(true); onSelect(card); } }} aria-expanded={expanded}>
         <div className="flex items-start gap-2">
@@ -53,7 +53,7 @@ export const EvidenceCard = memo(function EvidenceCard({ card, selected, onSelec
           </div>
         )}
 
-        {card.badges.length > 0 && (
+        {(card.badges.length > 0 || card.site) && (
           <div className="mt-2 flex flex-wrap gap-1">
             {card.badges.map((b) => (
               <Chip key={b} tone={BADGE[b].tone} title={BADGE[b].title} flip>
@@ -61,6 +61,7 @@ export const EvidenceCard = memo(function EvidenceCard({ card, selected, onSelec
                 {b === "merged" ? `merged ×${card.records.length}` : b === "left_open" && card.possibleSameAs.length ? `same as ${card.possibleSameAs[0]}? left open` : BADGE[b].label}
               </Chip>
             ))}
+            {card.site && <SiteChip site={card.site} />}
           </div>
         )}
 

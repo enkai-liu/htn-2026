@@ -12,10 +12,11 @@ export function StarGlyph({ size = 18, className }: { size?: number; className?:
   );
 }
 
-export function Wordmark({ className }: { className?: string }) {
+/** `pill`: on the water the mark sits in the same white pill as the spend and the score, so it reads the same on every page. */
+export function Wordmark({ className, pill }: { className?: string; pill?: boolean }) {
   return (
-    <Link href="/" className={clsx("group inline-flex items-center gap-2 text-bone", className)} aria-label="Whitespace home">
-      <StarGlyph className="text-amber transition-transform duration-500 group-hover:-translate-y-0.5" />
+    <Link href="/" className={clsx("group inline-flex items-center gap-2 text-bone", pill && "h-9 rounded-full border border-line bg-ink-900 pl-3 pr-4 transition-colors hover:border-line-strong", className)} aria-label="Whitespace home">
+      <StarGlyph className="text-accent transition-transform duration-500 group-hover:-translate-y-0.5" />
       <span className="font-display text-[22px] leading-none">
         White<span className="text-bone-dim">space</span>
       </span>
@@ -26,7 +27,7 @@ export function Wordmark({ className }: { className?: string }) {
 export function SiteNav() {
   return (
     <header className="relative z-10 flex h-[60px] flex-none items-center justify-between px-5 sm:px-8">
-      <Wordmark />
+      <Wordmark pill />
     </header>
   );
 }

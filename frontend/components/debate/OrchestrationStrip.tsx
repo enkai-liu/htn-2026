@@ -106,7 +106,7 @@ export function OrchestrationStrip({ board }: { board: DebateBoard }) {
             title="Scouts are the only role that retrieves, so every request for more evidence loops back through them."
           >
             <div className="flex items-center gap-1.5">
-              {scouts.status === "active" && <span className="size-[7px] animate-beacon rounded-full bg-amber text-amber" />}
+              {scouts.status === "active" && <span className="size-[7px] animate-beacon rounded-full bg-accent text-accent" />}
               <span className={clsx("text-[12px] font-medium sm:text-[13px]", sentBack ? "text-amber" : "text-mute")}>Scouts</span>
             </div>
             <div className="hidden font-mono text-[9.5px] text-faint sm:block">{sentBack ? `sent back out ×${sentBack}` : "on call"}</div>

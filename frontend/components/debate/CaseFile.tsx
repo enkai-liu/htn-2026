@@ -56,7 +56,7 @@ function Exchange({ claim, evidence, models }: { claim: ClaimState; evidence: Ev
           return (
             <blockquote key={e.evid} className="mt-1.5 text-[12px] italic leading-snug text-bone-dim">
               “{e.quote}”
-              {href && <a href={href} target="_blank" rel="noopener noreferrer" className="ml-1.5 font-mono text-[9.5px] not-italic text-amber hover:underline">source ↗</a>}
+              {href && <a href={href} target="_blank" rel="noopener noreferrer" className="ml-1.5 font-mono text-[9.5px] not-italic text-accent hover:underline">source ↗</a>}
             </blockquote>
           );
         })}

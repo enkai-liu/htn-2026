@@ -5,7 +5,7 @@ import Link from "next/link";
 import { FACET_KEYS } from "@/lib/islandLayout";
 import { fmtSim, safeHref, shortModel, splitEnumerated } from "@/lib/format";
 import type { GraphNode } from "@/lib/types";
-import { EvidenceDetail, listingLabel } from "../EvidenceDetail";
+import { EvidenceDetail, SiteChip, listingLabel } from "../EvidenceDetail";
 import { Chip, InferredTag, SourceMark } from "../ui";
 import { useRun } from "./RunProvider";
 
@@ -45,10 +45,10 @@ function FacetRow({ label, value }: { label: string; value: string }) {
             {items.map((it, i) => (
               <li key={it} className="flex gap-2">
                 {ordered ? (
-                  <span className="flex-none select-none font-mono text-[9.5px] leading-[1.45] tabular-nums text-amber">{String(i + 1).padStart(2, "0")}</span>
+                  <span className="flex-none select-none font-mono text-[9.5px] leading-[1.45] tabular-nums text-accent">{String(i + 1).padStart(2, "0")}</span>
                 ) : (
                   // shares the text's line box so it sits on the same baseline; muted, because the marker
-                  // carries no meaning here — amber is reserved for the steps, where the order is the point
+                  // carries no meaning here — the accent is reserved for the steps, where the order is the point
                   <span className="w-[14px] flex-none select-none text-center leading-snug text-line-strong">·</span>
                 )}
                 <span className="min-w-0">{it}</span>
@@ -131,9 +131,10 @@ export function DetailCard({ node }: { node: GraphNode }) {
       <>
         {card?.summary && <p className="line-clamp-5 text-[13.5px] leading-relaxed text-bone-dim">{card.summary}</p>}
         <SimilarityBar value={card?.similarity ?? node.similarity} />
-        {!!(card?.badges.length ?? node.badges.length) && (
+        {!!((card?.badges.length ?? node.badges.length) || card?.site) && (
           <div className="mt-3 flex flex-wrap gap-1">
             {(card?.badges ?? node.badges).map((b) => <Chip key={b} tone={b === "winner" ? "amber" : b === "conflict" || b === "source_failed" ? "red" : undefined}>{b.replace(/_/g, " ")}</Chip>)}
+            {card?.site && <SiteChip site={card.site} />}
           </div>
         )}
         {!!card?.possibleSameAs.length && <p className="mt-2 text-[12.5px] text-amber">Possibly the same as {card.possibleSameAs.join(", ")}: left open for lack of evidence.</p>}

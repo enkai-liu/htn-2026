@@ -19,7 +19,7 @@ export default async function RunTabsLayout({ children, params }: LayoutProps<"/
   const { id } = await params;
   return (
     // RunProvider reads ?replay= and ?speed= with useSearchParams, which needs a Suspense boundary to prerender
-    <Suspense fallback={<div className="flex h-dvh items-center justify-center font-display text-[20px] italic text-mute">Charting the islands…</div>}>
+    <Suspense fallback={<div className="flex h-dvh items-center justify-center font-display text-[20px] italic text-on-sea">Charting the islands…</div>}>
       <RunProvider runId={decodeURIComponent(id)}>{children}</RunProvider>
     </Suspense>
   );

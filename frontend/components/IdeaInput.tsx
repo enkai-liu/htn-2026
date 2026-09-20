@@ -66,9 +66,9 @@ export function IdeaInput() {
           value={text}
           onChange={(e) => setText(e.target.value.slice(0, MAX_CHARS))}
           onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") void submit(); }}
-          rows={7}
+          rows={5}
           spellCheck
-          placeholder="Write your pitch!"
+          placeholder="What are you thinking of building?"
           className="block w-full resize-y bg-transparent font-display text-[21px] leading-[1.4] text-bone outline-none placeholder:text-faint placeholder:italic"
         />
 
@@ -114,7 +114,7 @@ export function IdeaInput() {
               {REPLAY_ONLY && (
                 <>
                   {" "}
-                  <Link href="/runs/mock" className="text-amber underline decoration-dotted underline-offset-4 hover:text-bone">
+                  <Link href="/runs/mock" className="text-accent underline decoration-dotted underline-offset-4 hover:text-bone">
                     Watch the recorded run instead
                   </Link>
                   .

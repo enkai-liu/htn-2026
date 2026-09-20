@@ -11,14 +11,15 @@ import { IslandMap } from "./islands/IslandMap";
 const WIDE = "(min-width: 1024px)";
 const subscribe = (cb: () => void) => { const m = window.matchMedia(WIDE); m.addEventListener("change", cb); return () => m.removeEventListener("change", cb); };
 
-export function HeroIslands({ className }: { className?: string }) {
+/** `empty`: open water only, for a page with nothing on it (the 404). */
+export function HeroIslands({ className, empty }: { className?: string; empty?: boolean }) {
   const [{ graph, layout }] = useState(() => heroIslands());
   const [seen] = useState(() => new Set<string>());
   // on a narrow screen the form covers the middle of the page, so there is only open water and the boats on it
-  const wide = useSyncExternalStore(subscribe, () => window.matchMedia(WIDE).matches, () => true);
+  const wide = useSyncExternalStore(subscribe, () => window.matchMedia(WIDE).matches, () => true) && !empty;
   return (
     <div className={className} aria-hidden>
-      <IslandMap ambient anchorX={0.77} graph={wide ? graph : emptyGraph} layout={wide ? layout : emptyLayout} selectedId={null} onSelect={() => {}} seen={seen} />
+      <IslandMap ambient anchorX={0.75} graph={wide ? graph : emptyGraph} layout={wide ? layout : emptyLayout} selectedId={null} onSelect={() => {}} seen={seen} />
     </div>
   );
 }

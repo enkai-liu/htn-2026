@@ -1,7 +1,7 @@
 // Per-event `data` payloads (docs/events.md table). Frontend-only helper types layered on lib/types.ts.
 // Every field a reducer reads is treated as optional at runtime: a malformed event must never crash the UI.
 import type {
-  Claim, ClaimStatus, CoachMessage, CoachPitch, Conflict, Entity, Facets, GraphPatch, JurorVote, MergeVerdict, Mutation, Report, Scores,
+  Claim, ClaimStatus, CoachMessage, CoachPitch, Conflict, Entity, Facets, GraphPatch, JurorVote, MergeVerdict, Mutation, Report, Scores, SiteCheck,
   SourceRecord, Voice, Evidence } from "./types";
 
 export interface RunStartedData { idea_text: string; url?: string | null; orchestrator?: "asyncio" | "jiuwen" | string; replay?: boolean; mock?: boolean }
@@ -17,6 +17,7 @@ export interface SourceFailedData { source: string; error: string; reassigned_to
 export interface EvidenceFoundData { record: SourceRecord; eid?: string }
 export interface EntityMergedData { entity: Entity; rids: string[]; verdict: MergeVerdict }
 export interface ConflictDetectedData { eid: string; conflict: Conflict }
+export interface SiteCheckedData { eid: string; site: SiteCheck }
 /** `evidence` carries the quoted receipts so the debate can show them while it streams, not only in the final report. */
 export interface ClaimProposedData { claim: Claim; evidence?: Evidence[]; facets?: string[]; simulated?: boolean }
 export interface ClaimChallengedData { cid: string; by: string; challenge_type: "CHALLENGE" | "REBUTTAL" | "CONCEDE"; text: string; evidence?: string[]; simulated?: boolean }
@@ -51,6 +52,7 @@ export interface PayloadMap {
   "evidence.found": EvidenceFoundData;
   "entity.merged": EntityMergedData;
   "conflict.detected": ConflictDetectedData;
+  "site.checked": SiteCheckedData;
   "claim.proposed": ClaimProposedData;
   "claim.challenged": ClaimChallengedData;
   "claim.resolved": ClaimResolvedData;

@@ -129,6 +129,19 @@ describe("runReducer on the mock run", () => {
     expect(s).toEqual(foldEvents(events.slice(0, 40)));
   });
 
+  it("attaches the inspector's live-site check to the entity's evidence card", () => {
+    const eid = final.entityOrder[0];
+    const site = { eid, rid: final.entities[eid].records[0], url: "https://gone.example.org", status: "dead", why: "HTTP 404", http_status: 404, screenshot: null };
+    const ev = { seq: final.lastSeq + 1, run_id: "mock", ts: 1, agent: "inspector", phase: "verify", type: "site.checked", data: { eid, site } } as unknown as AgentEvent;
+    const s = runReducer(final, ev);
+    expect(selectEvidenceCards(s).find((c) => c.eid === eid)?.site).toMatchObject({ status: "dead", http_status: 404 });
+    expect(s.timeline.at(-1)).toMatchObject({ title: "gone.example.org: dead", tag: "live site" });
+    expect(selectEvidenceCards(final).every((c) => c.site === null)).toBe(true);
+    // a malformed payload changes nothing but the cursor
+    const bad = runReducer(final, { ...ev, data: { eid } } as unknown as AgentEvent);
+    expect(bad.sites).toBe(final.sites);
+  });
+
   it("survives malformed events", () => {
     const bad = { seq: 1, run_id: "x", ts: 1, agent: "conductor", phase: "plan", type: "team.formed", data: { team: "nope" } } as unknown as AgentEvent;
     const s = runReducer(initialRunState, bad);

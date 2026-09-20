@@ -26,8 +26,8 @@ const TREE_DARK = new Color("#557f58");
 const GOLD = new Color("#e0a422");
 const POLE = new Color("#5d564b");
 const LIME = new Color("#faf6ec");
-const BAND = new Color("#e9a23b");
-const BAND_DARK = new Color("#c9791f");
+const BAND = new Color("#2a5fd0");
+const BAND_DARK = new Color("#173f96");
 const LANTERN = new Color("#ffd76a");
 const HULL = new Color("#b98f63");
 const DECK = new Color("#e6d2b0");
@@ -35,6 +35,10 @@ const LANTERN_H = 0.13;
 
 /** Height of the lighthouse lantern above an idea island's turf, in island sizes: where the scene hangs the glow. */
 export const LANTERN_AT = 0.1 + 0.3 + 0.18 + 0.32 + 0.035 + LANTERN_H / 2;
+
+/** How far an island's beach can reach from its middle at the waterline, in island sizes: the beach's width there
+ *  (between 1.03 and 1.2) at the furthest the coast is roughened out (1.16). Boats keep outside this. */
+export const SHORE_REACH = 1.12 * 1.16;
 
 const slabHeight = (size: number) => 0.16 * size + 0.06;
 const beachHeight = (size: number) => 0.08 * size + 0.05;

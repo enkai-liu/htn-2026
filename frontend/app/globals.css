@@ -1,29 +1,33 @@
 @import "tailwindcss";
 
-/* Whitespace: paper-white and quiet. One warm accent (your idea), teal for open water (whitespace),
-   vermilion for anything that failed or was struck. The legacy token names (ink = surfaces, bone = text) are kept
-   so every existing utility re-skins itself; `.theme-dark` restores the original night-atlas values for the
-   classic dashboard and the 2D chart fallback. New code should prefer the semantic aliases below. */
+/* Whitespace: open water and quiet white cards. The map and the landing page sit on the sea itself; the reading
+   pages sit on the same blue let down with white, because full-strength sea behind large white cards glares. Surfaces,
+   hairlines and text are tinted toward it so nothing reads as warm paper. The palette is a sea chart's: a deep marine
+   blue accent (the brand, the active tab, links, your idea), teal for whitespace, vermilion for anything that failed
+   or was struck, and gold kept for caution only (inferred, contested, simulated). One typeface, Instrument Sans. The legacy token names (ink =
+   surfaces, bone = text) are kept so every existing utility re-skins itself; `.theme-dark` restores the original
+   night-atlas values for the classic dashboard and the 2D chart fallback. */
 
 /* static: emit every token even if no utility uses it, because inline styles and the .theme-dark scope read them */
 @theme static {
-  --color-ink-950: #f6f5f1;
+  --color-ink-950: #dcedf4; /* the canvas of the reading pages: the sea, let down with white, so white cards sit on it quietly */
   --color-ink-900: #ffffff;
-  --color-ink-850: #fbfaf8;
-  --color-ink-800: #f2f0eb;
-  --color-ink-700: #e9e6df;
-  --color-ink-600: #d8d5cc;
-  --color-ink-500: #bfbbb1;
-  --color-line: rgb(20 22 28 / 0.09);
-  --color-line-strong: rgb(20 22 28 / 0.17);
+  --color-ink-850: #f5fafc;
+  --color-ink-800: #eaf3f7;
+  --color-ink-700: #dbe9f0;
+  --color-ink-600: #c2d6e0;
+  --color-ink-500: #a3bcc9;
+  --color-line: rgb(14 42 60 / 0.1);
+  --color-line-strong: rgb(14 42 60 / 0.19);
 
-  --color-bone: #16181d;
-  --color-bone-dim: #4a4f5a;
-  --color-mute: #6b717c;
-  --color-faint: #8d929c;
+  --color-bone: #0f222e;
+  --color-bone-dim: #3a5162;
+  --color-mute: #597081;
+  --color-faint: #8299a7;
 
-  --color-amber: #b45309;
-  --color-amber-dim: #d9a441;
+  /* caution only: inferred, contested, degraded, simulated. Never the brand. */
+  --color-amber: #9a6a00;
+  --color-amber-dim: #d3ae4f;
   --color-teal: #0f766e;
   --color-teal-dim: #5eaaa2;
   --color-vermilion: #c0281f;
@@ -44,12 +48,18 @@
   --color-surface: var(--color-ink-900);
   --color-text: var(--color-bone);
   --color-text-dim: var(--color-bone-dim);
-  --color-accent: var(--color-amber);
-  --color-accent-fill: #f4b942;
+  /* small text set straight on the water, where --color-mute is too faint to read */
+  --color-on-sea: #2f4a5b;
+  /* the brand: deep marine blue. Reads on white cards, on the pale canvas and in the white pills on the water. */
+  --color-accent: #1a4fc4;
+  --color-accent-dim: #86a5e6;
+  --color-accent-fill: #2f6be6;
 
-  --font-display: var(--font-instrument-serif), "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+  /* One face. `font-display` and `font-mono` survive as roles (headings and quotes; labels and figures), styled in
+     the base layer below, so every existing utility re-skins itself. */
   --font-sans: var(--font-instrument-sans), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-dm-mono), ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --font-display: var(--font-sans);
+  --font-mono: var(--font-sans);
 
   --animate-rise: rise 0.42s cubic-bezier(0.2, 0.7, 0.2, 1) both;
   --animate-flip: flip 0.5s cubic-bezier(0.3, 1.4, 0.5, 1) both;
@@ -71,7 +81,7 @@
   100% { box-shadow: 0 0 0 7px transparent; }
 }
 @keyframes flash {
-  0% { background-color: color-mix(in srgb, var(--flash, var(--color-amber)) 26%, transparent); }
+  0% { background-color: color-mix(in srgb, var(--flash, var(--color-accent)) 26%, transparent); }
   100% { background-color: transparent; }
 }
 @keyframes drift {
@@ -92,11 +102,11 @@
 :root {
   color-scheme: light;
   /* low-alpha tint used by chips, buttons and hairline fills */
-  --tint: 20 22 28;
+  --tint: 14 42 60;
   --chart-surface: #ffffff;
-  --role-conductor: #b45309; --role-resolver: #7a6a3f; --role-critic: #c0281f; --role-advocate: #0f766e;
+  --role-conductor: #0b3a75; --role-resolver: #7a6a3f; --role-critic: #c0281f; --role-advocate: #0f766e;
   --role-judge: #6d28d9; --role-verifier: #1d4ed8; --role-synthesizer: #374151; --role-mutator: #0e7490;
-  --role-actuator: #a16207; --role-fire-drill: #b45309; --role-user: #16181d; --role-default: #6b717c;
+  --role-actuator: #4d7c0f; --role-fire-drill: #9a6a00; --role-user: #0f222e; --role-default: #597081;
 }
 
 html, body {
@@ -121,15 +131,16 @@ body {
   --color-ink-700: #152036; --color-ink-600: #1e2d4a; --color-ink-500: #2b3d61;
   --color-line: rgb(150 176 230 / 0.13); --color-line-strong: rgb(150 176 230 / 0.26);
   --color-bone: #ece5d3; --color-bone-dim: #b4b09f; --color-mute: #7c8498; --color-faint: #4d566b;
-  --color-amber: #f4b942; --color-amber-dim: #a97f2b; --color-teal: #4fd6c0; --color-teal-dim: #2c8677;
+  --color-amber: #e6c15a; --color-amber-dim: #8f7a3a; --color-accent: #7fb0ff; --color-accent-dim: #3f5f99; --color-accent-fill: #7fb0ff;
+  --color-teal: #4fd6c0; --color-teal-dim: #2c8677;
   --color-vermilion: #ff5d4d; --color-vermilion-dim: #9c352c;
   --color-src-devpost: #78b4ff; --color-src-yc: #ff9466; --color-src-github: #c4bdf0;
   --color-src-hn: #e87fa6; --color-src-arxiv: #9ad17f; --color-src-web: #9cc9d9;
   --tint: 150 176 230;
   --chart-surface: #0a101c;
-  --role-conductor: #f4b942; --role-resolver: #d9c9a3; --role-critic: #ff8a7a; --role-advocate: #4fd6c0;
+  --role-conductor: #7fb0ff; --role-resolver: #d9c9a3; --role-critic: #ff8a7a; --role-advocate: #4fd6c0;
   --role-judge: #c4bdf0; --role-verifier: #78b4ff; --role-synthesizer: #ece5d3; --role-mutator: #7fe0d0;
-  --role-actuator: #e0a94a; --role-fire-drill: #f4b942; --role-user: #ece5d3; --role-default: #b4b09f;
+  --role-actuator: #b5d67a; --role-fire-drill: #e6c15a; --role-user: #ece5d3; --role-default: #b4b09f;
   color: var(--color-bone);
   background:
     radial-gradient(ellipse 90% 70% at 50% -10%, rgb(40 66 120 / 0.22), transparent 60%),
@@ -139,7 +150,7 @@ body {
 }
 
 ::selection {
-  background: rgb(244 185 66 / 0.4);
+  background: color-mix(in srgb, var(--color-accent-fill) 28%, transparent);
   color: inherit;
 }
 
@@ -154,6 +165,15 @@ body {
 :focus-visible {
   outline: 2px solid var(--color-accent-fill);
   outline-offset: 2px;
+}
+
+/* With one typeface the old serif and mono utilities carry a role instead of a face: display text is set a touch
+   heavier and tighter (quotes and running prose stay regular), and labels and figures line up on tabular numerals.
+   Base layer, so any weight or tracking utility on the element still wins. */
+@layer base {
+  .font-display { font-weight: 500; letter-spacing: -0.014em; }
+  .font-display.italic, .font-display.prose-atlas { font-weight: 400; letter-spacing: 0; }
+  .font-mono, .label, .chip, .plate-head { font-variant-numeric: tabular-nums; }
 }
 
 @layer components {
@@ -175,7 +195,7 @@ body {
     width: 9px;
     height: 9px;
     pointer-events: none;
-    border-color: var(--color-amber-dim);
+    border-color: var(--color-accent-dim);
     border-style: solid;
     opacity: 0.9;
   }
@@ -196,7 +216,7 @@ body {
     color: var(--color-mute);
     flex: none;
   }
-  .plate-head .idx { color: var(--color-amber); letter-spacing: 0.08em; }
+  .plate-head .idx { color: var(--color-accent); letter-spacing: 0.08em; }
   .plate-head .ttl { color: var(--color-bone-dim); }
 
   .label {
@@ -232,7 +252,7 @@ body {
 
   /* hazard tape for anything simulated */
   .hazard {
-    background-image: repeating-linear-gradient(-45deg, rgb(244 185 66 / 0.22) 0 6px, transparent 6px 12px);
+    background-image: repeating-linear-gradient(-45deg, color-mix(in srgb, var(--color-amber-dim) 40%, transparent) 0 6px, transparent 6px 12px);
     border: 1px dashed color-mix(in srgb, var(--color-amber) 60%, transparent);
     color: var(--color-amber);
   }
@@ -270,9 +290,9 @@ body {
   .btn:active:not(:disabled) { transform: translateY(1px); }
   .btn:disabled { opacity: 0.45; cursor: not-allowed; }
   .btn-primary { background: var(--color-bone); border-color: var(--color-bone); color: var(--color-ink-900); }
-  .btn-primary:hover:not(:disabled) { background: #2b2f38; border-color: #2b2f38; }
-  .theme-dark .btn-primary { background: var(--color-amber); border-color: var(--color-amber); color: #130d02; font-weight: 500; }
-  .theme-dark .btn-primary:hover:not(:disabled) { background: #ffd074; border-color: #ffd074; }
+  .btn-primary:hover:not(:disabled) { background: #1d3c50; border-color: #1d3c50; }
+  .theme-dark .btn-primary { background: var(--color-accent); border-color: var(--color-accent); color: #04101f; font-weight: 500; }
+  .theme-dark .btn-primary:hover:not(:disabled) { background: #a6c8ff; border-color: #a6c8ff; }
   .btn-teal { border-color: color-mix(in srgb, var(--color-teal) 50%, transparent); color: var(--color-teal); background: color-mix(in srgb, var(--color-teal) 6%, transparent); }
   .btn-teal:hover:not(:disabled) { background: color-mix(in srgb, var(--color-teal) 14%, transparent); border-color: var(--color-teal); }
   .btn-sm, .theme-dark .btn-sm { height: 26px; padding: 0 10px; font-size: 11px; }
@@ -282,10 +302,35 @@ body {
   .prose-atlas p { margin: 0 0 0.7em; }
   .prose-atlas strong { color: var(--color-bone); font-weight: 600; }
   .prose-atlas ul { margin: 0 0 0.7em; padding-left: 1.1em; list-style: square; }
-  .prose-atlas code { font-family: var(--font-mono); font-size: 0.9em; color: var(--color-amber); }
-  .prose-atlas h3, .prose-atlas h4 { font-family: var(--font-display); font-size: 1.25em; margin: 0.4em 0 0.3em; color: var(--color-bone); }
-  .prose-atlas sup a { color: var(--color-amber); font-family: var(--font-mono); font-size: 0.85em; text-decoration: none; padding: 0 1px; }
+  .prose-atlas code { font-family: var(--font-mono); font-size: 0.9em; color: var(--color-accent); }
+  .prose-atlas h3, .prose-atlas h4 { font-family: var(--font-display); font-size: 1.15em; font-weight: 600; margin: 0.4em 0 0.3em; color: var(--color-bone); }
+  .prose-atlas sup a { color: var(--color-accent); font-family: var(--font-mono); font-size: 0.85em; text-decoration: none; padding: 0 1px; }
   .prose-atlas sup a:hover { text-decoration: underline; }
+}
+
+/* Keep the text shore light and let the open ocean carry the illustration. */
+.landing-ocean::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(90deg, rgb(218 240 235 / 0.88), rgb(207 232 229 / 0.65) 30%, rgb(197 228 226 / 0.12) 58%, transparent 75%);
+}
+.landing-content { position: relative; }
+.landing-pitch .plate {
+  border-color: rgb(255 255 255 / 0.8);
+  background: rgb(255 255 255 / 0.94);
+  border-radius: 20px;
+  box-shadow: 0 16px 50px -18px rgb(24 67 81 / 0.28), 0 2px 6px rgb(24 67 81 / 0.04);
+  overflow: hidden;
+}
+.landing-pitch .plate-head { min-height: 42px; padding-inline: 20px; letter-spacing: 0.13em; }
+.landing-pitch textarea { font-size: 18px; min-height: 145px; }
+.landing-pitch textarea::placeholder { font-style: normal; color: #78919c; }
+.landing-pitch .btn-primary { background: #174c61; border-color: #174c61; }
+.landing-pitch .btn-primary:disabled { opacity: 0.55; }
+@media (max-width: 1023px) {
+  .landing-ocean::after { background: linear-gradient(110deg, rgb(218 240 235 / 0.87), rgb(207 232 229 / 0.6)); }
 }
 
 /* labels floating over the islands map: positioned every frame by the scene, so no transitions on transform */
@@ -309,7 +354,7 @@ body {
   transition: opacity 0.25s;
 }
 .island-label[data-on="1"] { color: var(--color-ink-900); background: var(--color-bone); box-shadow: none; z-index: 2; }
-.island-label[data-kind="idea"] { color: #6b3a05; background: #fbe3b0; box-shadow: none; font-weight: 600; }
+.island-label[data-kind="idea"] { color: #ffffff; background: var(--color-accent); box-shadow: none; font-weight: 600; }
 .island-label[data-kind="mutation"] { color: var(--color-teal); }
 
 /* the map's loading state. It fades in late, so a scene that is ready within a frame or two never flashes it. */

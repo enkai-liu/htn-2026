@@ -50,8 +50,8 @@ const STATUS_PILL: Record<RunStatus, { label: string; color: string; pulse?: boo
   connecting: { label: "Connecting", color: "var(--color-mute)", pulse: true },
   live: { label: "Live", color: "var(--color-vermilion)", pulse: true },
   reconnecting: { label: "Reconnecting", color: "var(--color-amber)", pulse: true },
-  replaying: { label: "Replay", color: "var(--color-amber)", pulse: true },
-  paused: { label: "Replay · paused", color: "var(--color-amber)" },
+  replaying: { label: "Replay", color: "var(--color-accent)", pulse: true },
+  paused: { label: "Replay · paused", color: "var(--color-accent)" },
   finished: { label: "Finished", color: "var(--color-teal)" },
   failed: { label: "Run failed", color: "var(--color-vermilion)" },
   error: { label: "Offline", color: "var(--color-vermilion)" },
@@ -234,11 +234,11 @@ function RunViewInner({ runId, replay, speed }: { runId: string; replay: string 
                   onClick={() => pickTab(t.id)}
                   className={clsx("relative flex items-center gap-1.5 px-3 font-mono text-[10.5px] uppercase tracking-[0.16em] transition-colors", tab === t.id ? "text-bone" : "text-mute hover:text-bone-dim")}
                 >
-                  <span className="text-[9px] text-amber/80">{String(i + 5).padStart(2, "0")}</span>
+                  <span className="text-[9px] text-accent/80">{String(i + 5).padStart(2, "0")}</span>
                   {t.label}
                   {counts[t.id] != null && <span className="text-[9px] text-faint">{counts[t.id]}</span>}
                   {t.id === "report" && state.report && <span className="size-[5px] rounded-full bg-teal" />}
-                  {tab === t.id && <span className="absolute inset-x-2 bottom-0 h-[2px] bg-amber" />}
+                  {tab === t.id && <span className="absolute inset-x-2 bottom-0 h-[2px] bg-accent" />}
                 </button>
               ))}
               <button

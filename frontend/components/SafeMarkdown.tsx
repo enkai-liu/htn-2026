@@ -24,7 +24,7 @@ function inline(text: string, keyPrefix: string): ReactNode[] {
     } else {
       const parts = /^\[([^\]]+)\]\(([^)\s]+)\)$/.exec(tok);
       const href = parts ? safeHref(parts[2]) : null;
-      out.push(href ? <a key={key} href={href} target="_blank" rel="noopener noreferrer" className="text-amber underline decoration-dotted underline-offset-2">{parts![1]}</a> : parts ? parts[1] : tok);
+      out.push(href ? <a key={key} href={href} target="_blank" rel="noopener noreferrer" className="text-accent underline decoration-dotted underline-offset-2">{parts![1]}</a> : parts ? parts[1] : tok);
     }
     last = at + tok.length;
   }

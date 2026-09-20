@@ -1,6 +1,6 @@
 // Derived views over RunState. Pure functions, memoised by the components with useMemo.
 import type { RunState } from "./runReducer";
-import type { Entity, GraphNode, MergeDecision, SourceRecord } from "./types";
+import type { Entity, GraphNode, MergeDecision, SiteCheck, SourceRecord } from "./types";
 
 export type EvidenceBadge = "winner" | "merged" | "conflict" | "imputed" | "ai_written" | "source_failed" | "left_open";
 
@@ -17,6 +17,8 @@ export interface EvidenceCardModel {
   records: SourceRecord[];
   entity: Entity | null;
   badges: EvidenceBadge[];
+  /** the product's own site as a cloud browser found it today, when the inspector looked */
+  site: SiteCheck | null;
   /** names of entities the resolver declined to merge with this one */
   possibleSameAs: string[];
 }
@@ -68,6 +70,7 @@ export function selectEvidenceCards(state: RunState): EvidenceCardModel[] {
       records,
       entity: ent,
       badges,
+      site: state.sites[eid] ?? null,
       possibleSameAs: (ent.possible_same_as ?? []).map((other) => entityName(state, other)),
     });
   }
@@ -93,6 +96,7 @@ export function selectEvidenceCards(state: RunState): EvidenceCardModel[] {
       records: [rec],
       entity: null,
       badges,
+      site: null,
       possibleSameAs: [],
     });
   }
