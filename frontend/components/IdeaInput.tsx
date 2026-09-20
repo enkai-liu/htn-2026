@@ -109,10 +109,21 @@ export function IdeaInput() {
         </div>
 
         <div className="mt-4 flex flex-wrap items-center gap-3">
-          <button type="submit" className="btn btn-primary h-10 px-5" disabled={!searchReady || busy}>
-            {busy ? <LoaderCircle size={14} className="animate-spin" /> : <ArrowRight size={14} />}
-            {busy ? "Forming the team" : "Investigate"}
-          </button>
+          {REPLAY_ONLY ? (
+            // no backend behind this deploy: the way in is the recording, and it should not take a failed submit to find it
+            <>
+              <Link href="/runs/mock" className="btn btn-primary h-10 px-5">
+                <ArrowRight size={14} />
+                Watch a recorded run
+              </Link>
+              <span className="text-[12px] text-faint">This site replays a recording; live runs need the backend.</span>
+            </>
+          ) : (
+            <button type="submit" className="btn btn-primary h-10 px-5" disabled={!searchReady || busy}>
+              {busy ? <LoaderCircle size={14} className="animate-spin" /> : <ArrowRight size={14} />}
+              {busy ? "Forming the team" : "Investigate"}
+            </button>
+          )}
         </div>
 
         {error && (

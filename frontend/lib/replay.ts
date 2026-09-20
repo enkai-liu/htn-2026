@@ -55,7 +55,9 @@ export function parseJsonl(text: string): AgentEvent[] {
 }
 
 export async function loadReplay(name: string, signal?: AbortSignal): Promise<AgentEvent[]> {
-  const res = await fetch(`/replay/${encodeURIComponent(name)}.jsonl`, { signal, cache: "no-cache" });
+  // inlined at build time; "" unless the site is served under a sub-path (next.config.ts)
+  const base = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+  const res = await fetch(`${base}/replay/${encodeURIComponent(name)}.jsonl`, { signal, cache: "no-cache" });
   if (!res.ok) throw new Error(`no recorded run named “${name}” (HTTP ${res.status})`);
   const events = parseJsonl(await res.text());
   if (!events.length) throw new Error(`recorded run “${name}” is empty`);
