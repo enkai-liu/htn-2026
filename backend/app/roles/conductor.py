@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import re
 
 from pydantic import BaseModel, Field
 
@@ -12,6 +13,7 @@ from app.orchestration.host import Ctx, envelope, error, result, task
 from app.orchestration.registry import register
 from app.roles.base import HOUSE_RULES, BaseRole, clipped
 from app.schemas import FACET_KEYS, Facets, GraphLink, GraphNode, GraphPatch, SourceStatus
+from app.scoring.similarity import tokens
 from app.sources import idea_url
 from app.sources.http import SourceError
 
@@ -23,6 +25,11 @@ SCOUT_PURPOSE = {
     "scout.web": "the open web: companies, shipped products and launch posts of any kind, hardware and services included (Exa neural search, page text attached)",
 }
 SEMANTIC_SCOUTS = ("scout.devpost", "scout.yc", "scout.web")  # these take natural-language queries; the rest want keywords
+SHORT_PITCH = 8  # content words: below this a pitch is a topic, not a description
+_SENTENCE = re.compile(r"(?<=[.!?])\s+")
+_ABOUT_THE_PITCH = re.compile(r"\b(the|this|your) (idea|pitch|author|concept|description)\b|\bas (stated|written|pitched)\b"
+                              r"|\b(not|n't) (specif|stat|say|mention)|\bunclear\b", re.IGNORECASE)
+_A_THING = re.compile(r"(an?|the) \w", re.IGNORECASE)  # "A company that ...", "An app for ...": how a project page opens
 DEBATE_TEAM = ["resolver", "critic", "advocate", "judge", "verifier", "synthesizer", "mutator", "actuator"]
 
 
@@ -33,7 +40,9 @@ class Plan(BaseModel):
     problem_query: clipped(300) = Field(default="", description="the problem alone, in one sentence, with NO mention of how this idea "
                                         "solves it: it finds work that attacked the same problem a different way")
     writeup: clipped(600) = Field(default="", description="2-3 plain sentences describing a project that ALREADY built this idea, as its own "
-                                  "project page would ('A tool that ...'): no invented names, numbers or awards")
+                                  "project page would. Begin 'A company that', 'A tool that', 'A device that' or the like, and say what "
+                                  "it makes or does and for whom. Never mention 'the idea', the pitch or its author, and never remark on "
+                                  "what is missing. No invented names, numbers or awards")
     known_players: list[str] = Field(default_factory=list, description="up to 8 real companies, products or projects that already do this "
                                      "or something close: the names a domain expert would say at once, the large incumbents and the "
                                      "specialist startups alike. Bare names only, no asides. Each is looked up on the web and dropped if no page is found, so leave out "
@@ -62,6 +71,25 @@ def web_queries(plan: Plan, idea: str) -> list[str]:
     own = " ".join(dict.fromkeys(line.strip() for line in idea.splitlines() if line.strip()))
     out = [own] if 0 < len(own) <= 200 else []
     return out + [q for q in semantic_queries(plan) if q.lower() != own.lower()]
+
+
+def scored_as(plan: Plan, idea: str) -> str | None:
+    """The text a few-word pitch is scored as: the planner's write-up of it, or None to score the pitch itself.
+
+    The reranker answers "does this text answer the query", and the crowding percentile was calibrated on project
+    write-ups. Given the three words "chipmaking for AI" it put an explainer called "How AI Chips are Made" at 0.34,
+    Etched at 0.02 and Cerebras at 0.00: the explainer repeats the words, and a chip company's own description says
+    "wafer-scale processors for inference". Against the write-up -- the same idea, as a sentence about what is made
+    and for whom -- the same records rank Nvidia, Graphcore, Etched and Cerebras first. A pitch that already is a
+    description is left alone: the author's words outrank a paraphrase of them."""
+    if len(tokens(idea)) >= SHORT_PITCH:
+        return None
+    # A planner handed three words has been seen to fill the write-up with remarks on them ("The idea as stated is
+    # extremely thin..."). Those sentences describe the pitch, not a project: they are not scored against. And what is left has to open
+    # the way it was asked to, as a thing ("A company that ..."): a write-up that does not is remarks all the way
+    # through ("Very short, and does not say what subject..."), and the pitch is better scored as typed.
+    kept = [s for s in _SENTENCE.split(plan.writeup.strip()) if s and not _ABOUT_THE_PITCH.search(s)]
+    return " ".join(kept) if kept and _A_THING.match(kept[0]) else None
 
 
 class Conductor(BaseRole):
@@ -140,6 +168,10 @@ class Conductor(BaseRole):
                                               session=self.session(ctx), budget=ctx.budget)
         ctx.board.set("facets", self.id, plan.facets)
         await ctx.emit("facets.extracted", {"facets": plan.facets.model_dump()}, **res.meta())
+        if text := scored_as(plan, ctx.board.idea_text):
+            ctx.board.set("scored_as", self.id, text)
+            await ctx.emit("tool.result", {"tool": "plan.scored_as", "n_hits": 0, "summary":
+                           f"a {len(ctx.board.idea_text.split())}-word pitch: similarity is measured against the planner's description of it: {text}"[:400]})
         live = [k for k in FACET_KEYS if getattr(plan.facets, k)]
         await ctx.emit("graph.patch", GraphPatch(
             add_nodes=[GraphNode(id="idea", kind="idea", label="Your idea", val=8)]
@@ -182,7 +214,7 @@ class Conductor(BaseRole):
                         "lookups": [n.strip() for n in plan.known_players if n.strip()], "hint": plan.facets.domain}
             return {"queries": (semantic_queries(plan) if sid in SEMANTIC_SCOUTS else plan.keyword_queries[:3]) or [ctx.board.idea_text[:200]]}
 
-        replies = await asyncio.gather(*(ctx.send(s, task(**brief(s)), timeout=45) for s in scouts))
+        replies = await asyncio.gather(*(ctx.send(s, task(**brief(s)), timeout=60) for s in scouts))  # search, rerank, then a reader's grade
         for sid, reply in zip(scouts, replies):
             if reply.get("type") != "ERROR":
                 continue

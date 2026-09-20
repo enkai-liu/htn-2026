@@ -41,6 +41,7 @@ async def test_search_sends_the_documented_request(monkeypatch):
     assert seen["url"] == "https://api.exa.ai/search" and seen["headers"] == {"x-api-key": "k"}
     assert seen["body"]["numResults"] == 4 and seen["body"]["contents"]["text"] == {"maxCharacters": 1500}
     assert "Hardware" in seen["body"]["contents"]["summary"]["query"]  # the summary is asked for in words that do not assume software
+    assert "article" in seen["body"]["contents"]["summary"]["schema"]["properties"]["kind"]["enum"]  # and the page says what kind of page it is
     assert "github.com" in seen["body"]["excludeDomains"] and "category" not in seen["body"]
     await exa.search("chipmaker for ai", category="company")
     assert seen["body"]["category"] == "company"
@@ -68,7 +69,22 @@ async def test_a_lookup_keeps_only_a_page_that_carries_the_name(monkeypatch):
     assert await exa.lookup("Nonexistent Chips Inc") == [] and await exa.lookup("ab") == []
 
 
-async def test_the_web_scout_searches_pages_companies_and_named_players(monkeypatch):
+async def test_a_page_says_what_kind_of_page_it_is(monkeypatch):
+    """With a schema Exa's summary is a JSON string: the kind goes to `retrieval`, the sentence leads the pitch as before."""
+    async def fake_post(url, *, body, headers=None):
+        return {"results": [{"url": "https://etched.example/", "title": "Etched", "text": "Chips.", "summary": '{"kind": "company", "summary": "Etched makes inference chips."}'},
+                            {"url": "https://news.example/how-chips-are-made", "title": "How AI chips are made", "text": "An explainer.", "summary": '{"kind": "article", "summary": "An explainer."}'},
+                            {"url": "https://plain.example/", "title": "Plain", "text": "A page.", "summary": "Not JSON: a plain summary."}]}
+
+    monkeypatch.setattr(get_settings(), "exa_api_key", "k")
+    monkeypatch.setattr(exa, "post_json", fake_post)
+    company, article, plain = await exa.search("chipmaking for AI")
+    assert company.retrieval["kind"] == "company" and company.pitch.startswith("Etched. Etched makes inference chips. Chips")
+    assert exa.is_prior_art(company) and not exa.is_prior_art(article)
+    assert plain.tagline == "Not JSON: a plain summary." and exa.is_prior_art(plain)  # a page nobody could classify is kept
+
+
+async def test_the_web_scout_searches_companies_pages_and_named_players(monkeypatch):
     from app.roles.scouts.live import WebScout
     from test_scout_partial import FakeCtx
 
@@ -76,7 +92,8 @@ async def test_the_web_scout_searches_pages_companies_and_named_players(monkeypa
 
     async def fake_search(query, *, n=5, category=None):
         calls.append((query, category))
-        return [from_web({"url": f"https://{len(calls)}.example.org/", "title": f"Page {len(calls)}", "text": "A page."})]
+        page = {"url": f"https://{len(calls)}.example.org/", "title": f"Page {len(calls)}", "text": "A page."}
+        return [from_web(page)] + ([] if category else [from_web({"url": f"https://news.example/{len(calls)}", "title": "A story about it", "kind": "article"})])
 
     async def fake_lookup(name, hint=""):
         calls.append((name, "lookup:" + hint))
@@ -87,12 +104,36 @@ async def test_the_web_scout_searches_pages_companies_and_named_players(monkeypa
     ctx = FakeCtx()
     reply = await WebScout().handle({"type": "TASK", "payload": {"queries": ["chipmaker for ai", "q2", "q3"], "hint": "semiconductors",
                                                                  "lookups": ["Nvidia", "Cerebras", "Nvidia"]}}, ctx)
-    assert sorted(c for c in calls if c[1] is None) == [("chipmaker for ai", None), ("q2", None), ("q3", None)]
-    assert sorted(c for c in calls if c[1] == "company") == [("chipmaker for ai", "company"), ("q2", "company")]  # the first two only
+    assert sorted(c for c in calls if c[1] == "company") == [("chipmaker for ai", "company"), ("q2", "company"), ("q3", "company")]
+    assert sorted(c for c in calls if c[1] is None) == [("chipmaker for ai", None), ("q2", None)]  # pages of any kind: the first two only
     assert sorted(c for c in calls if str(c[1]).startswith("lookup")) == [("Cerebras", "lookup:semiconductors"), ("Nvidia", "lookup:semiconductors")]
-    assert len(reply["payload"]["rids"]) == 5 and ctx.board.sources["web"].status == "ok"
+    assert len(reply["payload"]["rids"]) == 5 and ctx.board.sources["web"].status == "ok"  # the two news stories are not prior art
+    assert not any(r.retrieval.get("kind") == "article" for r in ctx.board.records.values())
     shown = [d.get("tool") for t, d in ctx.events if t == "tool.call"]
-    assert shown.count("exa.search[companies]") == 2 and shown.count("exa.lookup") == 2  # every way in is visible in the run
+    assert shown.count("exa.search[companies]") == 3 and shown.count("exa.search[pages]") == 2 and shown.count("exa.lookup") == 2  # every way in is visible
+    assert sum("1 articles set aside" in d.get("summary", "") for t, d in ctx.events if t == "tool.result") == 2  # and so is what was dropped
+
+
+def test_a_few_word_pitch_is_scored_as_the_planners_description_of_it():
+    from app.core.blackboard import Blackboard
+    from app.roles.conductor import Plan, scored_as
+
+    plan = Plan.model_validate({"facets": {"purpose": "make chips", "mechanism": "design accelerators"}, "semantic_queries": [], "keyword_queries": [],
+                                "writeup": "A company that designs processors for training and running AI models."})
+    assert scored_as(plan, "ai chipmaker") == plan.writeup
+    long = "A desk-sized machine that etches custom inference accelerators overnight from a netlist, so a university lab can tape out a test chip without a foundry slot."
+    assert scored_as(plan, long) is None  # a pitch that is already a description is scored as written
+    assert scored_as(Plan.model_validate(plan.model_dump() | {"writeup": ""}), "ai chipmaker") is None  # some models skip optional fields
+    # both of these came back from the planner for a few-word pitch: remarks on the pitch are not a description of a project
+    mixed = plan.writeup + " The idea as stated is extremely thin: it names only the domain."
+    assert scored_as(Plan.model_validate(plan.model_dump() | {"writeup": mixed}), "ai chipmaker") == plan.writeup
+    remarks = "The description is very short and does not specify the subject area, how the AI decides on grades, or what is claimed as new."
+    assert scored_as(Plan.model_validate(plan.model_dump() | {"writeup": remarks}), "ai grading for teachers") is None
+    assert scored_as(Plan.model_validate(plan.model_dump() | {"writeup": "Very short. Grading could mean anything."}), "ai grading for teachers") is None
+    board = Blackboard("ai chipmaker")
+    assert board.similarity_text == "ai chipmaker"
+    board.set("scored_as", "conductor", plan.writeup)
+    assert board.similarity_text == plan.writeup and board.idea_text == "ai chipmaker"  # every agent still reads the pitch as typed
 
 
 def test_the_web_is_searched_in_the_authors_own_words_first():

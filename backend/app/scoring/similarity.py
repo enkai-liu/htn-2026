@@ -42,8 +42,31 @@ def from_es_rerank(score: float) -> float:
     return score - 1.0 if score >= 1.0 else (math.log(score) if score > 0 else -1.0)
 
 
-async def rerank(query: str, texts: list[str]) -> tuple[list[float], bool]:
-    """Returns (scores aligned with `texts`, calibrated). calibrated=False means the lexical fallback was used."""
+# A reader's grade of a hit, as a floor on its similarity. The floors are percentiles of the calibration population --
+# how close the nearest neighbours of 300 corpus projects are -- so they live on the reranker's own scale: a hit a
+# reader calls the same thing is at least as close as the nearest neighbour of 95% of projects.
+GRADE_PERCENTILE = {"same": 0.95, "close": 0.75}
+GRADE_SPREAD = 0.25  # share of the reranker's own score kept above the floor, so graded hits still rank among themselves
+
+
+def graded(score: float, grade: str | None) -> float:
+    """The similarity of a hit the reranker scored `score` (unclamped) and a reader graded `grade`.
+
+    The reranker measures whether a text answers a query, word for word: for "ai chipmaker" it gave Groq -0.05 and
+    Nvidia -0.03, because their pages say LPU and GPU. A model that reads the two texts knows better, and its grade
+    can only raise a score: what the reranker already found close stays where it is."""
+    p = GRADE_PERCENTILE.get(grade or "")
+    if p is None:
+        return clamp01(score)
+    from app.search.calibration import get_cdf
+
+    values = get_cdf().values
+    return clamp01(max(score, values[round(p * (len(values) - 1))] + GRADE_SPREAD * score))
+
+
+async def rerank(query: str, texts: list[str], *, clamp: bool = True) -> tuple[list[float], bool]:
+    """Returns (scores aligned with `texts`, calibrated). calibrated=False means the lexical fallback was used.
+    clamp=False keeps the reranker's negative scores, for a caller that ranks among them before clamping."""
     if not texts:
         return [], True
     s = get_settings()
@@ -56,7 +79,7 @@ async def rerank(query: str, texts: list[str]) -> tuple[list[float], bool]:
                                                 query=query, input=[t[:1500] or " " for t in texts])
             scores = [0.0] * len(texts)
             for item in resp["rerank"]:
-                scores[item["index"]] = clamp01(item["relevance_score"])
+                scores[item["index"]] = clamp01(item["relevance_score"]) if clamp else float(item["relevance_score"])
             return scores, True
         except Exception:
             pass  # fall through: degrade rather than fail the run; the caller surfaces `uncalibrated`

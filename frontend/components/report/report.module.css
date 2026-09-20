@@ -1,0 +1,56 @@
+.report { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+.card { border: 1px solid var(--color-line); border-radius: 10px; background: var(--color-ink-900); padding: 26px; min-width: 0; }
+.answer { display: flex; flex-wrap: wrap; align-items: center; gap: 24px 36px; }
+.scoreLabel { color: var(--color-mute); font-size: 12px; }
+.score { margin-top: 8px; font-size: 56px; font-weight: 500; letter-spacing: -.05em; line-height: 1; font-variant-numeric: tabular-nums; }
+.score > span { margin-left: 5px; font-size: 22px; font-weight: 400; letter-spacing: -.02em; color: var(--color-mute); }
+.scoreContext { flex: 1; min-width: 200px; }
+.interval { max-width: 50ch; color: var(--color-bone-dim); font-size: 16px; line-height: 1.5; }
+.metadata { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 10px; color: var(--color-mute); font-size: 12px; }
+.heading { font-size: 18px; font-weight: 500; letter-spacing: -.02em; }
+.empty { margin-top: 8px; color: var(--color-mute); font-size: 14px; line-height: 1.7; }
+.findings { margin-top: 16px; font-size: 15px; line-height: 1.8; color: var(--color-bone-dim); overflow-wrap: anywhere; }
+.findings p:last-child, .findings ul:last-child { margin-bottom: 0; }
+.preview { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+.readMore { display: inline-flex; align-items: center; gap: 6px; margin-top: 16px; padding: 4px 0; cursor: pointer; font-size: 12px; font-weight: 500; }
+.readMore:hover { color: var(--color-accent); }
+.details { border-top: 1px solid var(--color-line); }
+.details > summary { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px 0; cursor: pointer; list-style: none; color: var(--color-bone-dim); font-size: 13px; }
+.details > summary::-webkit-details-marker { display: none; }
+.details > summary:hover { color: var(--color-bone); }
+.details > summary svg { flex: none; color: var(--color-mute); transition: transform .15s; }
+.details[open] > summary svg { transform: rotate(180deg); }
+.detailBody { padding: 4px 0 24px; }
+.supporting { margin-top: 4px; }
+.citations { display: flex; flex-direction: column; gap: 16px; }
+.citations li { scroll-margin-top: 20px; font-size: 13px; line-height: 1.7; color: var(--color-bone-dim); overflow-wrap: anywhere; }
+.citations li:target { background: var(--color-ink-800); border-radius: 4px; outline: 6px solid var(--color-ink-800); }
+.citations a { display: inline-block; margin-left: 6px; color: var(--color-accent); font-size: 12px; white-space: nowrap; }
+.citations a:hover { text-decoration: underline; }
+.axisIntro { margin-bottom: 18px; color: var(--color-mute); font-size: 12px; }
+.axis { display: grid; grid-template-columns: minmax(130px, 1fr) 2fr 50px; gap: 12px 24px; align-items: center; padding: 16px 0; border-top: 1px solid var(--color-line); }
+.axis dt { font-size: 13px; }
+.axis dd { display: contents; }
+.axisTrack { height: 4px; background: var(--color-ink-700); border-radius: 4px; overflow: hidden; }
+.axisTrack > span { display: block; height: 100%; background: var(--color-bone-dim); }
+.axisValue { font-size: 14px; text-align: right; font-variant-numeric: tabular-nums; }
+.axisNote { grid-column: 1 / -1; font-size: 13px; line-height: 1.65; color: var(--color-mute); }
+.facetList { display: grid; gap: 14px; }
+.facetList > div { display: grid; grid-template-columns: 100px minmax(0, 1fr); gap: 20px; }
+.facetList dt { font-size: 12px; text-transform: capitalize; color: var(--color-mute); }
+.facetList dd { font-size: 14px; line-height: 1.6; color: var(--color-bone-dim); }
+.sources { display: flex; flex-direction: column; }
+.sources li { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 16px; padding: 12px 0; border-bottom: 1px solid var(--color-line); }
+.sourceError { width: 100%; font-size: 12px; color: var(--color-mute); overflow-wrap: anywhere; }
+.voice { padding-top: 8px; }
+.voiceNote { margin-bottom: 18px; color: var(--color-mute); font-size: 12px; line-height: 1.6; }
+@media (max-width: 520px) {
+  .card { padding: 20px; }
+  .answer { gap: 20px; }
+  .score { font-size: 48px; }
+  .interval { font-size: 14px; }
+  .findings { font-size: 14px; }
+  .axis { grid-template-columns: minmax(100px, 1fr) 1fr 36px; gap: 12px; }
+  .facetList > div { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+}
+@media (prefers-reduced-motion: reduce) { .report *, .details svg { animation: none !important; transition: none !important; } }

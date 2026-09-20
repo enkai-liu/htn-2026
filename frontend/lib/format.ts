@@ -18,6 +18,24 @@ export const fmtInt = (n: number | null | undefined) => (typeof n === "number" ?
 
 export const fmtSim = (n: number | null | undefined) => (typeof n === "number" ? n.toFixed(2) : "–");
 
+// A reranker score is not a share of anything: across 300 corpus projects the nearest neighbour sits at 0.16 on
+// the median and at 0.37 on the 95th percentile, so a direct competitor at "0.36" reads as a miss when it is about
+// as close as things get. The match scale is that score against those two landmarks: 50% is as close as a typical
+// project's nearest neighbour, 90% is closer than 95% of them. Monotone, so nothing is reordered; the raw score
+// stays in the tooltip. Only for project similarities: an LLM prior's cosine is on another scale and keeps fmtSim.
+const MATCH_MID = 0.156;
+const MATCH_SCALE = (0.365 - MATCH_MID) / Math.log(9);
+
+export function matchOf(similarity: number | null | undefined): number | null {
+  if (typeof similarity !== "number" || !Number.isFinite(similarity)) return null;
+  return 1 / (1 + Math.exp(-(similarity - MATCH_MID) / MATCH_SCALE));
+}
+
+export const fmtMatch = (similarity: number | null | undefined) => {
+  const m = matchOf(similarity);
+  return m == null ? "–" : `${Math.round(m * 100)}%`;
+};
+
 export const fmtPct = (n: number | null | undefined, digits = 0) => (typeof n === "number" ? `${(n * 100).toFixed(digits)}%` : "–");
 
 export function shortModel(model: string | null | undefined): string {

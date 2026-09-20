@@ -4,19 +4,20 @@
 import clsx from "clsx";
 import { Split } from "lucide-react";
 import { useState } from "react";
-import { agentColor } from "@/lib/agents";
 import type { FacetBench } from "@/lib/debate";
+import { agentColor } from "@/lib/agents";
 import { shortModel } from "@/lib/format";
 import { JURY_SPLIT_STD, type JuryVote } from "@/lib/runReducer";
 import { JUROR_COLORS } from "../DebateThread";
+import styles from "./debate.module.css";
 
-const ROW = "grid grid-cols-[76px_minmax(0,1fr)_88px] items-center gap-x-3";
+const ROW = styles.voteRow;
 
 function VoteRow({ label, vote }: { label: string; vote: JuryVote }) {
   const [open, setOpen] = useState(false);
   return (
     <div className="animate-rise">
-      <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className={clsx(ROW, "w-full rounded-md py-1 text-left hover:bg-ink-850")} title="Show each juror's reasoning">
+      <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className={clsx(ROW, styles.voteButton)} title="Show each juror's reasoning">
         <span className={clsx("truncate text-[12.5px]", vote.revote ? "text-mute" : "text-bone")}>{label}</span>
         {/* one dot per juror on a 0..1 overlap scale, over the ±σ band */}
         <span className="relative block h-[18px]">
@@ -36,13 +37,13 @@ function VoteRow({ label, vote }: { label: string; vote: JuryVote }) {
         </span>
       </button>
       {open && (
-        <ul className={clsx(ROW, "mb-1")}>
+        <ul className={styles.voteDetails}>
           {vote.votes.map((v, i) => (
-            <li key={i} className="col-span-2 col-start-2 flex items-baseline gap-1.5 text-[11.5px] leading-snug">
+            <li key={i} >
               <span className="size-[6px] flex-none -translate-y-px rounded-full" style={{ background: JUROR_COLORS[i % JUROR_COLORS.length] }} />
               <span className="w-[112px] flex-none truncate font-mono text-[9.5px] text-mute" title={v.model}>{shortModel(v.model)}</span>
               <span className="w-[28px] flex-none font-mono text-[10px] text-bone">{v.score.toFixed(2)}</span>
-              <span className="min-w-0 text-bone-dim">{v.why}</span>
+              <p className="text-bone-dim">{v.why}</p>
             </li>
           ))}
         </ul>
@@ -55,10 +56,10 @@ export function JuryBench({ bench }: { bench: FacetBench[] }) {
   const n = bench[0]?.votes[0]?.votes.length ?? 0;
   return (
     <div>
-      <div className="mb-1 flex items-baseline gap-2">
-        <span className="font-mono text-[9.5px] uppercase tracking-[0.16em]" style={{ color: agentColor("judge") }}>Jury</span>
-        <span className="text-[11.5px] text-mute">{n} jurors from different model families, blind to the debate and to each other</span>
-        <span className="ml-auto hidden font-mono text-[8.5px] uppercase tracking-[0.1em] text-faint sm:inline">0 different · same 1</span>
+      <div className={styles.juryHeader}>
+        <h3>Jury assessment</h3>
+        <p title="Jurors come from different model families and are blind to the debate and each other.">{n} independent jurors · select a row for reasoning</p>
+        <span>0 Different / 1 Identical</span>
       </div>
       {bench.map((b) => (
         <div key={b.facet}>

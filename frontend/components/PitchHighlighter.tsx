@@ -26,14 +26,14 @@ function segments(ideaText: string, voice: Voice | null): Segment[] {
 
 const CLASS_LABEL: Record<string, string> = { human: "reads human-written", ai: "reads AI-written", mixed: "reads mixed" };
 
-export function PitchHighlighter({ ideaText, voice }: { ideaText: string; voice: Voice | null }) {
+export function PitchHighlighter({ ideaText, voice, layout = "panel" }: { ideaText: string; voice: Voice | null; layout?: "panel" | "reading" }) {
   const segs = useMemo(() => segments(ideaText, voice), [ideaText, voice]);
   const total = voice?.sentences?.length ?? 0;
   const flagged = voice?.sentences?.filter((s) => s.flagged).length ?? 0;
 
   return (
-    <div className="flex h-full min-h-0 gap-3 px-3 py-1.5">
-      <div className="flex w-[286px] flex-none flex-col justify-center gap-1.5">
+    <div className={clsx("flex min-h-0", layout === "reading" ? "flex-col gap-5" : "h-full gap-3 px-3 py-1.5")}>
+      <div className={clsx("flex flex-none flex-col justify-center gap-1.5", layout === "panel" && "w-[286px]")}>
         {!voice ? (
           <p className="font-display text-[15px] italic leading-snug text-faint">Waiting for GPTZero to read the pitch…</p>
         ) : voice.too_short ? (
@@ -54,11 +54,11 @@ export function PitchHighlighter({ ideaText, voice }: { ideaText: string; voice:
         )}
       </div>
 
-      <div className="min-h-0 min-w-0 flex-1 overflow-y-auto border-l border-line pl-3 pr-1">
+      <div className={clsx("min-h-0 min-w-0 flex-1 border-line", layout === "reading" ? "border-t pt-4" : "overflow-y-auto border-l pl-3 pr-1")}>
         {segs.length === 0 ? (
           <p className="font-display text-[15px] italic text-faint">The pitch appears here once the run starts.</p>
         ) : (
-          <p className="text-[12.5px] leading-[1.55] text-bone-dim">
+          <p className={clsx("text-bone-dim", layout === "reading" ? "text-[14px] leading-relaxed" : "text-[12.5px] leading-[1.55]")}>
             {segs.map((s, i) => (
               <span
                 key={i}

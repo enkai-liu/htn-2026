@@ -89,6 +89,23 @@ is the top entity for "vibegrading for teachers", Cerebras/Nvidia/Etched show fo
 sourdough bakery gets real bakeries. Cost: ~12-16 Exa calls a run (~$0.15). Not tried: making the summary prompt
 idea-aware -- it would lift similarity for whatever the idea says, so it was left idea-independent on purpose.
 
+**Companies not articles, a similarity that reads, and a Results tab (Sun, later).** The author ran "ai chipmaker" /
+"chipmaking for AI": the web lane was topped by explainers and news (IAPS, Nikkei, IBM glossary), Etched showed 0.02 and
+Cerebras/Groq/AMD 0.00. Three changes. (1) **Web = prior art only.** Exa's summary now has a JSON `schema`
+(`exa.SUMMARY_SCHEMA`): the same two sentences plus `kind` = company/product/project/research/article/other, kept in
+`retrieval.kind`; articles and "other" are set aside before scoring and the run says how many. The lanes flipped:
+every query goes out as `category: company` (8 each), only the first two as open pages. The schema is idea-blind like
+the summary prompt. (2) **Similarity**: see `docs/scoring.md` rule 4 -- a few-word pitch is reranked as the planner's
+write-up, and each scout has GLM-5.3-Flash grade its hits (same/close/adjacent/unrelated) as a floor on the reranker's
+scale. DeepSeek Flash, the scouts' usual model, returned nothing valid for a 47-hit batch; do not switch the grader
+back. Scout timeout went 45 -> 60 s. Live: "ai chipmaker" -> 50 web records, 0 articles; Cerebras 0.38, AMD 0.375,
+Etched 0.36, Nvidia 0.35 (were 0.00-0.02); crowding percentile 0.75 -> 0.99. (3) **Results tab**
+(`frontend/components/run/ResultsScreen.tsx`, route `(tabs)/results`): every entity closest first, a search box over
+name/summary/tags/URL, source filter pills, rows that open to the listings, "Show on map" (selects the island, goes
+through `hrefFor`). Project similarity is displayed everywhere as a match % (`matchOf`), raw score in the tooltip.
+`backend/tests/conftest.py` now blanks the LLM keys for every test: the grading step would otherwise call a real model
+from any scout test on a machine with a filled `.env`.
+
 ## Verify the state
 
 ```bash

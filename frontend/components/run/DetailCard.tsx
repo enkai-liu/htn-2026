@@ -3,18 +3,20 @@
 import { ArrowUpRight, ChevronDown, LoaderCircle, X } from "lucide-react";
 import Link from "next/link";
 import { FACET_KEYS } from "@/lib/islandLayout";
-import { fmtSim, safeHref, shortModel, splitEnumerated } from "@/lib/format";
+import { fmtMatch, fmtSim, matchOf, safeHref, shortModel, splitEnumerated } from "@/lib/format";
 import type { GraphNode } from "@/lib/types";
 import { EvidenceDetail, SiteChip, listingLabel } from "../EvidenceDetail";
 import { Chip, InferredTag, SourceMark } from "../ui";
 import { useRun } from "./RunProvider";
 
-function SimilarityBar({ value }: { value: number | null | undefined }) {
+/** `match`: a project's reranker score, shown on the match scale (see `matchOf`). An LLM prior's cosine is shown as it is. */
+function SimilarityBar({ value, match }: { value: number | null | undefined; match?: boolean }) {
   if (value == null) return null;
+  const share = match ? matchOf(value) ?? 0 : Math.max(0, Math.min(1, value));
   return (
-    <div className="mt-3">
-      <div className="flex items-baseline justify-between text-[12px] text-mute"><span>Similarity to your idea</span><span className="font-mono text-bone">{fmtSim(value)}</span></div>
-      <div className="mt-1 h-[5px] overflow-hidden rounded-full bg-ink-700"><div className="h-full rounded-full bg-bone transition-[width] duration-700" style={{ width: `${Math.max(0, Math.min(1, value)) * 100}%` }} /></div>
+    <div className="mt-3" title={match ? `reranker score ${fmtSim(value)}` : undefined}>
+      <div className="flex items-baseline justify-between text-[12px] text-mute"><span>{match ? "Match to your idea" : "Similarity to your idea"}</span><span className="font-mono text-bone">{match ? fmtMatch(value) : fmtSim(value)}</span></div>
+      <div className="mt-1 h-[5px] overflow-hidden rounded-full bg-ink-700"><div className="h-full rounded-full bg-bone transition-[width] duration-700" style={{ width: `${share * 100}%` }} /></div>
     </div>
   );
 }
@@ -130,7 +132,7 @@ export function DetailCard({ node }: { node: GraphNode }) {
     body = (
       <>
         {card?.summary && <p className="line-clamp-5 text-[13.5px] leading-relaxed text-bone-dim">{card.summary}</p>}
-        <SimilarityBar value={card?.similarity ?? node.similarity} />
+        <SimilarityBar value={card?.similarity ?? node.similarity} match />
         {!!((card?.badges.length ?? node.badges.length) || card?.site) && (
           <div className="mt-3 flex flex-wrap gap-1">
             {(card?.badges ?? node.badges).map((b) => <Chip key={b} tone={b === "winner" ? "amber" : b === "conflict" || b === "source_failed" ? "red" : undefined}>{b.replace(/_/g, " ")}</Chip>)}

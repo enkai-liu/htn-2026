@@ -9,6 +9,7 @@ reranker can compare a chip company with a hackathon project.
 from __future__ import annotations
 
 import asyncio
+import json
 import re
 from urllib.parse import urlsplit
 
@@ -22,6 +23,19 @@ API = "https://api.exa.ai/search"
 TEXT_CHARS = 1500  # the pitch cap: one short field feeds the reranker and the quote check
 SUMMARY_QUERY = ("What does this company, product or project make or do, and for whom? Two plain sentences. "
                  "Hardware, services and research count as much as software.")
+# The same question of every page, and the kind of page it is beside the answer. Prior art is something that exists --
+# a company, a product, a project -- and a search for "chipmaking for AI" returned eight explainers and news stories
+# about chips: whoever wrote about the topic, not whoever works on it. The reranker liked them better than Cerebras,
+# too, because an article repeats the words of the pitch. Nothing here names a domain or sees the idea (see SUMMARY_QUERY).
+PRIOR_ART_KINDS = ("company", "product", "project", "research")
+SUMMARY_SCHEMA = {"type": "object", "required": ["kind", "summary"], "properties": {
+    "kind": {"type": "string", "enum": [*PRIOR_ART_KINDS, "article", "other"], "description": (
+        "What this page is. company: the site or profile of a business or organisation. product: the page of one product or "
+        "service that someone sells or ships. project: something a person or team built -- an open-source repository, a "
+        "hackathon entry, a demo, a prototype. research: a paper or technical report presenting a system its authors built. "
+        "article: news, an explainer, a glossary entry, a listicle, a market report, a forum thread, an opinion piece -- "
+        "writing ABOUT a topic or about other people's products. other: anything else.")},
+    "summary": {"type": "string", "description": SUMMARY_QUERY}}}
 COVERED_ELSEWHERE = ["github.com", "news.ycombinator.com"]  # their own scouts search these with better metadata
 _WORD = re.compile(r"[a-z0-9]+")
 _ASIDE = re.compile(r"\s*[(\[].*?[)\]]")
@@ -41,12 +55,29 @@ async def search(query: str, *, n: int = 5, category: str | None = None) -> list
     if not key:
         raise SourceError("EXA_API_KEY is not set")
     body = {"query": query, "type": "auto", "numResults": n, "excludeDomains": COVERED_ELSEWHERE,
-            "contents": {"text": {"maxCharacters": TEXT_CHARS}, "summary": {"query": SUMMARY_QUERY}}}
+            "contents": {"text": {"maxCharacters": TEXT_CHARS}, "summary": {"query": SUMMARY_QUERY, "schema": SUMMARY_SCHEMA}}}
     if category:
         body["category"] = category
     async with _slot():
         data = await post_json(API, headers={"x-api-key": key}, body=body)
-    return [from_web(r) for r in data.get("results", []) if _is_page(r.get("url")) and (r.get("title") or r.get("text"))]
+    return [from_web(_read_summary(r)) for r in data.get("results", []) if _is_page(r.get("url")) and (r.get("title") or r.get("text"))]
+
+
+def _read_summary(hit: dict) -> dict:
+    """With a schema the summary arrives as a JSON string. One that does not parse is kept as the plain summary it
+    then is, and its page as a page of no known kind: a failed classification is not a reason to lose a hit."""
+    try:
+        got = json.loads(hit.get("summary") or "")
+    except ValueError:
+        return hit
+    if not isinstance(got, dict):
+        return hit
+    return hit | {"summary": got.get("summary"), "kind": got.get("kind")}
+
+
+def is_prior_art(r: SourceRecord) -> bool:
+    """False for a page that is writing about the topic. A page whose kind nobody could tell stays."""
+    return r.retrieval.get("kind") not in ("article", "other")
 
 
 def _is_page(url: str | None) -> bool:

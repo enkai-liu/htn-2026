@@ -1,11 +1,12 @@
 "use client";
 // The list pages. Each one is an existing panel in a quiet reading column: the panels only ever needed `state`.
-import clsx from "clsx";
 import { ActionBar } from "../ActionBar";
 import { CoachPanel } from "../coach/CoachPanel";
 import { DebateBoard } from "../debate/DebateBoard";
+import debateStyles from "../debate/debate.module.css";
 import { PitchHighlighter } from "../PitchHighlighter";
-import { ReportPanel } from "../ReportPanel";
+import { ReportDetail, ReportPanel } from "../ReportPanel";
+import reportStyles from "../report/report.module.css";
 import { useRun } from "./RunProvider";
 import { PageColumn } from "./RunShell";
 
@@ -14,9 +15,15 @@ const card = "overflow-hidden rounded-2xl border border-line bg-ink-900";
 export function DebateScreen() {
   const { run, streaming } = useRun();
   return (
-    <PageColumn title="Debate">
-      <DebateBoard state={run.state} streaming={streaming} />
-    </PageColumn>
+    <div className={debateStyles.page}>
+      <div className={debateStyles.container}>
+        <header className={debateStyles.pageHeader}>
+          <h1>Debate</h1>
+          <p>See what overlaps with your idea, and what’s different.</p>
+        </header>
+        <DebateBoard state={run.state} streaming={streaming} />
+      </div>
+    </div>
   );
 }
 
@@ -37,12 +44,20 @@ export function ReportScreen() {
   const { run } = useRun();
   const { state } = run;
   return (
-    <PageColumn title="Report">
-      <div className={card}><ReportPanel state={state} /></div>
-      <section className="mt-6" aria-labelledby="voice-h">
-        <h2 id="voice-h" className="mb-2 font-display text-[22px] text-bone">Voice <span className="text-[13px] text-on-sea">· GPTZero</span></h2>
-        <div className={clsx(card, "min-h-[128px]")}><PitchHighlighter ideaText={state.ideaText} voice={state.voice} /></div>
-      </section>
-    </PageColumn>
+    <div className={debateStyles.page}>
+      <div className={debateStyles.container}>
+        <header className={debateStyles.pageHeader}>
+          <h1>Report</h1>
+          <p>What the investigation found, and what it means for your idea.</p>
+        </header>
+        <ReportPanel state={state} />
+        <ReportDetail title="Pitch writing analysis · GPTZero">
+          <div className={reportStyles.voice}>
+            <p className={reportStyles.voiceNote}>This checks how the pitch is written. It does not affect the originality score.</p>
+            <PitchHighlighter ideaText={state.ideaText} voice={state.voice} layout="reading" />
+          </div>
+        </ReportDetail>
+      </div>
+    </div>
   );
 }

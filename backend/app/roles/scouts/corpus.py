@@ -14,7 +14,7 @@ class CorpusScout(ScoutRole):
     idea_full = ""
 
     async def handle(self, msg: dict, ctx):
-        self.idea_full = ctx.board.idea_text
+        self.idea_full = ctx.board.similarity_text
         return await super().handle(msg, ctx)
 
     async def search(self, query: str, n: int) -> list[SourceRecord]:

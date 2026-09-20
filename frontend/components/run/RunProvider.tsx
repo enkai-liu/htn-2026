@@ -11,7 +11,7 @@ import { useRunEvents, type RunEvents } from "@/lib/useRunEvents";
 import { ToastProvider, useToast } from "../ui";
 import { RunShell } from "./RunShell";
 
-export type RunSegment = "" | "debate" | "coach" | "report";
+export type RunSegment = "" | "results" | "debate" | "coach" | "report";
 
 /** Camera pose of the islands map, remembered while another tab is showing. */
 export interface CameraMemo { position: [number, number, number]; target: [number, number, number]; zoom: number; userMoved: boolean }

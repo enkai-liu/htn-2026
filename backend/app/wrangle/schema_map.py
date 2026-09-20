@@ -95,6 +95,7 @@ def from_web(hit: dict[str, Any]) -> SourceRecord:
         traction={"author": hit["author"]} if hit.get("author") else {},
         field_provenance={"title": "source", "description": "normalized"} | ({"date": "source"} if published else {})
         | ({"tagline": "imputed"} if summary else {}),
+        retrieval={"kind": hit["kind"]} if hit.get("kind") else {},  # company, product, project, research, article, other
     )
 
 

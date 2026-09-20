@@ -27,15 +27,19 @@ class GitHubScout(ScoutRole):
 
 class WebScout(ScoutRole):
     """The one scout that is not a software catalogue: Devpost, YC, GitHub and HN all lean to code, so whoever
-    makes chips, runs clinics or sells a service is found here or nowhere. Three ways in: the queries as pages,
-    the first of them again as company homepages, and a lookup of each player the planner named."""
+    makes chips, runs clinics or sells a service is found here or nowhere. Three ways in: every query as company
+    homepages, the first of them again as pages of any kind (a product page, a launch post, a paper -- where no
+    company site says it), and a lookup of each player the planner named.
 
-    id, source, tool = "scout.web", "web", "exa.search"
-    per_query = 5  # each hit carries 1,500 characters of page text into the reranker: fewer, fuller records
-    company_queries, per_company_query, max_lookups = 2, 8, 8
+    What comes back is prior art or it is nothing: a news story, an explainer or a listicle about the topic is not a
+    thing that exists beside the idea, and it is set aside before it is scored."""
+
+    id, source, tool = "scout.web", "web", "exa.search[companies]"
+    per_query = 8  # each hit carries 1,500 characters of page text into the reranker: fewer, fuller records
+    page_queries, per_page_query, max_lookups = 2, 8, 8
 
     async def search(self, query: str, n: int) -> list[SourceRecord]:
-        return await exa.search(query, n=n)
+        return [r for r in await exa.search(query, n=n, category="company") if exa.is_prior_art(r)]
 
     def collapse(self, new: list[SourceRecord], ctx) -> list[SourceRecord]:
         """A company's homepage, pricing page and blog are one company: counted apart they crowd the map and the
@@ -69,14 +73,16 @@ class WebScout(ScoutRole):
     def extra(self, payload, ctx, phase):
         async def run(tool: str, shown: str, job) -> list[SourceRecord]:
             await ctx.emit("tool.call", {"tool": tool, "args_summary": shown[:120]}, phase=phase)
-            hits = await job
-            await ctx.emit("tool.result", {"tool": tool, "summary": f"{len(hits)} hits", "n_hits": len(hits)}, phase=phase)
+            found = await job
+            hits = [r for r in found if exa.is_prior_art(r)]
+            aside = f", {len(found) - len(hits)} articles set aside" if len(found) > len(hits) else ""
+            await ctx.emit("tool.result", {"tool": tool, "summary": f"{len(hits)} hits{aside}", "n_hits": len(hits)}, phase=phase)
             return hits
 
         queries = [q for q in (payload.get("queries") or [payload.get("query")]) if q]
         hint = str(payload.get("hint") or "")
-        return [(q, run("exa.search[companies]", q, exa.search(q, n=self.per_company_query, category="company")))
-                for q in queries[:self.company_queries]] + [
+        return [(q, run("exa.search[pages]", q, exa.search(q, n=self.per_page_query)))
+                for q in queries[:self.page_queries]] + [
             (f"lookup: {name}", run("exa.lookup", name, exa.lookup(name, hint)))
             for name in list(dict.fromkeys(payload.get("lookups") or []))[:self.max_lookups]]
 

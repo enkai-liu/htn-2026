@@ -60,7 +60,8 @@ export interface SourceRecord {
   lang: string;
   quality_flags: string[];
   field_provenance: Record<string, Provenance>;
-  retrieval: { query?: string; leg?: string; rank?: number; rerank_score?: number };
+  /** `grade`: how close a model that read the hit judged it; `rerank_raw`: the reranker's score before that grade lifted it; `kind`: what a web page is */
+  retrieval: { query?: string; leg?: string; rank?: number; rerank_score?: number; rerank_raw?: number; grade?: "same" | "close" | "adjacent" | "unrelated"; kind?: string };
   gptzero?: GPTZeroScan | null;
 }
 

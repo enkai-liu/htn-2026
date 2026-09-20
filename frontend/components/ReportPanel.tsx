@@ -1,11 +1,8 @@
 "use client";
-// The synthesizer's report: only what survived verification.
-//
-// Ordered for someone reading it for the first time, in front of an audience: the answer, then the sentence that
-// explains it, then the three axes it came from, then the receipts. Everything that is process rather than
-// finding -- how the idea was decomposed, which sources answered, the year histogram -- is folded away, one click
-// from the Q&A that asks for it.
+// Lead with the score and findings; keep supporting evidence and methodology on demand.
 import clsx from "clsx";
+import { ChevronDown } from "lucide-react";
+import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { BY_YEAR, CHART } from "@/lib/chartTheme";
 import { safeHref } from "@/lib/format";
@@ -13,47 +10,82 @@ import { headlineParts } from "@/lib/headline";
 import type { RunState } from "@/lib/runReducer";
 import { selectSourceStatus, type SourceStatusRow } from "@/lib/selectors";
 import type { Facets, Scores, YearCount } from "@/lib/types";
-import { AxisGauges } from "./AxisGauges";
+import styles from "./report/report.module.css";
 import { SafeMarkdown } from "./SafeMarkdown";
 import { Chip, SourceMark } from "./ui";
 
 const FACET_KEYS = ["purpose", "mechanism", "audience", "data", "twist"] as const;
 
-/** The number, said once, as large as it deserves. An abstention takes the same slot rather than hiding. */
+/** Use the same score and uncertainty as the run header. */
 function Answer({ scores, verifiedClaims }: { scores: Scores | null; verifiedClaims: number }) {
   const h = headlineParts(scores);
-
   if (h.abstain || h.value == null) {
     return (
-      <section className="animate-rise border-b border-line px-5 py-6">
-        <h3 className="font-display text-[30px] leading-tight text-bone">
-          {h.abstain ? "Insufficient evidence" : "Not scored yet"}
-        </h3>
-        <p className="mt-1.5 max-w-[60ch] text-[14px] leading-snug text-bone-dim">
-          {h.reason || "The run has not produced a score. Nothing here is withheld: there is not enough evidence to state one."}
-        </p>
+      <section className={styles.card}>
+        <h2 className={styles.heading}>{h.abstain ? "Insufficient evidence" : "Not scored yet"}</h2>
+        <p className={styles.empty}>{h.reason || "The score will appear once the debate and evidence checks are complete."}</p>
       </section>
     );
   }
-
   return (
-    <section className="animate-rise flex flex-wrap items-end gap-x-8 gap-y-3 border-b border-line px-5 py-6">
+    <section className={clsx(styles.card, styles.answer)} aria-label="Originality result">
       <div>
-        <p className="label text-mute">Originality</p>
-        <p className="mt-1 flex items-baseline gap-1 font-display text-[64px] leading-[0.9] tabular-nums text-bone">
-          {Math.round(h.value)}<span className="text-[30px] text-mute">{h.suffix}</span>
-        </p>
+        <h2 className={styles.scoreLabel}>{h.suffix ? "Originality percentile" : "Originality score"}</h2>
+        <p className={styles.score}>{Math.round(h.value)}<span>{h.suffix || "/ 100"}</span></p>
       </div>
-      <div className="min-w-0 flex-1 pb-1.5">
-        {h.interval && <p className="text-[15px] leading-snug text-bone-dim">{h.interval}</p>}
-        <p className="mt-1 font-mono text-[10.5px] uppercase tracking-[0.12em] text-mute">
-          {h.confidence != null && (
-            <>confidence {h.confidenceLabel} · {(h.confidence * 100).toFixed(0)}%</>
-          )}
-          {verifiedClaims > 0 && <> · {verifiedClaims} verified claim{verifiedClaims === 1 ? "" : "s"}</>}
-        </p>
+      <div className={styles.scoreContext}>
+        {h.interval && <p className={styles.interval}>{h.interval}</p>}
+        <div className={styles.metadata}>
+          {h.confidence != null && <span>{h.confidenceLabel} confidence · {Math.round(h.confidence * 100)}%</span>}
+          <span>{verifiedClaims} verified {verifiedClaims === 1 ? "claim" : "claims"}</span>
+        </div>
       </div>
     </section>
+  );
+}
+
+function Findings({ summary }: { summary: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const [clipped, setClipped] = useState(false);
+  const previewRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const node = previewRef.current;
+    if (!node || expanded) return;
+    const observer = new ResizeObserver(() => setClipped(node.scrollHeight > node.clientHeight + 1));
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [summary, expanded]);
+  return (
+    <section className={styles.card} aria-label="Findings">
+      <h2 className={styles.heading}>Findings</h2>
+      <div ref={previewRef} className={clsx(styles.findings, !expanded && styles.preview)}><SafeMarkdown source={summary} className="prose-atlas" /></div>
+      {(clipped || expanded) && <button type="button" className={styles.readMore} aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>
+        {expanded ? "Show less" : "Read full findings"}<ChevronDown size={14} className={expanded ? "rotate-180" : undefined} />
+      </button>}
+    </section>
+  );
+}
+
+function ScoreBreakdown({ scores }: { scores: Scores }) {
+  const axes = [
+    { label: "Crowding", scale: "Crowded → open", axis: scores.crowding },
+    { label: "Facet rarity", scale: "Common → rare", axis: scores.facet_rarity },
+    { label: "AI predictability", scale: "Obvious → surprising", axis: scores.llm_predictability },
+  ];
+  return (
+    <>
+      <p className={styles.axisIntro}>Each measure runs from 0 to 100. Higher values indicate greater originality.</p>
+      <dl>{axes.map(({ label, scale, axis }) => (
+        <div key={label} className={styles.axis}>
+          <dt>{label}</dt>
+          <dd>
+            <span className={styles.axisTrack} aria-hidden><span style={{ width: `${Math.max(0, Math.min(100, axis?.score ?? 0))}%` }} /></span>
+            <span className={styles.axisValue}>{axis?.score == null ? "—" : Math.round(axis.score)}</span>
+            <p className={styles.axisNote}>{scale}{axis?.note && <> · {axis.note}</>}</p>
+          </dd>
+        </div>
+      ))}</dl>
+    </>
   );
 }
 
@@ -63,22 +95,19 @@ function Citation({ text, n }: { text: string; n: number }) {
   const href = m ? safeHref(m[1]) : null;
   const body = m ? text.slice(0, m.index).trimEnd() : text;
   return (
-    <li id={`cite-${n}`} className="scroll-mt-4 text-[12px] leading-snug text-bone-dim target:text-bone">
+    <li id={`cite-${n}`}>
       {body}{" "}
-      {href && <a href={href} target="_blank" rel="noopener noreferrer" className="break-all font-mono text-[10.5px] text-accent hover:underline">{m![1]}</a>}
+      {href && <a href={href} target="_blank" rel="noopener noreferrer" aria-label={`Open source ${n}`}>Open source ↗</a>}
     </li>
   );
 }
 
-/** Everything that is process rather than finding lives behind one of these. */
-function More({ title, children }: { title: string; children: React.ReactNode }) {
+/** Supporting detail stays available without competing with the findings. */
+export function ReportDetail({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <details className="group border-t border-line px-5">
-      <summary className="flex cursor-pointer list-none items-center gap-2 py-2.5 font-mono text-[10px] uppercase tracking-[0.14em] text-mute hover:text-bone">
-        <span className="inline-block transition-transform group-open:rotate-90">›</span>
-        {title}
-      </summary>
-      <div className="pb-4">{children}</div>
+    <details className={styles.details}>
+      <summary>{title}<ChevronDown size={15} /></summary>
+      <div className={styles.detailBody}>{children}</div>
     </details>
   );
 }
@@ -86,11 +115,11 @@ function More({ title, children }: { title: string; children: React.ReactNode })
 function FacetList({ facets }: { facets: Facets }) {
   return (
     <>
-      <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
+      <dl className={styles.facetList}>
         {FACET_KEYS.map((k) => (
-          <div key={k} className="contents">
-            <dt className="pt-[2px] font-mono text-[10px] uppercase tracking-[0.12em] text-accent">{k}</dt>
-            <dd className="text-[12.5px] leading-snug text-bone-dim">{facets[k]}</dd>
+          <div key={k}>
+            <dt>{k}</dt>
+            <dd>{facets[k]}</dd>
           </div>
         ))}
       </dl>
@@ -146,13 +175,13 @@ const STATUS_TONE: Record<SourceStatusRow["status"], "teal" | "red" | "amber" | 
 
 function Sources({ rows }: { rows: SourceStatusRow[] }) {
   return (
-    <ul className="flex flex-col">
+    <ul className={styles.sources}>
       {rows.map((s) => (
-        <li key={s.source} className="flex items-center gap-2 border-t border-line py-1.5 first:border-t-0">
+        <li key={s.source}>
           <span className="w-[104px] flex-none"><SourceMark source={s.source} /></span>
           <Chip tone={STATUS_TONE[s.status]}>{s.status}</Chip>
           <span className="font-mono text-[10px] text-mute">{s.n_records} record{s.n_records === 1 ? "" : "s"}</span>
-          {s.error && <span className={clsx("min-w-0 truncate text-[11px]", s.status === "skipped" ? "text-mute" : "text-vermilion/90")} title={s.error}>{s.error}</span>}
+          {s.error && <span className={styles.sourceError}>{s.error}</span>}
         </li>
       ))}
     </ul>
@@ -163,36 +192,49 @@ export function ReportPanel({ state }: { state: RunState }) {
   const report = state.report;
   const sources = selectSourceStatus(state);
   const verified = state.claimOrder.filter((c) => state.claims[c].status === "verified").length;
+  const citationsRef = useRef<HTMLDetailsElement>(null);
+
+  // Citation links must reveal the source list before the browser scrolls to an anchor.
+  useEffect(() => {
+    const reveal = () => {
+      if (!/^#cite-\d+$/.test(window.location.hash)) return;
+      const details = citationsRef.current;
+      const target = details?.querySelector(window.location.hash);
+      if (!details || !target) return;
+      details.open = true;
+      target.scrollIntoView({ block: "nearest" });
+    };
+    reveal();
+    window.addEventListener("hashchange", reveal);
+    return () => window.removeEventListener("hashchange", reveal);
+  }, [report]);
+
+  const revealCitation = (event: MouseEvent<HTMLDivElement>) => {
+    const anchor = event.target instanceof Element ? event.target.closest("a") : null;
+    if (/^#cite-\d+$/.test(anchor?.getAttribute("href") ?? "") && citationsRef.current) citationsRef.current.open = true;
+  };
 
   return (
-    <div className="flex flex-col">
+    <div className={styles.report} onClickCapture={revealCitation}>
       <Answer scores={state.scores} verifiedClaims={verified} />
-
-      {report ? (
-        <section className="animate-rise border-b border-line px-5 py-4">
-          <SafeMarkdown source={report.summary_md} className="prose-atlas font-display text-[18px] leading-[1.4] text-bone-dim" />
-          {report.citations?.length > 0 && (
-            <ol className="mt-3 flex flex-col gap-1 border-l border-line pl-3">
-              {report.citations.map((c, i) => <Citation key={i} text={c} n={i + 1} />)}
-            </ol>
-          )}
-        </section>
-      ) : (
-        <section className="border-b border-line px-5 py-4">
-          <p className="font-display text-[17px] italic leading-snug text-faint">No verdict yet.</p>
+      {report?.summary_md ? <Findings summary={report.summary_md} /> : (
+        <section className={styles.card}>
+          <h2 className={styles.heading}>Findings are on the way</h2>
+          <p className={styles.empty}>The report will appear when the investigation is complete.</p>
         </section>
       )}
-
-      {/* the three axes behind the number, exactly as the header chip shows them */}
-      {state.scores && (
-        <section className="border-b border-line" aria-label="The axes behind the score">
-          <div className="h-[150px]"><AxisGauges scores={state.scores} headline={false} /></div>
-        </section>
-      )}
-
-      {report && report.by_year?.length > 0 && <More title="Similar projects per year"><ByYear rows={report.by_year} /></More>}
-      {state.facets && <More title="How the conductor read your idea"><FacetList facets={state.facets} /></More>}
-      {sources.length > 0 && <More title={`Sources · ${sources.length}`}><Sources rows={sources} /></More>}
+      <div className={styles.supporting}>
+        {state.scores && <ReportDetail title="Score breakdown"><ScoreBreakdown scores={state.scores} /></ReportDetail>}
+        {!!report?.citations?.length && (
+          <details ref={citationsRef} className={styles.details}>
+            <summary>References · {report.citations.length}<ChevronDown size={15} /></summary>
+            <ol className={clsx(styles.detailBody, styles.citations)}>{report.citations.map((c, i) => <Citation key={i} text={c} n={i + 1} />)}</ol>
+          </details>
+        )}
+        {report && report.by_year?.length > 0 && <ReportDetail title="Similar projects over time"><ByYear rows={report.by_year} /></ReportDetail>}
+        {state.facets && <ReportDetail title="How your idea was interpreted"><FacetList facets={state.facets} /></ReportDetail>}
+        {sources.length > 0 && <ReportDetail title={`Search coverage · ${sources.length} sources`}><Sources rows={sources} /></ReportDetail>}
+      </div>
     </div>
   );
 }

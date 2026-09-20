@@ -26,7 +26,7 @@ export interface DebateCase {
   stance: Stance;
   outcome: Outcome;
   firstSeq: number;
-  /** seq of the latest thing that happened to this case: the page opens the freshest one while streaming */
+  /** seq of the latest thing that happened to this case: the page marks the freshest one while streaming */
   lastSeq: number;
 }
 

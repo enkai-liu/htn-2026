@@ -55,6 +55,8 @@ class FakeRouter:
                          keyword_queries=["hackathon idea checker", "idea originality"])
         elif name == "Adjudication":
             obj = schema(verdicts=[])
+        elif name == "Grades":
+            obj = schema(grades=[])  # the reader has no opinion: every reranker score stands
         elif name == "Critique":
             obj = schema(claims=[{"entity": 0, "text": "IdeaRadar already checks whether a hackathon idea exists.",
                                   "quote": "checks whether your hackathon idea already exists", "facets": ["purpose"]},

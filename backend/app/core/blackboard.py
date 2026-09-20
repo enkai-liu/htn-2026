@@ -28,6 +28,7 @@ if TYPE_CHECKING:  # annotation only: nothing in core should pull the HTML parse
 WRITE_PERMISSIONS: dict[str, tuple[str, ...]] = {
     "facets": ("conductor",),
     "self_page": ("conductor",),
+    "scored_as": ("conductor",),
     "records": ("scout.",),  # prefix match: any scout
     "sources": ("scout.", "conductor"),
     "entities": ("resolver",),
@@ -54,6 +55,7 @@ class Blackboard:
         self.idea_text = idea_text
         self.url = url
         self.facets: Facets | None = None
+        self.scored_as: str | None = None  # a few-word pitch is scored as the planner's description of it: see similarity_text
         self.self_page: IdeaPage | None = None  # the author's own link, read once: context to plan with, and the one hit that is never prior art
         self.records: dict[str, SourceRecord] = {}
         self.sources: dict[str, SourceStatus] = {}
@@ -69,6 +71,11 @@ class Blackboard:
         self.coach: list[CoachMessage] = []  # the coaching conversation, oldest first
         self.pitches: list[CoachPitch] = []  # working-idea versions; [0] is the original
         self.stats: dict[str, Any] = {}  # cliches, whitespace, by_year, facet dfs
+
+    @property
+    def similarity_text(self) -> str:
+        """What every record is reranked against: the pitch, unless the conductor replaced a few-word one."""
+        return self.scored_as or self.idea_text
 
     def _check(self, section: str, writer: str) -> None:
         allowed = WRITE_PERMISSIONS[section]
