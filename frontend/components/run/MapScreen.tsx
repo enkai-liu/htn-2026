@@ -1,7 +1,7 @@
 "use client";
 // The home tab: the map and almost nothing else. One line says what the swarm is doing; the rest is on other pages.
-import { LocateFixed } from "lucide-react";
-import { useMemo, useState } from "react";
+import { LocateFixed, Pause } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { agentColor } from "@/lib/agents";
 import { IdeaGraph } from "../IdeaGraph";
 import { IslandMap } from "../islands/IslandMap";
@@ -36,6 +36,40 @@ export function MapScreen() {
 
   const selected = selectedId ? graph.nodes[selectedId] ?? null : null;
   const empty = layout.order.length === 0;
+
+  // Once the run is over there is nothing moving on this page, so walk the closest prior art: each one is
+  // focused in turn and the camera closes in on it. This is the attract loop for a demo, so the first touch
+  // of pointer or keyboard ends it for good -- it must never fight someone who has started exploring.
+  const [touring, setTouring] = useState(true);
+  const tourAt = useRef(0);
+  const nearest = useMemo(
+    () => graph.order.map((id) => graph.nodes[id])
+      .filter((n) => n.kind === "entity" && typeof n.similarity === "number")
+      .sort((a, b) => (b.similarity ?? 0) - (a.similarity ?? 0))
+      .slice(0, 5).map((n) => n.id),
+    [graph],
+  );
+  const tourOn = touring && mapMode === "3d" && state.finished && nearest.length > 1
+    && !(typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+
+  useEffect(() => {
+    if (!tourOn) return;
+    tourAt.current = 0;
+    select(nearest[0]);
+    const t = setInterval(() => {
+      tourAt.current = (tourAt.current + 1) % nearest.length;
+      select(nearest[tourAt.current]);
+    }, 4200);
+    return () => clearInterval(t);
+  }, [tourOn, nearest, select]);
+
+  useEffect(() => {
+    if (!touring) return;
+    const stop = () => setTouring(false);
+    window.addEventListener("pointerdown", stop, { once: true });
+    window.addEventListener("keydown", stop, { once: true });
+    return () => { window.removeEventListener("pointerdown", stop); window.removeEventListener("keydown", stop); };
+  }, [touring]);
 
   const flat = (
     <div className="absolute inset-x-4 bottom-4 top-2 overflow-hidden rounded-[22px] theme-dark">
@@ -76,6 +110,13 @@ export function MapScreen() {
           {!empty && !selected && (
             <button type="button" onClick={() => setRecenterTick((n) => n + 1)} className="absolute right-5 top-2 flex size-9 items-center justify-center rounded-full border border-line bg-ink-900 text-bone-dim transition-colors hover:text-bone sm:right-7" title="Re-centre the map" aria-label="Re-centre the map">
               <LocateFixed size={16} />
+            </button>
+          )}
+
+          {/* left, not right: the tour always has something selected, so the detail card owns the right edge */}
+          {tourOn && (
+            <button type="button" onClick={() => setTouring(false)} className="absolute left-5 top-[74px] flex items-center gap-1.5 rounded-full border border-line bg-ink-900/90 px-3 py-1.5 text-[12px] text-mute backdrop-blur transition-colors hover:text-bone sm:left-7">
+              <Pause size={13} /> Touring the {nearest.length} closest
             </button>
           )}
         </>

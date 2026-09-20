@@ -35,6 +35,11 @@ const INK = new Color("#16181d");
 const AMBER = new Color("#e9a23b");
 const TEAL = new Color("#0f766e");
 
+/** idle beam sweep, rad/ms — a full turn in about 6s */
+const IDLE_SWEEP = 0.00105;
+/** how hard the beam is allowed to swing when it is chasing a find */
+const SLEW_MAX = 0.0075;
+
 const easeOutBack = (t: number) => { const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2); };
 const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
 const easeInOutCubic = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
@@ -163,6 +168,8 @@ export class IslandScene {
   private userMoved = false;
   private extent = 8;
   private zoomTarget: number | null = null;
+  /** an explicit camera fly toward a focused island; overrides the passive follow, cancelled if you grab the camera */
+  private flyTo: Vector3 | null = null;
   private raf = 0;
   private running = false;
   private visible = true;
@@ -178,6 +185,8 @@ export class IslandScene {
   private eye = new Vector3();
   /** the beam's own bearing, integrated by hand so it can be steered off the idle sweep and back */
   private beaconAngle = 0;
+  /** angular velocity, so swinging onto a target ramps up and settles instead of snapping */
+  private beaconVel = -IDLE_SWEEP;
   private lastNow = 0;
   /** islands that have arrived and not yet been swept: the light goes and looks at each one */
   private scanQueue: string[] = [];
@@ -335,6 +344,15 @@ export class IslandScene {
   setSelected(id: string | null): void {
     if (id === this.selectedId) return;
     this.selectedId = id;
+    const isl = id ? this.islands.get(id) : undefined;
+    if (isl && !this.opts.reducedMotion && !this.opts.ambient) {
+      // fly to the island and close in on it; the zoom eases through the existing zoomTarget ramp
+      this.flyTo = new Vector3(isl.group.position.x, 0, isl.group.position.z);
+      this.zoomTarget = Math.min(1.9, Math.max(this.controls.minZoom, this.fitZoom() * 2.1));
+    } else if (!id) {
+      this.flyTo = this.opts.ambient ? null : this.focus.clone();
+      if (!this.opts.reducedMotion) this.fit(false);
+    }
     this.syncArcs(performance.now());
     this.sync();
   }
@@ -519,7 +537,18 @@ export class IslandScene {
       if (Math.abs(this.zoomTarget - this.camera.zoom) < 0.002) { this.camera.zoom = this.zoomTarget; this.zoomTarget = null; }
       this.camera.updateProjectionMatrix();
     }
-    if (!this.userMoved && !this.opts.ambient) {
+    // A focus fly overrides the passive follow, and survives userMoved: selecting an island is itself a
+    // pointerdown, so OrbitControls has already flagged the camera as user-driven by the time we hear about
+    // the selection. Grabbing the camera afterwards cancels the fly (see onControlStart).
+    if (this.flyTo && !this.opts.ambient) {
+      this.shift.copy(this.flyTo).sub(this.controls.target);
+      if (this.shift.lengthSq() < 4e-4) this.flyTo = null;
+      else {
+        this.shift.multiplyScalar(this.running ? 0.075 : 1);
+        this.controls.target.add(this.shift);
+        this.camera.position.add(this.shift);
+      }
+    } else if (!this.userMoved && !this.opts.ambient) {
       // slide target and camera together so the viewing angle never changes
       this.shift.copy(this.focus).sub(this.controls.target);
       if (this.shift.lengthSq() > 1e-6) {
@@ -587,12 +616,16 @@ export class IslandScene {
         const target = this.scanning ? this.islands.get(this.scanning.id) : undefined;
         if (this.scanning && (!target || target.dying)) this.scanning = null;
 
+        // Steer by velocity, not by position. Lerping the angle straight at the target makes the beam
+        // change direction in a single frame when a find lands; ramping the velocity instead means every
+        // swing accelerates out of the idle sweep and settles into it again.
+        let wantVel = -IDLE_SWEEP;
         if (this.scanning && target) {
           // the beam's local +X maps to (cos y, 0, -sin y) under a Y rotation, hence the negated dz
           const want = Math.atan2(-(target.group.position.z - idea.group.position.z), target.group.position.x - idea.group.position.x);
           let d = want - this.beaconAngle;
           d = Math.atan2(Math.sin(d), Math.cos(d)); // shortest way round
-          this.beaconAngle += d * Math.min(1, dt * 0.007);
+          wantVel = Math.max(-SLEW_MAX, Math.min(SLEW_MAX, d * 0.009));
           if (!this.scanning.until && Math.abs(d) < 0.05) {
             this.scanning.until = now + (this.scanQueue.length > 1 ? 340 : 820);
             target.group.userData.pulseAt = now; // the island reacts as the light lands on it
@@ -602,9 +635,9 @@ export class IslandScene {
           // scaling the cone shortens and narrows it together, which is what a tightening spot should do
           wantLen = Math.hypot(target.group.position.x - idea.group.position.x, target.group.position.z - idea.group.position.z) + target.datum.p.size * 0.5;
           if (this.scanning.until && now > this.scanning.until) this.scanning = null;
-        } else {
-          this.beaconAngle -= dt * 0.00042;
         }
+        this.beaconVel += (wantVel - this.beaconVel) * Math.min(1, dt * 0.006);
+        this.beaconAngle += this.beaconVel * dt;
       }
       this.beacon.rotation.y = still ? 0.6 : this.beaconAngle;
       this.beamLen = this.beamLen ? this.beamLen + (wantLen - this.beamLen) * Math.min(1, dt * 0.005) : wantLen;
@@ -670,7 +703,7 @@ export class IslandScene {
 
   // --- picking --------------------------------------------------------------------------------------------------------
 
-  private onControlStart = () => { this.userMoved = true; this.zoomTarget = null; };
+  private onControlStart = () => { this.userMoved = true; this.zoomTarget = null; this.flyTo = null; };
   private onPointerMove = (e: PointerEvent) => {
     const r = this.canvas.getBoundingClientRect();
     this.pointer.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);

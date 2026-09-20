@@ -8,12 +8,14 @@ import type { GraphState } from "./graphReducer";
 import { hashString, mulberry32 } from "./seeded";
 import type { GraphNode } from "./types";
 
-export const R_MIN = 4.5;
-export const R_SPAN = 12;
+export const R_MIN = 5.6;
+export const R_SPAN = 16;
 /** clear water kept between two islands */
-export const GAP = 0.3;
+export const GAP = 0.62;
 const RADIUS_STEP = 1.1;
-const MAX_RADIUS_STEPS = 14;
+// The wider rings and clearance above need more room to resolve a crowded neighbourhood: at 14 steps the
+// packer ran out of outward nudge and left islands overlapping (caught by the no-overlap test).
+const MAX_RADIUS_STEPS = 26;
 
 export type IslandKind = "idea" | "entity" | "prior" | "mutation";
 
