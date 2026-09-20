@@ -165,7 +165,7 @@ async def test_full_run_offline(offline):
 
     # abstention: without the corpus the headline is withheld, but the axes that can be computed still are
     assert report.scores.abstain.active and report.scores.headline is None
-    assert "corpus" in report.scores.abstain.reason
+    assert "dataset" in report.scores.abstain.reason
     assert report.scores.crowding.score is not None and report.scores.llm_predictability.score is not None
     assert report.scores.facet_rarity.score is None
 

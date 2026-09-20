@@ -739,7 +739,7 @@ function fold(state: RunState, ev: AgentEvent, t: number): RunState {
       const cur = next.mutations[data.mid];
       if (cur) set({ mutations: { ...next.mutations, [data.mid]: { ...cur, delta: data.delta, axes: data.axes ?? cur.axes, scoredSeq: ev.seq } } });
       const sign = data.delta > 0 ? "+" : "";
-      row({ title: `${data.mid} re-scored against the corpus: ${sign}${data.delta}`, detail: data.axes ? Object.entries(data.axes).map(([k, v]) => `${k} → ${v}`).join(" · ") : undefined, tag: "re-scored", tone: data.delta > 0 ? "teal" : "muted" });
+      row({ title: `${data.mid} re-scored against the dataset: ${sign}${data.delta}`, detail: data.axes ? Object.entries(data.axes).map(([k, v]) => `${k} → ${v}`).join(" · ") : undefined, tag: "re-scored", tone: data.delta > 0 ? "teal" : "muted" });
       touch(ev.agent);
       break;
     }
@@ -758,7 +758,7 @@ function fold(state: RunState, ev: AgentEvent, t: number): RunState {
         const i = next.pitches.findIndex((x) => x.version === p.version);
         const pitches = i >= 0 ? next.pitches.map((x, j) => (j === i ? { ...x, ...p, seq: ev.seq } : x)) : [...next.pitches, { ...p, seq: ev.seq }].sort((a, b) => a.version - b.version);
         set({ pitches });
-        if (p.version > 0 && p.crowding != null) row({ title: `working idea v${p.version} checked against the corpus${p.delta != null ? `: ${p.delta > 0 ? "+" : ""}${p.delta} crowding` : ""}`, tag: "re-scored", tone: (p.delta ?? 0) > 0 ? "teal" : "muted" });
+        if (p.version > 0 && p.crowding != null) row({ title: `working idea v${p.version} checked against the dataset${p.delta != null ? `: ${p.delta > 0 ? "+" : ""}${p.delta} crowding` : ""}`, tag: "re-scored", tone: (p.delta ?? 0) > 0 ? "teal" : "muted" });
       }
       touch(ev.agent);
       break;

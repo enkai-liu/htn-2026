@@ -66,7 +66,7 @@ function Thinking() {
   return (
     <div className="flex items-center gap-2 text-[12.5px] text-mute" role="status">
       <LoaderCircle size={13} className="animate-spin text-teal" />
-      searching the corpus for what you just said, then thinking
+      checking what you just said against the dataset
     </div>
   );
 }
@@ -169,7 +169,7 @@ function WorkingIdea({ pitches, shown, onPick }: { pitches: CoachPitch[]; shown:
 
       <div className="mt-3.5 border-t border-line pt-3">
         {checking ? (
-          <div className="flex items-center gap-2 text-[12.5px] text-mute" role="status"><LoaderCircle size={13} className="animate-spin text-teal" /> checking this version against the corpus</div>
+          <div className="flex items-center gap-2 text-[12.5px] text-mute" role="status"><LoaderCircle size={13} className="animate-spin text-teal" /> checking this version against the dataset</div>
         ) : score == null ? (
           <p className="text-[12.5px] text-mute">Not measured: no prior art was retrieved for this version.</p>
         ) : (
@@ -231,7 +231,7 @@ function Terms({ title, blurb, terms, kind }: { title: string; blurb: string; te
       <p className="mt-0.5 text-[11px] leading-snug text-mute">{blurb}</p>
       <div className="mt-1.5 flex flex-wrap gap-1">
         {terms.map((t) => (
-          <Chip key={t.term} tone={kind === "whitespace" ? "teal" : "mute"} title={kind === "cliche" ? `significance ${t.score?.toFixed(1) ?? "–"}` : `${fmtInt(t.global_count)} in the corpus · ${fmtInt(t.neighbourhood_count)} near you`}>{t.term}</Chip>
+          <Chip key={t.term} tone={kind === "whitespace" ? "teal" : "mute"} title={kind === "cliche" ? `significance ${t.score?.toFixed(1) ?? "–"}` : `${fmtInt(t.global_count)} in the dataset · ${fmtInt(t.neighbourhood_count)} near you`}>{t.term}</Chip>
         ))}
       </div>
     </div>
@@ -296,9 +296,9 @@ export function CoachPanel({ state, footer }: { state: RunState; footer?: ReactN
 
         {(whitespace.length > 0 || cliches.length > 0) && (
           <details className={clsx(card, "group p-4")}>
-            <summary className={clsx(label, "cursor-pointer list-none select-none group-open:mb-3")}>what the corpus says around you <span className="text-faint group-open:hidden">+</span></summary>
+            <summary className={clsx(label, "cursor-pointer list-none select-none group-open:mb-3")}>what the dataset says around you <span className="text-faint group-open:hidden">+</span></summary>
             <div className="flex flex-col gap-4">
-              {whitespace.length > 0 && <Terms kind="whitespace" title="open ground" blurb="Common across the corpus, (almost) absent among your neighbours." terms={whitespace} />}
+              {whitespace.length > 0 && <Terms kind="whitespace" title="open ground" blurb="Common across the dataset, (almost) absent among your neighbours." terms={whitespace} />}
               {cliches.length > 0 && <Terms kind="cliche" title="clichés here" blurb="Over-represented among your neighbours." terms={cliches} />}
             </div>
           </details>

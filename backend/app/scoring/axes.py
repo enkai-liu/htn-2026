@@ -79,7 +79,7 @@ def crowding(sims: list[float], percentile: Callable[[float], float] | None = No
     pct = statistics.fmean(pcts.values())
     notes = []
     if not (calibrated and percentile):
-        notes.append("Uncalibrated: similarity scale has not been calibrated against the corpus yet.")
+        notes.append("Uncalibrated: similarity scale has not been calibrated against the dataset yet.")
     if rcs is not None and rcs_pct is None:
         notes.append("Surprisal uncalibrated: run `calibration build-rcs`.")
     if rcs is None:
@@ -117,7 +117,7 @@ def facet_rarity(facet_dfs: dict[str, int] | None, pair_df: int | None, cliche_o
         rar = {k: round(rarity_from_df(v), 3) for k, v in facet_dfs.items()}
         measure = "df"
     else:
-        return AxisScore(score=None, note="Needs the indexed corpus (Elasticsearch) to count how common each facet is.")
+        return AxisScore(score=None, note="Needs the indexed dataset (Elasticsearch) to count how common each facet is.")
     if pair_npmi is not None:
         pair = (1.0 - max(-1.0, min(1.0, pair_npmi))) / 2.0
     elif pair_df is not None:

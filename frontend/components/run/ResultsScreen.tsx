@@ -126,7 +126,7 @@ export function ResultsScreen() {
       )}
       {shown.length > 0 && (
         <p className="mt-3 px-1 text-[12px] leading-relaxed text-on-sea">
-          Match is the reranker&rsquo;s score against the corpus: 50% is as close as a typical project&rsquo;s nearest neighbour, 90% is closer than 95% of them.
+          Match is the reranker&rsquo;s score against the dataset: 50% is as close as a typical project&rsquo;s nearest neighbour, 90% is closer than 95% of them.
           A result marked <em>same thing</em> or <em>close</em> was also read beside your idea by a model, which can raise a score the reranker read too literally.
         </p>
       )}

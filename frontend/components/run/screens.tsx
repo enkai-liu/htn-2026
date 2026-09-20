@@ -31,7 +31,7 @@ export function CoachScreen() {
   const { run, busyAction, onAct } = useRun();
   const { state } = run;
   return (
-    <PageColumn wide title="Coach" hint="Talk the idea through. Everything you say is checked against the corpus before the coach answers.">
+    <PageColumn wide title="Coach" hint="Talk the idea through. Everything you say is checked against the dataset before the coach answers.">
       <CoachPanel
         state={state}
         footer={state.actions.length > 0 ? <div className={card}><ActionBar actions={state.actions} busy={busyAction} onAct={onAct} /></div> : null}

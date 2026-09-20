@@ -12,7 +12,7 @@ function DeltaBadge({ m }: { m: MutationState }) {
   if (m.delta == null) {
     return (
       <span className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.12em] text-mute">
-        <LoaderCircle size={11} className="animate-spin" /> re-scoring against the corpus
+        <LoaderCircle size={11} className="animate-spin" /> re-scoring against the dataset
       </span>
     );
   }
@@ -49,7 +49,7 @@ function MutationCard({ m, base, selected, onFocus, onRescore, busy }: {
 
       <div className="mt-2 flex flex-wrap items-center gap-1">
         {m.grounded_in.length > 0 && <span className="font-mono text-[9px] uppercase tracking-[0.14em] text-faint">grounded in</span>}
-        {m.grounded_in.map((g) => <Chip key={g} tone="mute" title="A whitespace term: common across the corpus, absent from your neighbourhood">{g}</Chip>)}
+        {m.grounded_in.map((g) => <Chip key={g} tone="mute" title="A whitespace term: common across the dataset, absent from your neighbourhood">{g}</Chip>)}
         {m.axes && Object.entries(m.axes).map(([axis, to]) => (
           <Chip key={axis} tone="teal" title="Axis score after the swap">
             {axis.replace(/_/g, " ")} {base[axis] != null ? `${base[axis]} → ` : "→ "}{to}
@@ -81,7 +81,7 @@ function TermList({ title, blurb, terms, kind }: { title: string; blurb: string;
               <div className="flex items-baseline justify-between gap-2">
                 <span className="truncate text-bone">{t.term}</span>
                 <span className="flex-none font-mono text-[9.5px] text-mute">
-                  {kind === "cliche" ? `significance ${t.score?.toFixed(1) ?? "–"}` : `${fmtInt(t.global_count)} in corpus · ${fmtInt(t.neighbourhood_count)} near you`}
+                  {kind === "cliche" ? `significance ${t.score?.toFixed(1) ?? "–"}` : `${fmtInt(t.global_count)} in the dataset · ${fmtInt(t.neighbourhood_count)} near you`}
                 </span>
               </div>
               <div className="mt-[3px] h-[2px] bg-ink-700"><div className={clsx("h-full", kind === "whitespace" ? "bg-teal/80" : "bg-bone-dim/60")} style={{ width: `${(v / max) * 100}%` }} /></div>
@@ -117,7 +117,7 @@ export function MutationPanel({ state, selectedId, onFocus, onRescore, busyMid }
 
       {(whitespace.length > 0 || cliches.length > 0) && (
         <div className="mt-1 grid animate-rise gap-4 border-t border-line pt-3 sm:grid-cols-2">
-          {whitespace.length > 0 && <TermList kind="whitespace" title="Whitespace terms" blurb="Common across the corpus, (almost) absent among your neighbours." terms={whitespace} />}
+          {whitespace.length > 0 && <TermList kind="whitespace" title="Whitespace terms" blurb="Common across the dataset, (almost) absent among your neighbours." terms={whitespace} />}
           {cliches.length > 0 && <TermList kind="cliche" title="Cliché terms" blurb="Over-represented among your neighbours (Elasticsearch significant_text)." terms={cliches} />}
         </div>
       )}

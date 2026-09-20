@@ -62,7 +62,7 @@ class Synthesizer(BaseRole):
         conf = axes.confidence(coverage=coverage, jury_std=jury_std, verified_share=verified_share, canary_pass=canary)
         missing = [f"{s.source} {s.status}" for s in planned if s.status in ("failed", "skipped")]
         if not corpus_ok:
-            missing.insert(0, "the hackathon/startup corpus was not searched")
+            missing.insert(0, "the hackathon/startup dataset was not searched")
         scores = axes.assemble(crowd, rarity, pred, jury_std=jury_std, conf=conf,
                                abstain=axes.decide_abstain(coverage=coverage, corpus_ok=corpus_ok, conf=conf, missing=missing),
                                boot=self._bootstrap_inputs(board, ents, stats, pair, overlap, rcs))
@@ -204,7 +204,7 @@ class Synthesizer(BaseRole):
                 "pair": await rarity.pair_stats(f.purpose, f.mechanism) if (f.purpose and f.mechanism) else {},
             }
         except Exception as exc:
-            await ctx.emit("error", {"message": f"corpus statistics unavailable: {type(exc).__name__}: {exc}"[:200], "recoverable": True})
+            await ctx.emit("error", {"message": f"dataset statistics unavailable: {type(exc).__name__}: {exc}"[:200], "recoverable": True})
             return {}
 
 

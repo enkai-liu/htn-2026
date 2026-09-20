@@ -65,7 +65,7 @@ live and the `semantic_prior_art` fallback is not needed. **Still not run agains
 
 **Coach is a conversation (added Sat ~19:30).** The Coach tab is no longer three finished swaps: the mutator opens a
 conversation (what is crowded, what is already yours, one question), the author answers in free text or taps a
-suggested reply, and `POST /api/runs/{id}/coach {text, mid?}` runs one turn. Each turn (i) searches the corpus for what
+suggested reply, and `POST /api/runs/{id}/coach {text, mid?}` runs one turn. Each turn (i) searches the dataset for what
 the author just said BEFORE answering, so pushback names real projects, (ii) runs the coach reply and a separate
 `PitchEdit` call side by side (asked to do both at once, Kimi just echoed the old pitch), (iii) when the AUTHOR moved
 the idea, writes working-idea v(n+1) and re-measures crowding (headline recomputed with the other axes held). New
@@ -73,6 +73,22 @@ events `coach.message` / `coach.pitch` (docs/events.md); the mock fixture script
 it. Every turn restarts the run's retention window. Verified live on Baseten + Elastic: ~3.5 s per turn, StudyPal went
 23 -> 44 -> 54 over two author moves. UI: `frontend/components/coach/CoachPanel.tsx` (the old `MutationPanel` is still
 used by `/classic`). A backend started before this change has no `/coach` route: restart it.
+
+**Coach, held to a few sentences (Sun ~02:45).** Real transcripts showed the coach scolding one-line pitches, quoting
+its own prompt ("twist=unspecified", "WHITESPACE term 'opencv'"), putting invented life stories into the tap-to-send
+chips ("I grew up on a farm"), writing 130-word build plans, and proposing directions bolted onto a random tag. Kimi
+ignores word limits, so the limits live in code in `backend/app/roles/mutator.py`: `_brief` (3 sentences / 420 chars),
+`_one_question` (drops the menu bolted onto a question), `_chips` (no biography, no blanks, neutral fallbacks), `_plain`
+(strips prompt labels; "corpus" -> "the dataset"), all covered by `tests/test_coach_harness.py`. The shared `VOICE`
+prompt sets the tone; directions are found in the gap between the closest projects, and only subject tags (never tech
+tags like `opencv`) are passed as hints. `_measure` now scores a version against the dataset AND the run's own top
+entities: the dataset holds only Devpost/YC, so a rewording of "ai chipmaker" used to gain 70 points just because the
+web incumbents were no longer in the comparison. User-visible text says "dataset", never "corpus" (HOUSE_RULES too).
+
+**Islands never overlap (Sun ~02:15).** `lib/islandLayout.ts` packs by the shore as drawn (`footprint()` =
+`SHORE_REACH`/`BOAT_REACH`, not the turf radius), the packer no longer gives up (a wedge widens by 7 degrees a ring once 6
+rings are full, so `place()` always finds clear water), and the wedges follow what real runs bring back (web 105 degrees:
+live search returns 35-46 projects, which used to be stacked inside 30). Checked at every fold of all 719 recorded runs.
 
 **The open web is a first-class source (Sun ~01:30).** Two judges on Sat 19:00 typed "ai grading for teachers" and
 "chipmaker for ai" and saw neither VibeGrade nor Cerebras, and mostly software. Cause: those runs had no web scout at

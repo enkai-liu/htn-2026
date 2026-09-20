@@ -150,7 +150,7 @@ def build() -> list[AgentEvent]:
     e(0.2, "conductor", "plan", "agent.started", {"purpose": "Decompose, staff, replan."})
     facets = Facets(
         purpose="tell a hacker whether their project idea has been done before",
-        mechanism="multi-agent retrieval, debate and claim verification over a large prior-art corpus",
+        mechanism="multi-agent retrieval, debate and claim verification over a large prior-art dataset",
         audience="hackathon participants and early founders", data="past hackathon write-ups, startup directories, repos",
         twist="coaches you toward whitespace and re-scores each suggestion against evidence",
         domain="developer-tools", keywords=["originality", "hackathon", "idea", "prior art", "novelty"],
@@ -289,7 +289,7 @@ def build() -> list[AgentEvent]:
     e(0.4, "advocate", "debate", "claim.proposed", {"claim": d1.model_dump(mode="json")}, model=GLM)
     e(0.3, "judge", "debate", "agent.started", {"purpose": "Count the votes, measure the split."})
     e(2.2, "judge", "debate", "jury.vote", {"subject": "e1 vs idea: purpose", "eid": "e1", "facet": "purpose", "mean": 0.86, "std": 0.05, "votes": [
-        {"model": GLMF, "score": 0.9, "why": "same goal"}, {"model": FLASH, "score": 0.85, "why": "same goal, narrower corpus"}, {"model": OSS, "score": 0.82, "why": "same goal"}]})
+        {"model": GLMF, "score": 0.9, "why": "same goal"}, {"model": FLASH, "score": 0.85, "why": "same goal, narrower dataset"}, {"model": OSS, "score": 0.82, "why": "same goal"}]})
     e(0.3, "judge", "debate", "jury.vote", {"subject": "e1 vs idea: mechanism", "eid": "e1", "facet": "mechanism", "mean": 0.41, "std": 0.27, "votes": [
         {"model": GLMF, "score": 0.2, "why": "keyword search is a different mechanism"}, {"model": FLASH, "score": 0.75, "why": "both are LLM + search"},
         {"model": OSS, "score": 0.28, "why": "no verification or resolution step"}]})
@@ -361,7 +361,7 @@ def build() -> list[AgentEvent]:
         Mutation(mid="mu2", facet="mechanism", frm="one LLM opinion", to="adversarial agents whose claims are independently verified before display",
                  rationale="No neighbour verifies its own claims; 'verification' is a whitespace term here.", grounded_in=["verification", "citations"],
                  pitch="An originality checker where a critic and an advocate argue, and nothing reaches you unless a verifier finds the receipt."),
-        Mutation(mid="mu3", facet="twist", frm="a score", to="coaching: facet swaps re-scored live against the corpus",
+        Mutation(mid="mu3", facet="twist", frm="a score", to="coaching: facet swaps re-scored live against the dataset",
                  rationale="purpose AND coaching returns 0 projects.", grounded_in=["coaching", "iteration"],
                  pitch="Don't just grade the idea: propose concrete swaps and show the neighbourhood thinning out as you accept them."),
     ]
@@ -414,7 +414,7 @@ def build() -> list[AgentEvent]:
         suggestions=["Knowing what to change", "Seeing what nobody had built", "Proof it was really the same"], cites=[radar, check])
     say(2.2, "user", "Knowing what to change without throwing everything away. We had half the code written.")
     say(2.4, "coach", "Then that is the idea: not a checker, a pivot partner. It holds what you have built fixed and looks for the nearest open ground from "
-        "there. I searched that framing: nothing in the corpus is about salvaging a half-built project. The closest is NoveltyLens, which is "
+        "there. I searched that framing: nothing in the dataset is about salvaging a half-built project. The closest is NoveltyLens, which is "
         "inspiration search with no notion of what you already have.",
         question="What would a team hand it about their half-built project: the repo, the stack, or just a description?",
         suggestions=["The repo", "Just a description", "Both, repo first"], cites=[lens], pitch_version=1)
@@ -423,7 +423,7 @@ def build() -> list[AgentEvent]:
             "from grading an idea to salvaging a half-built one", 58, 61, [lens, radar, catch])
     say(2.0, "user", "The repo. It could read the README and the dependencies.")
     say(2.4, "coach", "Reading the repo is the part nobody near you does, and lab/idea-novelty shows retrieve-then-rerank holds up for the search half. One "
-        "caution: this corpus is write-ups, not code, so match on what the repo does, not on what it imports.",
+        "caution: this dataset is write-ups, not code, so match on what the repo does, not on what it imports.",
         question="Do you want to pressure-test this version, or back up and try a different direction?",
         suggestions=["Pressure-test it", "What would a judge poke at?", "Try another direction"], cites=[lab], pitch_version=2)
     version(1.6, 2, "Point SLOP at your half-built repo the moment you learn your hackathon idea exists. It reads what you have already made, "
@@ -435,7 +435,7 @@ def build() -> list[AgentEvent]:
     e(0.3, "actuator", "act", "agent.started", {"purpose": "An answer that doesn't act is a report."})
     for action, label, click in (("arm_watch", "Watch for new look-alikes (re-checks every 30 min, pings Slack)", True),
                                  ("draft_pitch", "Draft a differentiated pitch from the chosen mutation", False),
-                                 ("writeback", "Add this idea to the corpus so the next search can find it", True)):
+                                 ("writeback", "Add this idea to the dataset so the next search can find it", True)):
         e(0.3, "actuator", "act", "action.proposed", {"action": action, "label": label, "requires_click": click})
     e(0.2, "conductor", "act", "budget.updated", {"calls": 52, "tokens": 91400, "cost_usd": 0.058, "elapsed_s": 74.0, "degraded": False})
 

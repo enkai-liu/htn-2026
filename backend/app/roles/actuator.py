@@ -40,7 +40,7 @@ class Actuator(BaseRole):
         if s.has_elastic:
             proposals.insert(0, ("arm_watch", "Watch for new look-alikes (re-checked on a schedule; alerts to Slack)", True))
             if scores and not scores.abstain.active:  # don't pollute the corpus with ideas we could not even assess
-                proposals.append(("writeback", "Add this idea to the corpus so the next search can find it", True))
+                proposals.append(("writeback", "Add this idea to the dataset so the next search can find it", True))
         for action, label, click in proposals:
             await ctx.emit("action.proposed", {"action": action, "label": label, "requires_click": click})
         return result(actions=[a for a, _, _ in proposals], summary=f"{len(proposals)} actions proposed")
@@ -65,7 +65,7 @@ class Actuator(BaseRole):
                "description": board.idea_text, "pitch": text, "semantic_pitch": text, "year": now.year, "date": now.date().isoformat(),
                "date_precision": "day", "tags": ["whitespace-user-idea"], "status": "unknown", "has_semantic": True, "first_seen_at": now.isoformat()}
         await get_async_es().index(index=s.es_index, id=doc["rid"], document=doc)
-        return "Idea written back to the corpus; the next person with this idea will find it."
+        return "Idea written back to the dataset; the next person with this idea will find it."
 
     async def _draft_pitch(self, ctx: Ctx, p: dict) -> str:
         board = ctx.board
