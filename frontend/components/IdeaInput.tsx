@@ -7,7 +7,7 @@ import { useState, type FormEvent } from "react";
 import { ApiError, createRun } from "@/lib/api";
 
 export const VOICE_MIN_CHARS = 250;
-const SEARCH_MIN_CHARS = 20; // backend RunRequest.idea_text min_length
+const SEARCH_MIN_CHARS = 1; // backend RunRequest.idea_text min_length
 const MAX_CHARS = 5000;
 const REPLAY_ONLY = process.env.NEXT_PUBLIC_REPLAY_ONLY === "1";
 

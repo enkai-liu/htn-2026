@@ -20,7 +20,7 @@ ACTIONS = {"arm_watch", "draft_pitch", "writeback"}
 
 
 class RunRequest(BaseModel):
-    idea_text: str = Field(min_length=20, max_length=5000)
+    idea_text: str = Field(min_length=1, max_length=5000)
     url: str | None = Field(default=None, max_length=500)
 
 
@@ -46,8 +46,11 @@ async def _stream_recorded(path: Path, speed: float, after: int) -> AsyncIterato
 
 @router.post("/runs")
 async def create_run(req: RunRequest) -> dict:
+    idea = req.idea_text.strip()
+    if not idea:  # min_length counts whitespace
+        raise HTTPException(422, "idea_text is empty")
     try:
-        run = runstore.create_run(req.idea_text.strip(), req.url)
+        run = runstore.create_run(idea, req.url)
     except runstore.RunLimitExceeded as exc:
         raise HTTPException(429, str(exc)) from exc
     return {"run_id": run.run_id}
