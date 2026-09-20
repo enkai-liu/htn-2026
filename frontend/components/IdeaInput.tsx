@@ -1,5 +1,4 @@
 "use client";
-import clsx from "clsx";
 import { ArrowRight, Link2, LoaderCircle, TriangleAlert } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -28,7 +27,6 @@ export function IdeaInput() {
   const chars = text.trim().length;
   const voiceReady = chars >= VOICE_MIN_CHARS;
   const searchReady = chars >= SEARCH_MIN_CHARS;
-  const pct = Math.min(100, (chars / VOICE_MIN_CHARS) * 100);
 
   async function submit(e?: FormEvent) {
     e?.preventDefault();
@@ -74,17 +72,17 @@ export function IdeaInput() {
           className="block w-full resize-y bg-transparent font-display text-[21px] leading-[1.4] text-bone outline-none placeholder:text-faint placeholder:italic"
         />
 
-        {/* character gauge with the 250 mark */}
-        <div className="mt-3">
-          <div className="relative h-[3px] bg-ink-700">
-            <div className={clsx("absolute inset-y-0 left-0 transition-[width,background-color] duration-300", voiceReady ? "bg-teal" : "bg-amber")} style={{ width: `${pct}%` }} />
-          </div>
-          <div className="mt-1.5 flex items-start justify-between gap-4 font-mono text-[10.5px] tracking-[0.06em]">
-            <span className={voiceReady ? "text-teal" : "text-amber"}>
-              {chars.toLocaleString("en-US")} <span className="text-mute">/ {VOICE_MIN_CHARS} characters</span>
-            </span>
-            {!voiceReady && searchReady && <span className="text-right text-mute">Voice API requires {VOICE_MIN_CHARS} characters</span>}
-          </div>
+        {/* Never "x / 250" and no bar filling toward it: both read as a quota being spent. 250 is only the floor
+            below which Voice abstains, and the real ceiling, MAX_CHARS, is worth a word only once you are near it. */}
+        <div className="mt-3 flex items-start justify-between gap-4 font-mono text-[10.5px] tracking-[0.06em]">
+          <span className={voiceReady ? "text-teal" : "text-amber"}>
+            {chars.toLocaleString("en-US")} character{chars === 1 ? "" : "s"}
+          </span>
+          {!voiceReady ? (
+            <span className="text-right text-mute">{(VOICE_MIN_CHARS - chars).toLocaleString("en-US")} more before the Voice check runs</span>
+          ) : chars > MAX_CHARS - 500 ? (
+            <span className="text-right text-mute">{(MAX_CHARS - chars).toLocaleString("en-US")} of {MAX_CHARS.toLocaleString("en-US")} left</span>
+          ) : null}
         </div>
 
         <div className="mt-4 flex items-center gap-2 border-t border-line pt-3">
