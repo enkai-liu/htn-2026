@@ -84,7 +84,7 @@ bash scripts/validate_swarm_skill.sh                         # official Swarm Sk
 backend/.venv/bin/python elastic/apply.py --dry-run          # 17-step plan, sends nothing
 bash scripts/smoke_all.sh                                    # SKIPs without keys, exit 0
 ```
-Dev servers: `.claude/launch.json` defines `frontend` (:3000) and `backend` (:8000). Recorded run: http://localhost:3000/runs/mock?speed=3
+Dev servers: `.claude/launch.json` defines `frontend` (:3000) and `backend` (:8000). Recorded run (kept as demo insurance, no longer linked from the UI): http://localhost:3000/runs/mock?speed=3
 
 ## Open issues, most important first
 

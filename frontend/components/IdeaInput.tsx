@@ -1,6 +1,6 @@
 "use client";
 import clsx from "clsx";
-import { ArrowRight, Link2, LoaderCircle, Play, TriangleAlert } from "lucide-react";
+import { ArrowRight, Link2, LoaderCircle, TriangleAlert } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
@@ -109,10 +109,6 @@ export function IdeaInput() {
             {busy ? <LoaderCircle size={14} className="animate-spin" /> : <ArrowRight size={14} />}
             {busy ? "Forming the team" : "Investigate"}
           </button>
-          <Link href="/runs/mock" className="btn h-10 px-4">
-            <Play size={12} />
-            Watch a recorded run
-          </Link>
           {!voiceReady && searchReady && !busy && (
             <button type="button" onClick={() => void submit()} className="font-mono text-[10.5px] uppercase tracking-[0.12em] text-mute underline decoration-dotted underline-offset-4 hover:text-bone">
               Run anyway (Voice will abstain)
@@ -124,11 +120,16 @@ export function IdeaInput() {
           <div role="alert" className="mt-4 flex animate-rise items-start gap-2.5 border border-vermilion/50 bg-vermilion/[0.07] px-3 py-2.5 text-[13px] leading-snug text-bone">
             <TriangleAlert size={15} className="mt-0.5 flex-none text-vermilion" />
             <span>
-              {error}{" "}
-              <Link href="/runs/mock" className="text-amber underline decoration-dotted underline-offset-4 hover:text-bone">
-                Watch a recorded run instead
-              </Link>
-              .
+              {error}
+              {REPLAY_ONLY && (
+                <>
+                  {" "}
+                  <Link href="/runs/mock" className="text-amber underline decoration-dotted underline-offset-4 hover:text-bone">
+                    Watch the recorded run instead
+                  </Link>
+                  .
+                </>
+              )}
             </span>
           </div>
         )}

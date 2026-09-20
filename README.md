@@ -28,8 +28,6 @@ make backend                # http://localhost:8000
 make frontend               # http://localhost:3000
 ```
 
-No keys yet? The backend serves a recorded run: open `http://localhost:3000/runs/mock`.
-
 ## Layout
 
 `backend/` FastAPI + agents · `frontend/` Next.js · `ingest/` corpus loaders · `elastic/` mappings, pipeline, Agent Builder tools, Workflows · `investigation/` the Slop Index study · `swarm-skill/` reusable openJiuwen Swarm Skill · `baseten/` bake-off + surprisal deployment · `scripts/` smokes and benchmarks

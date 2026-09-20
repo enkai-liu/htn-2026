@@ -39,7 +39,7 @@ class Conductor(BaseRole):
     async def handle(self, msg: dict, ctx: Ctx) -> dict:
         board = ctx.board
         if not self.llm.available:
-            return error("No LLM provider is configured. Set BASETEN_API_KEY (or OPENROUTER_API_KEY) in .env, or open /runs/mock for a recorded run.")
+            return error("No LLM provider is configured. Set BASETEN_API_KEY (or OPENROUTER_API_KEY) in .env.")
         await self._read_link(ctx)
         try:
             plan = await self._plan(ctx)

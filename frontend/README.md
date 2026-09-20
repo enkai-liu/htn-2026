@@ -34,12 +34,15 @@ Copy `.env.example` to `.env.local`.
 ## Pages
 
 - `/` : hero + pitch input. 250-character gate for the GPTZero voice read (with a "run anyway" escape hatch from 20 characters, the
-  backend minimum). `POST {API}/api/runs` then routes to `/runs/{run_id}`. If the POST fails you get an inline error with a link to the recorded run.
+  backend minimum). `POST {API}/api/runs` then routes to `/runs/{run_id}`. If the POST fails you get an inline error (on a replay-only deploy it also links to the recorded run).
 - `/runs/[id]` : the live view.
 - `/slop-index` : the investigation page. Fetches `{API}/api/investigation/slop-index`, falls back to
   `public/slop-index.sample.json` and then shows a **SAMPLE DATA** ribbon, banner and per-card stamps.
 
 ## Transports: live vs replay
+
+Replay is demo insurance, not a feature of the site: nothing in the UI links to `/runs/mock` any more, and the route is
+reached only by typing it, by `?replay=`, or on the replay-only deploy. It is still prerendered, which is what `build:static` exports.
 
 `lib/useRunEvents.ts` picks the transport:
 

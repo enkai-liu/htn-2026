@@ -90,8 +90,7 @@ export function RunShell({ children }: { children: ReactNode }) {
             <h1 className="mt-2 font-display text-[32px] leading-tight text-bone">{isReplay ? "That recording could not be loaded." : "The investigation backend is not answering."}</h1>
             <p className="mt-2 text-[14px] leading-relaxed text-bone-dim">{run.error}</p>
             <div className="mt-6 flex justify-center gap-2">
-              <Link href="/runs/mock" className="btn btn-primary">Watch a recorded run</Link>
-              <Link href="/" className="btn">Back to start</Link>
+              <Link href="/" className="btn btn-primary">Back to start</Link>
             </div>
           </div>
         </div>

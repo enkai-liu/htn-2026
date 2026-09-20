@@ -11,7 +11,6 @@ export default function NotFound() {
         
         <div className="mt-6 flex gap-3">
           <Link href="/" className="btn btn-primary h-10 px-5">Investigate an idea</Link>
-          <Link href="/runs/mock" className="btn h-10 px-4">Watch a recorded run</Link>
         </div>
       </main>
     </>
