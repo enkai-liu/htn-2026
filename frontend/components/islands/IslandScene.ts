@@ -66,6 +66,7 @@ const easeOutBack = (t: number) => { const c1 = 1.70158, c3 = c1 + 1; return 1 +
 const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
 const easeInOutCubic = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 const clamp01 = (n: number) => Math.min(1, Math.max(0, n));
+const smoothstep = (a: number, b: number, x: number) => { const t = clamp01((x - a) / (b - a)); return t * t * (3 - 2 * t); };
 
 interface Island {
   datum: IslandDatum;
@@ -110,19 +111,53 @@ function jitter(i: number, j: number): number {
   return n - Math.floor(n) - 0.5;
 }
 
+/**
+ * The wave train, as [dirX, dirZ, wavenumber, speed, height]: each row is one sine rolling across the map in
+ * its own direction. One long swell carries the sea, with a second running a few degrees off it so the crests
+ * wander instead of corrugating, and the three short ones on top are the chop this sea always had. The second
+ * swell stays small on purpose: at equal heights two crossing trains stop being a swell and become an egg
+ * crate, which from the landing page's altitude read as a cloudy sky rather than water.
+ *
+ * This table is the only place the waves are written down. The shader's GLSL is generated from it (see
+ * seaMaterial) and swell() below sums the same rows, so the water the boats ride cannot drift out of step with
+ * the water they are drawn on.
+ */
+const WAVES: readonly (readonly [number, number, number, number, number])[] = [
+  [0.86, 0.51, 0.42, 0.6, 0.1], // the swell that carries the sea
+  [0.62, 0.78, 0.85, -0.72, 0.028], // a shorter one a few degrees off it
+  [1, 0, 0.62, 0.9, 0.04],
+  [0.273, 0.962, 0.842, -0.7, 0.032],
+  [0.707, 0.707, 1.938, 1.3, 0.018],
+];
+
+/**
+ * How much of one wave survives at a given facet size. A sheet whose facets are half a wavelength across cannot
+ * draw that wave; it draws the beat between the wave and its own grid instead, and with the vertices jittered
+ * that beat is noise -- which is what turned the zoomed-out hero's water into a cloudy sky. So each row fades
+ * out as the facets close on it, and the view is left with the long swell that the grid can still carry.
+ *
+ * The facet size handed in here is the unrounded one. The sheet itself can only step in doublings, and fading
+ * against a value that jumps by 2x would pop the whole surface as you crossed each boundary.
+ */
+const waveFade = (k: number, cell: number) => smoothstep(2, 4, (2 * Math.PI) / k / cell);
+
 /** The height of the swell at a point on the map. Boats ask too, so they ride the same water they are drawn on. */
-function swell(x: number, z: number, t: number): number {
-  return Math.sin(x * 0.62 + t * 0.9) * 0.06 + Math.sin(z * 0.81 - t * 0.7 + x * 0.23) * 0.05 + Math.sin((x + z) * 1.37 + t * 1.3) * 0.025;
+function swell(x: number, z: number, t: number, cell: number): number {
+  let h = 0;
+  for (const [dx, dz, k, speed, amp] of WAVES) h += Math.sin((x * dx + z * dz) * k + t * speed) * amp * waveFade(k, cell);
+  return h;
 }
 
-interface SeaUniforms { uTime: { value: number }; uFocus: { value: Vector2 }; uFar: { value: number } }
+interface SeaUniforms { uTime: { value: number }; uFocus: { value: Vector2 }; uFar: { value: number }; uCell: { value: number } }
 
 /**
  * The water's material. Swell and depth tint are pure functions of where a vertex is on the map and what time
  * it is, so they belong on the GPU: in JS they meant rewriting and re-uploading every one of the sheet's ~9,400
- * vertices -- position and colour, five sines apiece, a quarter of a megabyte -- on every single frame, which
- * was the bulk of the map's frame budget. Here the vertex buffer only changes when the grid the sheet is laid
- * on moves (see laySea), and a still camera uploads nothing at all.
+ * vertices -- position and colour, a sine per wave apiece, a quarter of a megabyte -- on every single frame,
+ * which was the bulk of the map's frame budget. Here the vertex buffer only changes when the grid the sheet is
+ * laid on moves (see laySea), and a still camera uploads nothing at all. Which is why the sea can afford a
+ * proper wave train and foam on the crests now: another few sines per vertex is nothing to a GPU, and the CPU
+ * never sees them.
  *
  * Displacing in the vertex shader keeps the facets: flat shading takes its normals from screen-space
  * derivatives in the fragment shader, so it sees the water the vertex shader actually built.
@@ -131,6 +166,14 @@ function seaMaterial(uniforms: SeaUniforms): MeshStandardMaterial {
   const m = new MeshStandardMaterial({ flatShading: true, transparent: true, opacity: 0.88, depthWrite: false, roughness: 0.5, metalness: 0 });
   // Colors are already in the renderer's linear working space, which is what the shader wants
   const rgb = (c: Color) => `vec3(${c.r.toFixed(5)}, ${c.g.toFixed(5)}, ${c.b.toFixed(5)})`;
+  const f = (n: number) => n.toFixed(5);
+  // The same rows swell() sums, unrolled: no loop, no uniform array, and the compiler folds every constant
+  // but the fade, which needs the live facet size. `amp` accumulates what is left of the train after the
+  // fades, so the foam threshold below tracks the crest the water can actually reach at this zoom.
+  const train = WAVES.map(([dx, dz, k, speed, a]) => `
+        amp = ${f(a)} * smoothstep(2.0, 4.0, ${f((2 * Math.PI) / k)} / uCell);
+        wave += sin((p.x * ${f(dx)} + p.y * ${f(dz)}) * ${f(k)} + uTime * ${f(speed)}) * amp;
+        reach += amp;`).join("");
   m.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms);
     shader.vertexShader = shader.vertexShader
@@ -138,15 +181,26 @@ function seaMaterial(uniforms: SeaUniforms): MeshStandardMaterial {
         uniform float uTime;
         uniform vec2 uFocus;
         uniform float uFar;
+        uniform float uCell;
         varying vec3 vSeaTint;`)
       .replace("#include <begin_vertex>", `#include <begin_vertex>
-        // the same swell as swell() in JS, which the boats and the floating islands still ride on the CPU
-        transformed.y += sin(position.x * 0.62 + uTime * 0.9) * 0.06
-          + sin(position.z * 0.81 - uTime * 0.7 + position.x * 0.23) * 0.05
-          + sin((position.x + position.z) * 1.37 + uTime * 1.3) * 0.025;
+        vec2 p = vec2(position.x, position.z);
+        float wave = 0.0;
+        float amp = 0.0;
+        float reach = 0.0;${train}
+        transformed.y += wave;
         // the water deepens away from the archipelago, which is what gives a screen of flat colour a middle
-        float depth = clamp(length(vec2(position.x, position.z) - uFocus) / uFar, 0.0, 1.0);
-        vSeaTint = mix(${rgb(SEA)}, ${rgb(SEA_DEEP)}, depth * depth * (3.0 - 2.0 * depth));`);
+        float depth = clamp(length(p - uFocus) / uFar, 0.0, 1.0);
+        vec3 tint = mix(${rgb(SEA)}, ${rgb(SEA_DEEP)}, depth * depth * (3.0 - 2.0 * depth));
+        // Foam, and the reason the waves are visible at all: from this camera a tenth of a unit of height is
+        // almost nothing, but the colour breaking on the crests reads from across the room. Only the top of a
+        // crest catches it, so the sea stays pale and calm between them rather than going stormy.
+        // Thresholds off a real crest, not the theoretical one: five sines only all peak together about
+        // never, so the full height of the train is one the water does not reach, and foaming from there is
+        // foam nobody sees.
+        reach = max(reach, 0.001);
+        float crest = smoothstep(reach * 0.48, reach * 0.68, wave);
+        vSeaTint = mix(tint, ${rgb(FOAM)}, crest * 0.42);`);
     shader.fragmentShader = shader.fragmentShader
       .replace("#include <common>", "#include <common>\nvarying vec3 vSeaTint;")
       .replace("#include <color_fragment>", "#include <color_fragment>\ndiffuseColor.rgb *= vSeaTint;");
@@ -215,7 +269,9 @@ export class IslandScene {
   private sea: Mesh;
   /** the facet size the water is drawn at right now */
   private seaCell = SEA_CELL;
-  private seaUniforms: SeaUniforms = { uTime: { value: 0 }, uFocus: { value: new Vector2() }, uFar: { value: 16 } };
+  private seaUniforms: SeaUniforms = { uTime: { value: 0 }, uFocus: { value: new Vector2() }, uFar: { value: 16 }, uCell: { value: SEA_CELL } };
+  /** the facet size the waves are faded against: the one the view asks for, before it is rounded to a doubling */
+  private waveCell = SEA_CELL;
   /** the grid the sheet is currently laid on: while that does not move, its buffer is left alone */
   private seaAt = { i: NaN, j: NaN, c: 0 };
   private rippleGeo = new RingGeometry(0.94, 1, 56);
@@ -572,6 +628,7 @@ export class IslandScene {
     const halfW = (this.camera.right - this.camera.left) / 2;
     const reach = (Math.hypot(halfW, VIEW / Math.max(0.3, -this.look.y)) / this.camera.zoom) * 1.12;
 
+    this.waveCell = Math.max(SEA_CELL, (2 * reach) / SEA_CELLS);
     // coarser facets when zoomed out, finer again on the way back in; the slack stops it flickering at a boundary
     while (2 * reach > SEA_CELLS * this.seaCell) this.seaCell *= 2;
     while (this.seaCell > SEA_CELL && 2 * reach < SEA_CELLS * this.seaCell * 0.42) this.seaCell /= 2;
@@ -584,6 +641,7 @@ export class IslandScene {
     this.seaUniforms.uTime.value = t;
     this.seaUniforms.uFocus.value.set(this.focus.x, this.focus.z);
     this.seaUniforms.uFar.value = this.extent * 1.5 + 8;
+    this.seaUniforms.uCell.value = this.waveCell;
     if (i0 === this.seaAt.i && j0 === this.seaAt.j && c === this.seaAt.c) return;
     this.seaAt = { i: i0, j: j0, c };
 
@@ -722,7 +780,7 @@ export class IslandScene {
       p.y += (1 - easeOutCubic(born)) * -2.2;
       // land stands still; only a boat rides the swell
       const afloat = i.datum.p.kind === "mutation";
-      if (afloat) p.y += swell(p.x, p.z, t);
+      if (afloat) p.y += swell(p.x, p.z, t, this.waveCell);
 
       const wantLift = id === this.selectedId ? 0.16 : id === this.hoverId ? 0.08 : 0;
       i.lift += (wantLift - i.lift) * liftK;
@@ -756,7 +814,7 @@ export class IslandScene {
         return { x: Math.cos(a) * r, z: Math.sin(a) * r };
       };
       const p = at(now), q = at(now + 240);
-      b.mesh.position.set(p.x, SEA_Y + waterline("mutation", 0.52) + swell(p.x, p.z, t), p.z);
+      b.mesh.position.set(p.x, SEA_Y + waterline("mutation", 0.52) + swell(p.x, p.z, t, this.waveCell), p.z);
       b.mesh.rotation.y = Math.atan2(q.x - p.x, q.z - p.z);
       b.mesh.rotation.z = Math.sin(now * 0.0011 + b.bob) * 0.05; // roll with the swell
     }
