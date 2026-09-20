@@ -7,7 +7,20 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from app.schemas import Claim, CoachMessage, CoachPitch, Entity, Evidence, Facets, Mutation, Scores, SourceRecord, SourceStatus, Voice
+from app.schemas import (
+    Claim,
+    CoachMessage,
+    CoachPitch,
+    Entity,
+    Evidence,
+    Facets,
+    Mutation,
+    Scores,
+    SiteCheck,
+    SourceRecord,
+    SourceStatus,
+    Voice,
+)
 
 if TYPE_CHECKING:  # annotation only: nothing in core should pull the HTML parser in at import time
     from app.sources.idea_url import IdeaPage
@@ -18,6 +31,7 @@ WRITE_PERMISSIONS: dict[str, tuple[str, ...]] = {
     "records": ("scout.",),  # prefix match: any scout
     "sources": ("scout.", "conductor"),
     "entities": ("resolver",),
+    "sites": ("inspector",),
     "evidence": ("critic", "advocate", "scout.", "verifier"),
     "claims": ("critic", "advocate", "judge", "verifier"),
     "jury": ("judge",),
@@ -44,6 +58,7 @@ class Blackboard:
         self.records: dict[str, SourceRecord] = {}
         self.sources: dict[str, SourceStatus] = {}
         self.entities: dict[str, Entity] = {}
+        self.sites: dict[str, SiteCheck] = {}  # eid -> what a browser found at the product's own site
         self.evidence: dict[str, Evidence] = {}
         self.claims: dict[str, Claim] = {}
         self.jury: list[dict[str, Any]] = []

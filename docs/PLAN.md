@@ -83,8 +83,8 @@ Workflow (scheduled) ─▶ idea-alerts-v1 ─▶ backend poller ─▶ SSE toas
 | Role | Authority | Model |
 |---|---|---|
 | `conductor` | extracts facets, forms team dynamically, budget (≤70 calls/150k tok/90 s), reassigns on failure | GLM-5.3-Flash |
-| `scout.devpost`, `scout.yc` | ES hybrid (3 queries: full idea · purpose+mechanism · twist), MCP tools | DeepSeek-V4-Flash |
-| `scout.github`, `scout.hn` (+arXiv, browser: P2) | live APIs, broaden-and-retry on 0 hits | same |
+| `scout.devpost`, `scout.yc` | ES hybrid (up to 5 concurrent queries: full idea · purpose+mechanism · twist · problem only · hypothetical write-up), MCP tools | DeepSeek-V4-Flash |
+| `scout.github`, `scout.hn`, `scout.web` (Exa; needs `EXA_API_KEY`) (+arXiv: P2) | live APIs, broaden-and-retry on 0 hits | same |
 | `resolver` | **only role that writes entities**: schema match → blocking (URL xref, `dedupe_key`, name trigram ≥0.6) → LLM adjudication → union-find → field fusion with reliability priors → conflicts, imputation | DeepSeek-V4-Flash, 8 pairs/call |
 | `critic` | "exists" claims with quotes; **may send scouts back out** (≤2 `REQUEST_EVIDENCE`) | DeepSeek-V4-Pro |
 | `advocate` | must concede, distinguish by facet, or challenge evidence; different model family | GLM-5.3 |

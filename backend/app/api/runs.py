@@ -5,6 +5,7 @@ from collections.abc import AsyncIterator
 from pathlib import Path
 
 from fastapi import APIRouter, Header, HTTPException, Query
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from sse_starlette.sse import EventSourceResponse
 
@@ -70,6 +71,18 @@ async def run_events(run_id: str, speed: float = Query(1.5, ge=0, le=20), last_e
     if path is None:
         raise HTTPException(404, f"unknown run {run_id!r}")
     return EventSourceResponse(_stream_recorded(path, speed, after))
+
+
+@router.get("/runs/{run_id}/shots/{name}")
+async def run_shot(run_id: str, name: str) -> FileResponse:
+    """A screenshot the inspector took of a prior-art product's live site. Both path parts are sanitised to plain ids."""
+    eid = name.removesuffix(".jpg")
+    if not (run_id.isalnum() and eid.isalnum() and name.endswith(".jpg")):
+        raise HTTPException(404, "no such screenshot")
+    path = RUNS_DIR / "shots" / f"{run_id}-{eid}.jpg"
+    if not path.is_file():
+        raise HTTPException(404, "no such screenshot")
+    return FileResponse(path, media_type="image/jpeg", headers={"Cache-Control": "public, max-age=86400"})
 
 
 @router.get("/replay/{name}/events")

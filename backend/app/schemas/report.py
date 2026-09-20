@@ -6,7 +6,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 from .claims import Claim
-from .entities import Entity, Evidence
+from .entities import Entity, Evidence, SiteCheck
 
 FACET_KEYS = ("purpose", "mechanism", "audience", "data", "twist")
 
@@ -184,5 +184,6 @@ class Report(BaseModel):
     by_year: list[YearCount] = Field(default_factory=list)
     mutations: list[Mutation] = Field(default_factory=list)
     sources: list[SourceStatus] = Field(default_factory=list)
+    sites: list[SiteCheck] = Field(default_factory=list)  # live renders of the closest prior art's own sites
     citations: list[str] = Field(default_factory=list)
     summary_md: str = ""

@@ -66,12 +66,12 @@ async def get_page(url: str, *, headers: dict | None = None, max_bytes: int = 2_
     raise SourceError("unreachable")
 
 
-async def get_json(url: str, *, params: dict | None = None, headers: dict | None = None) -> dict:
+async def _json(method: str, url: str, **kwargs) -> dict:
     try:
         async for attempt in AsyncRetrying(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=0.5, max=3),
                                            retry=retry_if_exception(_retryable), reraise=True):
             with attempt:
-                resp = await client().get(url, params=params, headers=headers)
+                resp = await client().request(method, url, **kwargs)
                 resp.raise_for_status()
                 return resp.json()
     except httpx.HTTPStatusError as exc:  # 403/429 are not retried: we back off instead of pushing through limits
@@ -79,3 +79,11 @@ async def get_json(url: str, *, params: dict | None = None, headers: dict | None
     except (httpx.TimeoutException, httpx.TransportError) as exc:
         raise SourceError(f"{type(exc).__name__} from {httpx.URL(url).host} after 3 attempts") from exc
     raise SourceError("unreachable")
+
+
+async def get_json(url: str, *, params: dict | None = None, headers: dict | None = None) -> dict:
+    return await _json("GET", url, params=params, headers=headers)
+
+
+async def post_json(url: str, *, body: dict, headers: dict | None = None) -> dict:
+    return await _json("POST", url, json=body, headers=headers)

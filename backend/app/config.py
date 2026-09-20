@@ -78,6 +78,14 @@ class Settings(BaseSettings):
         return bool(self.es_url and self.es_api_key)
 
     @property
+    def has_browser(self) -> bool:
+        return bool(self.browserbase_api_key)
+
+    @property
+    def has_web_search(self) -> bool:
+        return bool(self.exa_api_key)
+
+    @property
     def has_llm(self) -> bool:
         return bool(self.baseten_api_key or self.openrouter_api_key)
 

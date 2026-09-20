@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+
 from app.orchestration.host import Ctx, error, result
 from app.roles.base import BaseRole, eid_for
 from app.schemas import GraphLink, GraphNode, GraphPatch, SourceRecord, SourceStatus
@@ -21,25 +23,32 @@ class ScoutRole(BaseRole):
     async def search(self, query: str, n: int) -> list[SourceRecord]:  # pragma: no cover
         raise NotImplementedError
 
+    async def _one(self, q: str, ctx: Ctx, phase: str) -> list[SourceRecord]:
+        await ctx.emit("tool.call", {"tool": self.tool, "args_summary": q[:120]}, phase=phase)
+        hits = await self.search(q, self.per_query)
+        if not hits and len(tokens(q)) > 3:  # adaptive broaden-and-retry: keep the 3 most specific terms
+            broad = " ".join(sorted(set(tokens(q)), key=len, reverse=True)[:3])
+            await ctx.emit("tool.call", {"tool": self.tool, "args_summary": f"broadened: {broad}"}, phase=phase)
+            hits = await self.search(broad, self.per_query)
+        await ctx.emit("tool.result", {"tool": self.tool, "summary": f"{len(hits)} hits", "n_hits": len(hits)}, phase=phase)
+        return hits
+
     async def handle(self, msg: dict, ctx: Ctx) -> dict:
         p = msg["payload"]
         queries = [q for q in (p.get("queries") or [p.get("query")]) if q]
         phase = "debate" if msg["type"] == "REQUEST_EVIDENCE" else "scout"
         found: dict[str, SourceRecord] = {}
         failed: str | None = None
-        for q in queries:
-            try:
-                await ctx.emit("tool.call", {"tool": self.tool, "args_summary": q[:120]}, phase=phase)
-                hits = await self.search(q, self.per_query)
-                if not hits and len(tokens(q)) > 3:  # adaptive broaden-and-retry: keep the 3 most specific terms
-                    broad = " ".join(sorted(set(tokens(q)), key=len, reverse=True)[:3])
-                    await ctx.emit("tool.call", {"tool": self.tool, "args_summary": f"broadened: {broad}"}, phase=phase)
-                    hits = await self.search(broad, self.per_query)
-            except SourceError as exc:
-                failed = str(exc)
-                await ctx.emit("source.failed", {"source": self.source, "error": failed, "reassigned_to": None}, phase=phase)
-                break  # the source is unwell; whatever earlier queries returned is still real evidence
-            await ctx.emit("tool.result", {"tool": self.tool, "summary": f"{len(hits)} hits", "n_hits": len(hits)}, phase=phase)
+        # The queries are independent, so they go out together: a scout costs its slowest query, not the sum of them.
+        outcomes = await asyncio.gather(*(self._one(q, ctx, phase) for q in queries), return_exceptions=True)
+        for q, hits in zip(queries, outcomes):  # merged in query order, so the result does not depend on which came back first
+            if isinstance(hits, SourceError):
+                if failed is None:  # said once per scout; whatever the other queries returned is still real evidence
+                    failed = str(hits)
+                    await ctx.emit("source.failed", {"source": self.source, "error": failed, "reassigned_to": None}, phase=phase)
+                continue
+            if isinstance(hits, BaseException):
+                raise hits
             for r in hits:
                 r.retrieval.setdefault("query", q)
                 found.setdefault(r.rid, r)

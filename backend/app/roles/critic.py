@@ -11,6 +11,8 @@ from app.roles.base import HOUSE_RULES, BaseRole, clipped
 from app.schemas import Claim, Entity, Evidence
 
 MAX_FOLLOWUPS = 2
+COVERS = {"scout.devpost": "past hackathon projects", "scout.yc": "YC companies", "scout.github": "open-source repositories",
+          "scout.hn": "Hacker News launches and discussion", "scout.web": "the open web: shipped products, startups, app stores"}
 SITE = {"devpost": "Devpost", "yc": "Y Combinator", "github": "GitHub", "hn": "Hacker News", "arxiv": "arXiv", "web": "Web"}
 
 
@@ -58,7 +60,8 @@ class Critic(BaseRole):
         scouts = [m for m in ctx.members() if m.startswith("scout.")]
         system = (HOUSE_RULES + "Role: hostile prior-art critic. Make the strongest honest case that the idea is NOT original. "
                   "One claim per entity that genuinely overlaps; skip entities that do not. Each quote must be copied verbatim from that "
-                  f"entity's TEXT. Then list up to {MAX_FOLLOWUPS} follow-up searches (only if they could change the verdict) choosing from scouts: {scouts}.")
+                  f"entity's TEXT. Then list up to {MAX_FOLLOWUPS} follow-up searches (only if they could change the verdict), each sent "
+                  "to the scout whose ground it is: " + "; ".join(f"{s} ({COVERS.get(s, 'search')})" for s in scouts) + ".")
         user = (f"IDEA: {board.idea_text}\nFACETS: purpose={f.purpose} | mechanism={f.mechanism} | audience={f.audience} | twist={f.twist}\n\n{listing}")
         crit, res = await self.llm.structured(role=self.id, system=system, user=user, schema=Critique, session=self.session(ctx), budget=ctx.budget)
 

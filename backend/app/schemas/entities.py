@@ -36,6 +36,22 @@ class FusedField(BaseModel):
     imputed: bool = False
 
 
+class SiteCheck(BaseModel):
+    """What a cloud browser found at a prior-art product's own site, today. Deterministic: no model judged it."""
+    eid: str
+    rid: str  # the record whose link was followed
+    url: str
+    final_url: str = ""
+    status: Literal["alive", "dead", "parked", "blocked"]
+    why: str = ""
+    http_status: int | None = None
+    title: str = ""
+    excerpt: str = ""  # visible text, as rendered
+    screenshot: str | None = None  # path under the API, e.g. /api/runs/r1/shots/e1.jpg
+    elapsed_ms: int = 0
+    conflict: Conflict | None = None  # set when the render contradicts what a listing says about the project
+
+
 class JurorVote(BaseModel):
     model: str
     score: float  # 0..1 overlap on this facet

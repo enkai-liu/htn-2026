@@ -52,6 +52,7 @@ type AgentEvent = {
 | `evidence.found` | `{record: SourceRecord, eid}` | EvidenceCard appears. `eid` = the record's graph node `ent:<eid>` before resolution (the resolver may absorb it later) |
 | `entity.merged` | `{entity: Entity, rids: string[], verdict}` | cards collapse into one entity |
 | `conflict.detected` | `{eid, conflict: Conflict}` | conflict badge + ledger row |
+| `site.checked` | `{eid, site: SiteCheck}` | the inspector rendered the entity's own site in a Browserbase cloud browser: `status` alive/dead/parked/blocked (deterministic), `why`, `http_status`, `title`, `excerpt`, `screenshot` (a path under the API, `GET /api/runs/{id}/shots/{eid}.jpg`; never set for `blocked`). Shown as a chip on the evidence card and a "Live site" block in its detail. A render that contradicts a listing's status is followed by `conflict.detected` |
 | `claim.proposed` | `{claim: Claim, evidence?: Evidence[], facets?: string[]}` | DebateThread. `evidence` carries the quoted receipts so quotes show while the debate streams |
 | `claim.challenged` | `{cid, by, challenge_type: "CHALLENGE"\|"REBUTTAL"\|"CONCEDE", text}` | DebateThread |
 | `claim.resolved` | `{cid, status: ClaimStatus, reason}` | claim badge |

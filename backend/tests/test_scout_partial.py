@@ -30,19 +30,47 @@ class Flaky(ScoutRole):
         return [from_hn(HIT)]
 
 
-async def test_hits_before_a_failure_survive_as_a_degraded_source():
+async def test_hits_survive_a_failed_query_as_a_degraded_source():
     ctx = FakeCtx()
-    reply = await Flaky().handle({"type": "TASK", "payload": {"queries": ["good", "bad", "never reached"]}}, ctx)
+    reply = await Flaky().handle({"type": "TASK", "payload": {"queries": ["good", "bad", "also bad"]}}, ctx)
     assert reply["type"] == "RESULT" and len(reply["payload"]["rids"]) == 1
     st = ctx.board.sources["hn"]
     assert (st.status, st.n_records) == ("degraded", 1) and "503" in st.error
     types = [t for t, _ in ctx.events]
-    assert "source.failed" in types and "evidence.found" in types
-    assert types.count("tool.call") == 2  # the third query was not attempted
+    assert "evidence.found" in types
+    assert types.count("tool.call") == 3  # the queries go out together, so every one is attempted
+    assert types.count("source.failed") == 1  # and a sick source is announced once, not once per query
 
 
-async def test_nothing_found_before_the_failure_is_still_a_failed_source():
+async def test_a_failure_before_a_good_query_no_longer_loses_it():
     ctx = FakeCtx()
     reply = await Flaky().handle({"type": "TASK", "payload": {"queries": ["bad", "good"]}}, ctx)
+    assert reply["type"] == "RESULT" and ctx.board.sources["hn"].status == "degraded"
+    assert ctx.board.records[reply["payload"]["rids"][0]].retrieval["query"] == "good"
+
+
+async def test_every_query_failing_is_a_failed_source():
+    ctx = FakeCtx()
+    reply = await Flaky().handle({"type": "TASK", "payload": {"queries": ["bad", "bad"]}}, ctx)
     assert reply["type"] == "ERROR" and ctx.board.sources["hn"].status == "failed"
     assert not ctx.board.records
+
+
+async def test_queries_run_concurrently():
+    import asyncio
+
+    class Slow(ScoutRole):
+        id, source, tool = "scout.hn", "hn", "fake"
+        live = peak = 0
+
+        async def search(self, query: str, n: int):
+            Slow.live += 1
+            Slow.peak = max(Slow.peak, Slow.live)
+            await asyncio.sleep(0.01)
+            Slow.live -= 1
+            return [from_hn(HIT | {"objectID": query})]
+
+    ctx = FakeCtx()
+    reply = await Slow().handle({"type": "TASK", "payload": {"queries": ["1", "2", "3"]}}, ctx)
+    assert Slow.peak == 3
+    assert reply["payload"]["rids"] and set(reply["payload"]["rids"]) == {"hn:1", "hn:2", "hn:3"}

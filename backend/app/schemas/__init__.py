@@ -8,6 +8,7 @@ from .entities import (
     FusedField,
     JurorVote,
     MergeDecision,
+    SiteCheck,
     Verification,
 )
 from .events import EVENT_TYPES, AgentEvent, Phase
@@ -65,6 +66,7 @@ __all__ = [
     "Phase",
     "Report",
     "Scores",
+    "SiteCheck",
     "SourceRecord",
     "SourceStatus",
     "TermStat",

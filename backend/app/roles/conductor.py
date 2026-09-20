@@ -10,7 +10,7 @@ from app.llm.router import LLMUnavailable
 from app.orchestration import registry
 from app.orchestration.host import Ctx, envelope, error, result, task
 from app.orchestration.registry import register
-from app.roles.base import HOUSE_RULES, BaseRole
+from app.roles.base import HOUSE_RULES, BaseRole, clipped
 from app.schemas import FACET_KEYS, Facets, GraphLink, GraphNode, GraphPatch, SourceStatus
 from app.sources import idea_url
 from app.sources.http import SourceError
@@ -20,7 +20,9 @@ SCOUT_PURPOSE = {
     "scout.yc": "YC companies (Elasticsearch hybrid search)",
     "scout.github": "live GitHub repository search",
     "scout.hn": "live Hacker News search",
+    "scout.web": "the open web: shipped products, startups and launch posts (Exa neural search, page text attached)",
 }
+SEMANTIC_SCOUTS = ("scout.devpost", "scout.yc", "scout.web")  # these take natural-language queries; the rest want keywords
 DEBATE_TEAM = ["resolver", "critic", "advocate", "judge", "verifier", "synthesizer", "mutator", "actuator"]
 
 
@@ -28,7 +30,25 @@ class Plan(BaseModel):
     facets: Facets
     semantic_queries: list[str] = Field(description="3 natural-language queries: the full idea; purpose + mechanism; the twist alone")
     keyword_queries: list[str] = Field(description="2-3 short keyword queries (max 5 words each) for lexical search engines")
+    problem_query: clipped(300) = Field(default="", description="the problem alone, in one sentence, with NO mention of how this idea "
+                                        "solves it: it finds work that attacked the same problem a different way")
+    writeup: clipped(600) = Field(default="", description="2-3 plain sentences describing a project that ALREADY built this idea, as its own "
+                                  "project page would ('A tool that ...'): no invented names, numbers or awards")
     is_research: bool = Field(default=False, description="true only if the idea is a research contribution rather than a product")
+
+
+def semantic_queries(plan: Plan) -> list[str]:
+    """The natural-language queries, one per way prior art can hide: the idea as pitched, its halves, the problem
+    without the solution (same need, different approach) and a hypothetical write-up (the corpus is written in the
+    register of project pages, not pitches). The two newer shapes are optional in the schema -- some models skip
+    optional fields -- so the problem falls back to the facets and a missing write-up is simply not searched."""
+    f = plan.facets
+    problem = plan.problem_query.strip() or " for ".join(x for x in (f.purpose, f.audience) if x)
+    out: list[str] = []
+    for q in (*plan.semantic_queries[:3], problem, plan.writeup.strip()):
+        if q and q.lower() not in {o.lower() for o in out}:
+            out.append(q)
+    return out
 
 
 class Conductor(BaseRole):
@@ -54,8 +74,10 @@ class Conductor(BaseRole):
         if board.records:
             await ctx.send("resolver", task(reason="initial resolution"), timeout=90)
             await self._debate(ctx, scouts)
+            # Three independent checks on what the debate produced: the quotes, the LLM priors, and the products' live sites.
             await asyncio.gather(ctx.send("verifier", task(kind="claims"), timeout=90),
-                                 ctx.send("judge", task(kind="priors"), timeout=60))
+                                 ctx.send("judge", task(kind="priors"), timeout=60),
+                                 *([ctx.send("inspector", task(), timeout=80)] if "inspector" in ctx.members() else []))
         await ctx.send("synthesizer", task(kind="score"), timeout=90)
         if board.records and not ctx.budget.exhausted():
             await ctx.send("mutator", task(), timeout=120)
@@ -95,7 +117,7 @@ class Conductor(BaseRole):
     async def _plan(self, ctx: Ctx) -> Plan:
         system = (HOUSE_RULES + "Role: planner. Decompose the idea into facets: purpose (the goal, for whom), mechanism (how it works), "
                   "audience, data (what it consumes), twist (what the author thinks is new), domain (2-3 words), keywords. "
-                  "Facet values are short noun phrases in plain words. Then write the search queries.")
+                  "Facet values are short noun phrases in plain words. Then write the search queries, the problem_query and the writeup.")
         page = ctx.board.self_page
         user = f"IDEA: {ctx.board.idea_text}" + (f"\n\n{page.context()}" if page else "")
         plan, res = await self.llm.structured(role=self.id, system=system, user=user, schema=Plan,
@@ -111,19 +133,26 @@ class Conductor(BaseRole):
 
     async def _form_team(self, ctx: Ctx, plan: Plan) -> list[str]:
         """Dynamic team formation: who joins depends on the idea and on what is reachable right now."""
-        has_es, known = get_settings().has_elastic, set(registry.known_roles())
+        settings, known = get_settings(), set(registry.known_roles())
+        has_es = settings.has_elastic
         scouts, skipped = [], []
-        for sid in ("scout.devpost", "scout.yc", "scout.github", "scout.hn"):
+        for sid in ("scout.devpost", "scout.yc", "scout.github", "scout.hn", "scout.web"):
             if sid not in known:
                 skipped.append({"agent": sid, "why": "not available in this build"})
             elif sid in ("scout.devpost", "scout.yc") and not has_es:
                 skipped.append({"agent": sid, "why": "Elasticsearch is not configured"})
                 ctx.board.put("sources", self.id, sid.split(".")[1], SourceStatus(source=sid.split(".")[1], status="skipped", error="Elasticsearch is not configured"))
+            elif sid == "scout.web" and not settings.has_web_search:
+                skipped.append({"agent": sid, "why": "EXA_API_KEY is not set"})
+                ctx.board.put("sources", self.id, "web", SourceStatus(source="web", status="skipped", error="EXA_API_KEY is not set"))
             else:
                 scouts.append(sid)
         skipped.append({"agent": "scout.arxiv", "why": "arXiv scout is not enabled in this build" if plan.is_research
                         else "the idea is a product, not a research contribution"})
-        team = scouts + [r for r in DEBATE_TEAM if r in known]
+        browser = "inspector" in known and settings.has_browser
+        if not browser:
+            skipped.append({"agent": "inspector", "why": "BROWSERBASE_API_KEY is not set" if "inspector" in known else "not available in this build"})
+        team = scouts + [r for r in DEBATE_TEAM if r in known] + (["inspector"] if browser else [])
         ctx.form_team(team)
         await ctx.emit("team.formed", {"team": [{"agent": a, "purpose": SCOUT_PURPOSE.get(a) or registry.create(a).purpose} for a in team],
                                        "skipped": skipped})
@@ -132,8 +161,7 @@ class Conductor(BaseRole):
     # -- scout -------------------------------------------------------------------------------------------
     async def _scout(self, ctx: Ctx, plan: Plan, scouts: list[str]) -> None:
         def queries(sid: str) -> list[str]:
-            corpus = sid in ("scout.devpost", "scout.yc")
-            return (plan.semantic_queries[:3] if corpus else plan.keyword_queries[:3]) or [ctx.board.idea_text[:200]]
+            return (semantic_queries(plan) if sid in SEMANTIC_SCOUTS else plan.keyword_queries[:3]) or [ctx.board.idea_text[:200]]
 
         replies = await asyncio.gather(*(ctx.send(s, task(queries=queries(s)), timeout=45) for s in scouts))
         for sid, reply in zip(scouts, replies):

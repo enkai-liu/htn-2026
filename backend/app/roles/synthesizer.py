@@ -16,7 +16,7 @@ from app.scoring import axes
 from app.scoring.similarity import tokens
 from app.signals.surprisal import RCSResult
 
-SOURCE_WEIGHT = {"devpost": 0.40, "github": 0.20, "yc": 0.15, "hn": 0.15, "arxiv": 0.05, "web": 0.05}
+SOURCE_WEIGHT = {"devpost": 0.40, "github": 0.20, "yc": 0.15, "hn": 0.15, "arxiv": 0.05, "web": 0.20}
 CORPUS = ("devpost", "yc")
 
 
@@ -84,13 +84,16 @@ class Synthesizer(BaseRole):
             for (eid, facet), v in latest.items():
                 if eid == e.eid:
                     e.facet_overlap[facet] = FacetOverlap(mean=v["mean"], std=v["std"], votes=[JurorVote(**x) for x in v["votes"]])
+            site = board.sites.get(e.eid)
+            if site and site.conflict:  # "the listing says active, the site is gone" belongs with the entity's other conflicts
+                e.conflicts.append(site.conflict)
             entities.append(e)
         evidence = list(board.evidence.values())
         report = Report(
             run_id=ctx.run_id, idea_text=board.idea_text, facets=board.facets, scores=scores, voice=board.voice, entities=entities,
             claims=list(board.claims.values()), evidence=evidence, cliches=cliches, whitespace=stats.get("whitespace") or [],
             by_year=stats.get("by_year") or [], mutations=list(board.mutations.values()), sources=planned,
-            citations=[ev.citation for ev in evidence], summary_md=summary)
+            sites=list(board.sites.values()), citations=[ev.citation for ev in evidence], summary_md=summary)
         return result(report=report.model_dump(mode="json"), summary=f"report from {sum(c.status == 'verified' for c in exists)} verified claims", **({"llm": meta} if meta else {}))
 
     async def _summary(self, ctx: Ctx, scores) -> tuple[str, dict]:

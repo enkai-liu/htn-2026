@@ -80,7 +80,7 @@ A geometric mean means one crowded axis cannot be averaged away by two good ones
 E = 0.35 · coverage + 0.25 · (1 − jury_std / 0.35) + 0.25 · verified_share + 0.15 · canary
 ```
 
-- **coverage** — weighted share of planned sources that answered (devpost 0.40, github 0.20, yc 0.15, hn 0.15, other 0.05 each). A failed source lowers confidence; it never fails silently.
+- **coverage** — weighted share of planned sources that answered (devpost 0.40, github 0.20, web 0.20, yc 0.15, hn 0.15, arxiv 0.05). A failed source lowers confidence; it never fails silently.
 - **jury_std** — mean standard deviation across the jury's facet-overlap votes (different model families). Disagreement is information: it widens the band, lowers E, and (≥ 0.25) triggers a targeted re-query and re-vote.
 - **verified_share** — share of "already exists" claims whose quote was found in the source (layer 1) and whose citation GPTZero did not judge fake (layer 2).
 - **canary** — the corpus answered a broad query at all.

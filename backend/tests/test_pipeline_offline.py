@@ -101,6 +101,8 @@ def offline(monkeypatch, request):
     monkeypatch.setattr(s, "orchestrator", request.param)
     monkeypatch.setattr(s, "es_url", "")  # no Elasticsearch: corpus scouts are skipped and the headline must abstain
     monkeypatch.setattr(s, "es_api_key", "")
+    monkeypatch.setattr(s, "exa_api_key", "")  # a developer's real key must not send the suite to the network
+    monkeypatch.setattr(s, "browserbase_api_key", "")
     monkeypatch.setattr(s, "gptzero_mode", "replay")
     fake = FakeRouter()
     monkeypatch.setattr(router_mod, "_router", fake)
@@ -134,7 +136,7 @@ async def test_full_run_offline(offline):
 
     # dynamic team formation: corpus scouts skipped with a reason
     team = next(e for e in events if e.type == "team.formed").data
-    assert {s["agent"] for s in team["skipped"]} >= {"scout.devpost", "scout.yc", "scout.arxiv"}
+    assert {s["agent"] for s in team["skipped"]} >= {"scout.devpost", "scout.yc", "scout.arxiv", "scout.web", "inspector"}
 
     # failure handling: HN failed once, was retried by the conductor, and ended up degraded rather than lost
     assert "source.failed" in types
@@ -214,7 +216,7 @@ async def test_host_parity(monkeypatch, request):
         monkeypatch.setattr(get_settings(), "orchestrator", host)
         request.getfixturevalue  # noqa: B018
         s = get_settings()
-        for k in ("es_url", "es_api_key"):
+        for k in ("es_url", "es_api_key", "exa_api_key", "browserbase_api_key"):
             monkeypatch.setattr(s, k, "")
         monkeypatch.setattr(router_mod, "_router", FakeRouter())
         state = {"n": 0}
@@ -235,6 +237,57 @@ async def test_host_parity(monkeypatch, request):
         assert run.host.name == host
         counts[host] = Counter(e.type for e in run.bus.history)
     assert counts["asyncio"] == counts["jiuwen"], {k: (counts["asyncio"][k], counts["jiuwen"][k]) for k in counts["asyncio"] | counts["jiuwen"] if counts["asyncio"][k] != counts["jiuwen"][k]}
+
+
+async def test_web_scout_joins_when_a_key_is_set(offline, monkeypatch):
+    from app.sources import exa
+    from app.wrangle.schema_map import from_web
+
+    asked: list[str] = []
+
+    async def exa_search(query, *, n=5):
+        asked.append(query)
+        return [from_web({"url": "https://pitchprobe.example.com", "title": "PitchProbe", "publishedDate": "2024-02-01T00:00:00Z",
+                          "text": "PitchProbe tells founders whether their startup idea already exists."})]
+
+    monkeypatch.setattr(get_settings(), "exa_api_key", "k")
+    monkeypatch.setattr(exa, "search", exa_search)
+    run = runstore.create_run(IDEA)
+    await run.task
+    events = run.bus.history
+    assert events[-1].type == "run.finished", [e.data for e in events if e.type == "error"]
+    team = next(e for e in events if e.type == "team.formed").data
+    assert "scout.web" in {t["agent"] for t in team["team"]} and "scout.web" not in {s["agent"] for s in team["skipped"]}
+    report = Report.model_validate(events[-1].data["report"])
+    assert {s.source: s.status for s in report.sources}["web"] == "ok"
+    assert any(e.type == "evidence.found" and e.data["record"]["source"] == "web" for e in events)
+    assert any(len(q.split()) > 5 for q in asked)  # the neural index is sent the natural-language queries, not keywords
+
+
+async def test_inspector_joins_when_a_browser_is_configured(offline, monkeypatch, tmp_path):
+    from app.roles import inspector
+    from app.sources import browserbase
+
+    async def render(urls):
+        assert urls == ["https://idearadar.example.org"]  # the merged GitHub + HN entity's homepage, visited once
+        return [browserbase.Render(url=urls[0], final_url=urls[0], http_status=404, title="Not found", screenshot=b"jpg")]
+
+    monkeypatch.setattr(get_settings(), "browserbase_api_key", "k")
+    monkeypatch.setattr(browserbase, "render", render)
+    monkeypatch.setattr(inspector, "SHOTS_DIR", tmp_path)
+    run = runstore.create_run(IDEA)
+    await run.task
+    events = run.bus.history
+    assert events[-1].type == "run.finished", [e.data for e in events if e.type == "error"]
+    assert set(e.type for e in events) <= EVENT_TYPES
+    team = next(e for e in events if e.type == "team.formed").data
+    assert "inspector" in {t["agent"] for t in team["team"]}
+    checked = [e for e in events if e.type == "site.checked"]
+    assert len(checked) == 1 and checked[0].agent == "inspector" and checked[0].data["site"]["status"] == "dead"
+    report = Report.model_validate(events[-1].data["report"])
+    assert [s.status for s in report.sites] == ["dead"]
+    assert report.sites[0].eid in {e.eid for e in report.entities}
+    assert report.sites[0].conflict is None  # the repo is already dormant: a dead site agrees with the listing
 
 
 async def test_coach_conversation(offline):

@@ -6,10 +6,12 @@ records its provenance: `source` (copied), `normalized` (reshaped), `imputed` (i
 from __future__ import annotations
 
 import datetime as dt
+import hashlib
 import re
 from typing import Any
 
 from app.schemas import SourceRecord
+from app.wrangle.blocking import norm_url
 
 _TAG = re.compile(r"<[^>]+>")
 _WS = re.compile(r"\s+")
@@ -20,6 +22,8 @@ MAPPING_TABLE: dict[str, dict[str, str]] = {
            "date": "created_at", "traction": "points, num_comments"},
     "github": {"title": "full_name", "tagline": "description", "url": "html_url", "links": "homepage", "tags": "topics",
                "tech": "language", "date": "created_at", "status": "archived + pushed_at (derived)", "traction": "stargazers_count, pushed_at"},
+    "web": {"title": "title", "description": "text (page body, first 1500 chars)", "url": "url", "date": "publishedDate",
+            "traction": "author"},
     "devpost": {"title": "title", "tagline": "brief_desc | tagline", "description": "full_desc | description", "tags": "tags",
                 "tech": "built_with (or imputed from 'How we built it')", "year": "hackathons.json submission_period_dates",
                 "traction": "prize -> is_winner", "links": "other_links"},
@@ -71,6 +75,22 @@ def from_github(repo: dict[str, Any], *, now: dt.datetime | None = None) -> Sour
         traction={"stars": repo.get("stargazers_count") or 0, "pushed_at": repo.get("pushed_at")},
         field_provenance={"title": "source", "tagline": "source", "tags": "source", "tech": "normalized",
                           "status": status_prov, "date": "source"},
+    )
+
+
+def from_web(hit: dict[str, Any]) -> SourceRecord:
+    """An Exa search result. A web page has no native id, so the rid is a hash of its normalised URL: the same page
+    found by two queries is one record, and the resolver still merges it with a Devpost/GitHub record by URL key."""
+    url = hit["url"]
+    published = _parse_dt(hit.get("publishedDate"))
+    body = clean(hit.get("text"))
+    title = clean(hit.get("title")) or (norm_url(url) or url)[:80]
+    return SourceRecord(
+        rid="web:" + hashlib.sha1((norm_url(url) or url).encode()).hexdigest()[:12], source="web", url=url, title=title,
+        description=body[:4000], pitch=_pitch(title, body), year=published.year if published else None,
+        date=published.date() if published else None, date_precision="day" if published else None,
+        traction={"author": hit["author"]} if hit.get("author") else {},
+        field_provenance={"title": "source", "description": "normalized"} | ({"date": "source"} if published else {}),
     )
 
 

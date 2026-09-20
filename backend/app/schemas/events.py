@@ -27,6 +27,7 @@ EVENT_TYPES: frozenset[str] = frozenset(
         # resolution
         "entity.merged",
         "conflict.detected",
+        "site.checked",
         # claims and debate
         "claim.proposed",
         "claim.challenged",
