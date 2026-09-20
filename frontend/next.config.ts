@@ -9,6 +9,8 @@ const nextConfig: NextConfig = {
   ...(staticExport ? { output: "export" as const, trailingSlash: true, images: { unoptimized: true } } : {}),
   // the monorepo root has no lockfile of its own: pin tracing to this package so Next does not guess
   outputFileTracingRoot: __dirname,
+  // no dev badge: bottom-left, it sat on top of the replay transport
+  devIndicators: false,
 };
 
 export default nextConfig;

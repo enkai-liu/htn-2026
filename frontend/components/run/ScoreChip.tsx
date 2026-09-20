@@ -33,11 +33,11 @@ export function ScoreChip({ scores }: { scores: Scores | null }) {
         type="button"
         onClick={() => { setOpenedAt(pathname); setOpen(!visible); }}
         aria-expanded={visible}
-        className={clsx("flex items-baseline gap-1.5 rounded-full border px-3.5 py-1 transition-colors", visible ? "border-line-strong bg-ink-900" : "border-transparent hover:border-line")}
+        className={clsx("flex h-9 items-center gap-1.5 rounded-full border bg-ink-900 px-3.5 transition-colors", visible ? "border-line-strong" : "border-line hover:border-line-strong")}
         title="Originality: crowding, facet rarity and LLM-predictability"
       >
         <span className={clsx("font-display text-[24px] leading-none tabular-nums", headline == null ? "text-faint" : "text-bone")}>{headline == null ? "–" : Math.round(headline)}</span>
-        <span className="text-[12.5px] text-mute">{abstain ? "abstained" : headline != null && scores?.band != null ? `± ${scores.band} original` : "original"}</span>
+        <span className="text-[12.5px] leading-none text-mute">{abstain ? "abstained" : headline != null && scores?.band != null ? `± ${scores.band} original` : "original"}</span>
       </button>
       {visible && (
         <div className="absolute right-0 top-[calc(100%+8px)] z-40 w-[min(660px,calc(100vw-32px))] animate-rise overflow-hidden rounded-2xl border border-line bg-ink-900 shadow-[0_18px_50px_rgb(0_0_0/0.12)]">

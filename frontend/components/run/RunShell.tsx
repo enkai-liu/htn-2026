@@ -1,5 +1,5 @@
 "use client";
-// The chrome around every run page: a quiet header (idea, spend, score, status), the replay and error banners, and the
+// The chrome around every run page: a quiet header (status, spend, score), the replay and error banners, and the
 // bottom bar with the tabs. Pages render in between and own nothing but their content.
 import clsx from "clsx";
 import { TriangleAlert } from "lucide-react";
@@ -10,7 +10,6 @@ import { selectSpend } from "@/lib/selectors";
 import type { RunStatus } from "@/lib/useRunEvents";
 import { ReplayControls } from "../ReplayControls";
 import { Wordmark } from "../SiteNav";
-import { PitchDisclosure } from "./PitchDisclosure";
 import { useRun } from "./RunProvider";
 import { ScoreChip } from "./ScoreChip";
 import { TabBar } from "./TabBar";
@@ -27,13 +26,12 @@ const STATUS: Record<RunStatus, { label: string; color: string; pulse?: boolean 
   error: { label: "Offline", color: "var(--color-vermilion)" },
 };
 
-function StatusDot({ status, replay }: { status: RunStatus; replay: boolean }) {
+function StatusDot({ status }: { status: RunStatus }) {
   const s = STATUS[status];
-  const label = status === "finished" && replay ? "Replay finished" : s.label;
   return (
-    <span className="flex flex-none items-center gap-2 text-[12.5px]" style={{ color: s.color }}>
+    <span className="flex flex-none items-center gap-2 text-[12.5px] leading-none" style={{ color: s.color }}>
       <span className={clsx("size-[7px] rounded-full bg-current", s.pulse && "animate-beacon")} />
-      {label}
+      {s.label}
     </span>
   );
 }
@@ -58,20 +56,23 @@ export function RunShell({ children }: { children: ReactNode }) {
         </div>
       )}
 
-      <header className="relative z-30 flex h-[60px] flex-none items-center gap-4 px-5 sm:px-7">
+      <header className="relative z-30 flex h-[60px] flex-none items-center justify-between gap-4 px-5 sm:px-7">
         <Wordmark className="flex-none" />
-        <PitchDisclosure text={state.ideaText} url={state.ideaUrl} />
-        <Link
-          href={hrefFor("swarm")}
-          className="hidden flex-none items-center gap-1.5 text-[12.5px] tabular-nums text-mute transition-colors hover:text-bone sm:flex"
-          title={spend.degraded ? "Budget pressure: the conductor degraded the run. Details on the Swarm page." : "Spend so far. Per-model detail on the Swarm page."}
-        >
-          {spend.degraded && <span className="size-[6px] rounded-full bg-vermilion" />}
-          {fmtUsd(spend.usd)} · {spend.calls} calls
-          {spend.degraded && <span className="text-vermilion">· degraded</span>}
-        </Link>
-        <ScoreChip scores={state.scores} />
-        <StatusDot status={status} replay={isReplay} />
+        {/* one cluster, one centre line: status, spend, then the score pill, whose edge the map's own button sits under */}
+        <div className="flex flex-none items-center gap-4 sm:gap-5">
+          {/* a recording's state is already on the transport in the bottom bar */}
+          {!isReplay && <StatusDot status={status} />}
+          <Link
+            href={hrefFor("swarm")}
+            className="hidden items-center gap-1.5 text-[12.5px] leading-none tabular-nums text-mute transition-colors hover:text-bone sm:flex"
+            title={spend.degraded ? "Budget pressure: the conductor degraded the run. Details on the Swarm page." : "Spend so far. Per-model detail on the Swarm page."}
+          >
+            {spend.degraded && <span className="size-[6px] rounded-full bg-vermilion" />}
+            {fmtUsd(spend.usd)} · {spend.calls} calls
+            {spend.degraded && <span className="text-vermilion">· degraded</span>}
+          </Link>
+          <ScoreChip scores={state.scores} />
+        </div>
       </header>
 
       {status === "error" ? (
@@ -89,7 +90,7 @@ export function RunShell({ children }: { children: ReactNode }) {
         <>
           <main className="relative min-h-0 flex-1">{children}</main>
           {/* see-through: on the map tab the sea runs on underneath it */}
-          <footer className="relative z-30 flex h-[68px] flex-none items-center border-t border-line bg-ink-900/70 px-4 backdrop-blur-md">
+          <footer className="relative z-30 flex h-[68px] flex-none items-center border-t border-line bg-ink-900/70 px-5 backdrop-blur-md sm:px-7">
             <div className="hidden min-w-0 flex-1 lg:block">{isReplay && controls && <ReplayControls controls={controls} snapshot={run.replay} />}</div>
             <TabBar />
             <div className="hidden flex-1 lg:block" />

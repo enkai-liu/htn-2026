@@ -48,6 +48,7 @@ export function MapScreen() {
 
   return (
     <div className="absolute inset-0">
+      <h1 className="sr-only">Map of the idea-space</h1>
       {/* fixed, not absolute: the sea fills the window and runs under the header and the tab bar, which sit over it */}
       {mapMode === "2d" ? flat : (
         <IslandMap
@@ -58,13 +59,6 @@ export function MapScreen() {
 
       {mapMode === "3d" && (
         <>
-          <div className="pointer-events-none absolute left-5 top-1 sm:left-7">
-            <h1 className="font-display text-[30px] leading-tight text-bone">The idea-space</h1>
-            <p className="text-[13.5px] text-mute">
-              {empty ? "Waiting for the conductor to place your idea" : `${stats.counts.entity} prior-art ${stats.counts.entity === 1 ? "project" : "projects"}${stats.counts.prior ? ` · ${stats.counts.prior} LLM guesses` : ""}${stats.counts.mutation ? ` · ${stats.counts.mutation} mutations` : ""} · closer means more similar`}
-            </p>
-          </div>
-
           {!empty && (
             <div className="absolute bottom-14 left-5 sm:left-7">
               <MapLegend
@@ -75,7 +69,7 @@ export function MapScreen() {
           )}
 
           {!empty && !selected && (
-            <button type="button" onClick={() => setRecenterTick((n) => n + 1)} className="absolute right-5 top-2 flex size-9 items-center justify-center rounded-full border border-line bg-ink-900 text-bone-dim transition-colors hover:text-bone sm:right-7" title="Re-centre the map" aria-label="Re-centre the map">
+            <button type="button" onClick={() => setRecenterTick((n) => n + 1)} className="absolute right-5 top-1 flex size-9 items-center justify-center rounded-full border border-line bg-ink-900 text-bone-dim transition-colors hover:text-bone sm:right-7" title="Re-centre the map" aria-label="Re-centre the map">
               <LocateFixed size={16} />
             </button>
           )}
