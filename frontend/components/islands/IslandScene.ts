@@ -158,6 +158,14 @@ export class IslandScene {
   private shift = new Vector3();
   private beam = new Vector3();
   private eye = new Vector3();
+  /** the beam's own bearing, integrated by hand so it can be steered off the idle sweep and back */
+  private beaconAngle = 0;
+  private lastNow = 0;
+  /** islands that have arrived and not yet been swept: the light goes and looks at each one */
+  private scanQueue: string[] = [];
+  private scanning: { id: string; until: number } | null = null;
+  /** eased beam length, so locking on pulls the light in to land on the island instead of past it */
+  private beamLen = 0;
 
   constructor(private canvas: HTMLCanvasElement, private cb: SceneCallbacks, private opts: SceneOptions) {
     this.renderer = new WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: "high-performance" });
@@ -328,6 +336,12 @@ export class IslandScene {
     const island: Island = { datum: d, group, mesh, hit, shadow, look: lookKey(look), bornAt, from: to.clone(), to, moveAt: -Infinity, origin: null, lift: 0, dying: null, phase: (d.p.seed % 1000) / 159 };
     this.islands.set(d.id, island);
     if (bornAt > 0 && d.p.kind !== "prior") this.ripple(to, d.p.size, bornAt);
+    // a fresh arrival is something the swarm just found: send the light over to look at it. Keep only the
+    // newest few -- a burst of forty hits would otherwise queue up minutes of sweeping nobody waits through.
+    if (bornAt > 0 && d.id !== "idea" && !this.opts.reducedMotion) {
+      this.scanQueue.push(d.id);
+      if (this.scanQueue.length > 4) this.scanQueue.splice(0, this.scanQueue.length - 4);
+    }
   }
 
   private ripple(at: Vector3, size: number, when: number) {
@@ -530,9 +544,45 @@ export class IslandScene {
       const reach = Math.max(6, ...[...this.islands.values()].map((i) => Math.hypot(i.group.position.x, i.group.position.z) + i.datum.p.size));
       const lantern = idea.datum.p.size * LANTERN_AT * idea.group.scale.y;
       this.beacon.position.copy(idea.group.position).y += lantern;
-      this.beacon.scale.setScalar(reach * 1.15);
-      this.beacon.rotation.y = still ? 0.6 : -now * 0.00042;
       this.beacon.visible = !still && born > 0.25;
+
+      // Steering. Idle is a slow sweep; an arrival pulls the light off it, holds a beat on the island, then
+      // hands back. The hold shortens when arrivals are stacked up, so a busy run still feels like scanning
+      // rather than a queue being worked through.
+      const dt = this.lastNow ? Math.min(64, now - this.lastNow) : 16;
+      this.lastNow = now;
+      let locked = 0;
+      let wantLen = reach * 1.15;
+      if (!still) {
+        if (!this.scanning && this.scanQueue.length) {
+          const id = this.scanQueue.shift()!;
+          if (this.islands.has(id)) this.scanning = { id, until: 0 };
+        }
+        const target = this.scanning ? this.islands.get(this.scanning.id) : undefined;
+        if (this.scanning && (!target || target.dying)) this.scanning = null;
+
+        if (this.scanning && target) {
+          // the beam's local +X maps to (cos y, 0, -sin y) under a Y rotation, hence the negated dz
+          const want = Math.atan2(-(target.group.position.z - idea.group.position.z), target.group.position.x - idea.group.position.x);
+          let d = want - this.beaconAngle;
+          d = Math.atan2(Math.sin(d), Math.cos(d)); // shortest way round
+          this.beaconAngle += d * Math.min(1, dt * 0.007);
+          if (!this.scanning.until && Math.abs(d) < 0.05) {
+            this.scanning.until = now + (this.scanQueue.length > 1 ? 340 : 820);
+            target.group.userData.pulseAt = now; // the island reacts as the light lands on it
+          }
+          locked = this.scanning.until ? 1 : 1 - Math.min(1, Math.abs(d));
+          // pull the shaft in so the light lands on the island rather than running past it to the horizon;
+          // scaling the cone shortens and narrows it together, which is what a tightening spot should do
+          wantLen = Math.hypot(target.group.position.x - idea.group.position.x, target.group.position.z - idea.group.position.z) + target.datum.p.size * 0.5;
+          if (this.scanning.until && now > this.scanning.until) this.scanning = null;
+        } else {
+          this.beaconAngle -= dt * 0.00042;
+        }
+      }
+      this.beacon.rotation.y = still ? 0.6 : this.beaconAngle;
+      this.beamLen = this.beamLen ? this.beamLen + (wantLen - this.beamLen) * Math.min(1, dt * 0.005) : wantLen;
+      this.beacon.scale.setScalar(this.beamLen);
 
       // a real lighthouse flares as the beam comes round to face you, and the shaft is shortest head-on:
       // driving both the halo and the shells from one angle keeps them reading as a single light
@@ -541,7 +591,10 @@ export class IslandScene {
         this.beam.set(1, 0, 0).applyQuaternion(this.beacon.quaternion).setY(0).normalize();
         this.eye.copy(this.camera.position).sub(this.controls.target).setY(0).normalize();
         flash = Math.max(0, this.beam.dot(this.eye)) ** 6;
-        for (const m of this.shells) (m.material as MeshBasicMaterial).opacity = born * (0.85 + flash * 0.3);
+        // locked on a find the light burns harder, but the boost is weighted to the core: brightening the
+        // outer bloom as hard would just fatten the shaft into a slab instead of tightening it to a spot
+        const BOOST = [0.95, 0.4, 0.18];
+        this.shells.forEach((m, n) => { (m.material as MeshBasicMaterial).opacity = born * (0.7 + flash * 0.28 + locked * BOOST[n]); });
       }
       (this.halo.material as SpriteMaterial).opacity = born * (still ? 0.6 : 0.46 + Math.sin(now * 0.0016) * 0.08 + flash * 0.5);
       this.halo.scale.setScalar(7 * (1 + flash * 0.22));
