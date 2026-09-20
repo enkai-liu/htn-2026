@@ -35,10 +35,10 @@ const INK = new Color("#16181d");
 const AMBER = new Color("#e9a23b");
 const TEAL = new Color("#0f766e");
 
-/** idle beam sweep, rad/ms — a full turn in about 6s */
-const IDLE_SWEEP = 0.00105;
+/** idle beam sweep, rad/ms — a full turn in about 11s */
+const IDLE_SWEEP = 0.00058;
 /** how hard the beam is allowed to swing when it is chasing a find */
-const SLEW_MAX = 0.0075;
+const SLEW_MAX = 0.0031;
 
 const easeOutBack = (t: number) => { const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2); };
 const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
@@ -136,6 +136,8 @@ export class IslandScene {
   /** a generous invisible cylinder around each island: what the pointer actually hits */
   private hitGeo = new CylinderGeometry(1.1, 0.95, 1.8, 10);
   private hitMat = new MeshBasicMaterial({ visible: false });
+  /** scout boats working the water: decoration, on their own wandering orbits */
+  private boats: { mesh: Mesh; r: number; spd: number; ph: number; wob: number; bob: number }[] = [];
   private halo: Sprite;
   private beacon = new Group();
   private shells: Mesh[] = [];
@@ -208,6 +210,18 @@ export class IslandScene {
     this.beacon.rotation.order = "YZX"; // sweep about Y first, then the fixed downward tilt
     this.beacon.rotation.z = -0.13; // rake down toward the water rather than out to the horizon
     this.scene.add(this.beacon);
+
+    // Boats out working the water. The same hull the mutations use, so they belong to the same world, but
+    // small and grey-sailed: a teal boat means "your idea went this way" and these must not read as that.
+    // Radii are fractions of the map's extent, so they keep their station as the neighbourhood grows.
+    if (!opts.reducedMotion) {
+      for (let i = 0; i < 5; i++) {
+        const mesh = new Mesh(buildIslandGeometry({ seed: 9001 + i * 137, size: 0.52, kind: "mutation", tint: "#8d929c", winner: false, heading: 0 }), this.material);
+        mesh.frustumCulled = false;
+        this.boats.push({ mesh, r: 0.42 + i * 0.16, spd: (i % 2 ? -1 : 1) * (0.000035 + (i % 3) * 0.000012), ph: i * 1.27, wob: 0.06 + (i % 3) * 0.03, bob: i * 0.9 });
+        this.scene.add(mesh);
+      }
+    }
 
     this.controls = new OrbitControls(this.camera, canvas);
     this.controls.enableDamping = true;
@@ -382,11 +396,15 @@ export class IslandScene {
     const want = new Map<string, SceneLink>();
     const focus = this.selectedId ?? this.hoverId;
     const similar = this.links.filter((l) => l.kind === "similar" && this.islands.get(l.b)?.datum.p.kind === "entity" && !this.islands.get(l.b)!.dying);
-    const top = [...similar].sort((x, y) => (this.islands.get(y.b)!.datum.similarity ?? 0) - (this.islands.get(x.b)!.datum.similarity ?? 0)).slice(0, 6);
-    for (const l of top) want.set(`${l.a}>${l.b}`, l);
+    // Focusing an island reveals its own links. The idea is the exception: every `similar` link starts at it,
+    // so "show what this connects to" would be "show all of them" -- forty-odd lines converging on one island,
+    // which says nothing. Focusing the idea widens the ranked set instead of lifting the cap.
+    const ideaFocused = focus === "idea";
+    const ranked = [...similar].sort((x, y) => (this.islands.get(y.b)!.datum.similarity ?? 0) - (this.islands.get(x.b)!.datum.similarity ?? 0));
+    for (const l of ranked.slice(0, ideaFocused ? 12 : 6)) want.set(`${l.a}>${l.b}`, l);
     for (const l of this.links) {
       if (!this.islands.has(l.a) || !this.islands.has(l.b)) continue;
-      if (l.kind !== "similar" || l.a === focus || l.b === focus) want.set(`${l.a}>${l.b}`, l);
+      if (l.kind !== "similar" || (!ideaFocused && (l.a === focus || l.b === focus))) want.set(`${l.a}>${l.b}`, l);
     }
     for (const [key, arc] of this.arcs) {
       if (want.has(key)) continue;
@@ -565,6 +583,20 @@ export class IslandScene {
       i.shadow.scale.setScalar(i.datum.p.size * 1.5 * Math.min(1, scale));
     }
 
+    // sail the scouts: a wandering orbit, heading taken from where the next step actually puts them
+    for (const b of this.boats) {
+      const span = Math.max(6, this.extent);
+      const at = (t: number) => {
+        const a = b.ph + t * b.spd;
+        const r = span * (b.r + Math.sin(a * 2.3 + b.ph) * b.wob);
+        return { x: Math.cos(a) * r, z: Math.sin(a) * r };
+      };
+      const p = at(now), q = at(now + 240);
+      b.mesh.position.set(p.x, FLOOR_Y + 0.12 + Math.sin(now * 0.0013 + b.bob) * 0.06, p.z);
+      b.mesh.rotation.y = Math.atan2(q.x - p.x, q.z - p.z);
+      b.mesh.rotation.z = Math.sin(now * 0.0011 + b.bob) * 0.05; // roll with the swell
+    }
+
     const idea = this.islands.get("idea");
     if (idea) {
       this.halo.position.copy(idea.group.position).y += idea.datum.p.size * LANTERN_AT * idea.group.scale.y;
@@ -599,7 +631,7 @@ export class IslandScene {
           const want = Math.atan2(-(target.group.position.z - idea.group.position.z), target.group.position.x - idea.group.position.x);
           let d = want - this.beaconAngle;
           d = Math.atan2(Math.sin(d), Math.cos(d)); // shortest way round
-          wantVel = Math.max(-SLEW_MAX, Math.min(SLEW_MAX, d * 0.009));
+          wantVel = Math.max(-SLEW_MAX, Math.min(SLEW_MAX, d * 0.0042));
           if (!this.scanning.until && Math.abs(d) < 0.05) {
             this.scanning.until = now + (this.scanQueue.length > 1 ? 340 : 820);
             target.group.userData.pulseAt = now; // the island reacts as the light lands on it
@@ -610,7 +642,7 @@ export class IslandScene {
           wantLen = Math.hypot(target.group.position.x - idea.group.position.x, target.group.position.z - idea.group.position.z) + target.datum.p.size * 0.5;
           if (this.scanning.until && now > this.scanning.until) this.scanning = null;
         }
-        this.beaconVel += (wantVel - this.beaconVel) * Math.min(1, dt * 0.006);
+        this.beaconVel += (wantVel - this.beaconVel) * Math.min(1, dt * 0.0032);
         this.beaconAngle += this.beaconVel * dt;
       }
       this.beacon.rotation.y = still ? 0.6 : this.beaconAngle;
@@ -777,6 +809,7 @@ export class IslandScene {
     (this.halo.material as SpriteMaterial).map?.dispose();
     (this.halo.material as SpriteMaterial).dispose();
     for (const m of this.shells) { m.geometry.dispose(); (m.material as MeshBasicMaterial).dispose(); }
+    for (const b of this.boats) b.mesh.geometry.dispose(); // hulls own their geometry; the material is shared
     this.material.dispose();
     this.renderer.dispose();
   }
