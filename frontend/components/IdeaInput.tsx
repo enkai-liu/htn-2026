@@ -1,5 +1,5 @@
 "use client";
-import { ArrowRight, Link2, LoaderCircle, TriangleAlert } from "lucide-react";
+import { ArrowRight, Link2, LoaderCircle, Shuffle, TriangleAlert } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
@@ -55,7 +55,7 @@ export function IdeaInput() {
         <span className="ttl">Your pitch</span>
         <button
           type="button"
-          className="chip ml-auto cursor-pointer normal-case tracking-normal hover:text-bone"
+          className="chip ml-auto h-[26px] cursor-pointer gap-1.5 px-3 uppercase tracking-[inherit] text-bone-dim transition-colors hover:border-line-strong hover:text-bone"
           data-tone="mute"
           aria-label="Fill the box with an example pitch"
           onClick={() => {
@@ -64,7 +64,7 @@ export function IdeaInput() {
             setNextPitch((i) => (i + 1) % PITCHES.length);
           }}
         >
-          <span aria-hidden>&#128256;</span> Shuffle
+          <Shuffle size={12} aria-hidden /> Shuffle
         </button>
       </div>
 
