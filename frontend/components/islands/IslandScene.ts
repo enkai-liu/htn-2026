@@ -790,6 +790,9 @@ export class IslandScene {
     this.scene.remove(i.group);
     i.mesh.geometry.dispose();
     this.islands.delete(id);
+    // the label set and the pick list are cached, and this is the other way an island leaves the map
+    this.rebuildLabelSet();
+    this.rebuildPickList();
     this.syncArcs(performance.now());
   }
 
