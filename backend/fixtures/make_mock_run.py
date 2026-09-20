@@ -51,7 +51,7 @@ T0 = 1_790_000_000.0
 OUT = Path(__file__).with_name("mock_run.jsonl")
 
 IDEA = (
-    "Whitespace checks how original your hackathon idea is before you build it. You paste a pitch, and a team "
+    "SLOP checks how original your hackathon idea is before you build it. You paste a pitch, and a team "
     "of AI agents searches hundreds of thousands of past hackathon projects, startups and repos for prior art, "
     "argues about whether it is really the same idea, verifies every claim against its source, and then "
     "suggests concrete changes that move your idea into emptier territory, re-scoring each suggestion live."
@@ -418,7 +418,7 @@ def build() -> list[AgentEvent]:
         "inspiration search with no notion of what you already have.",
         question="What would a team hand it about their half-built project: the repo, the stack, or just a description?",
         suggestions=["The repo", "Just a description", "Both, repo first"], cites=[lens], pitch_version=1)
-    version(1.6, 1, "Whitespace is a pivot partner for hackathon teams who find out mid-build that their idea exists: tell it what you have already "
+    version(1.6, 1, "SLOP is a pivot partner for hackathon teams who find out mid-build that their idea exists: tell it what you have already "
             "built, and it finds the nearest unbuilt idea that keeps your work, with verified evidence that the space is open.",
             "from grading an idea to salvaging a half-built one", 58, 61, [lens, radar, catch])
     say(2.0, "user", "The repo. It could read the README and the dependencies.")
@@ -426,7 +426,7 @@ def build() -> list[AgentEvent]:
         "caution: this corpus is write-ups, not code, so match on what the repo does, not on what it imports.",
         question="Do you want to pressure-test this version, or back up and try a different direction?",
         suggestions=["Pressure-test it", "What would a judge poke at?", "Try another direction"], cites=[lab], pitch_version=2)
-    version(1.6, 2, "Point Whitespace at your half-built repo the moment you learn your hackathon idea exists. It reads what you have already made, "
+    version(1.6, 2, "Point SLOP at your half-built repo the moment you learn your hackathon idea exists. It reads what you have already made, "
             "finds the nearest idea nobody has built that reuses it, and shows verified evidence that the space is open.",
             "the input is your repo, not a pitch", 66, 66, [lens, lab, catch])
     e(0.2, "mutator", "mutate", "agent.finished", {"ok": True, "summary": "3 mutations re-scored; coaching conversation open"})

@@ -29,6 +29,69 @@ def test_pair_rarity_saturates_earlier_than_a_single_facet():
     assert rarity.pair_rarity(50) < rarity.rarity_from_df(50)
 
 
+def test_idf_endpoints():
+    assert rarity.idf(0, 8110) == pytest.approx(math.log(8111))  # never seen
+    assert rarity.idf(8110, 8110) == pytest.approx(math.log(8111 / 8111))  # in every document -> 0
+    assert rarity.idf(5, 0) == 0.0
+    assert rarity.idf(-3, 100) == rarity.idf(0, 100)
+
+
+def test_facet_rarity_from_idf_ignores_padding_with_common_words():
+    """The bug this replaces: a 20-word mechanism matched 12.6% of the corpus under FACET_MATCH and scored
+    0.089 -- a measurement of how long the phrase was. Here, words more common than the facet's k most
+    distinctive ones cannot enter the top k, so an LLM's verbosity does not move the score at all."""
+    n = 8110
+    base = {"chatbot": 105, "large": 275, "language": 417}
+    padded = {**base, "app": 3000, "using": 4000, "build": 2500, "project": 3100, "web": 1500}
+    assert rarity.facet_rarity_from_idf(base, n) == rarity.facet_rarity_from_idf(padded, n)
+
+
+def test_facet_rarity_from_idf_averages_what_is_there_below_k_terms():
+    """A facet with fewer than k content words is the one case padding can move: with one term the 'top 3'
+    is a mean of one. Real facets are phrases, so this is a documented edge, not the common path."""
+    n = 8110
+    one = rarity.facet_rarity_from_idf({"chatbot": 105}, n)
+    three = rarity.facet_rarity_from_idf({"chatbot": 105, "team": 262, "build": 2500}, n)
+    assert one > three  # the single distinctive term is no longer averaged with commoner company
+    assert rarity.facet_rarity_from_idf({"chatbot": 105}, n, k=1) == one
+
+
+def test_facet_rarity_from_idf_ranks_real_facets_correctly():
+    """Measured against the 8.1k corpus; the ordering is the point, the exact values are the regression."""
+    n = 8110
+    varroa = rarity.facet_rarity_from_idf({"acoustic": 7, "detection": 900, "varroa": 0, "mite": 0, "beehive": 0}, n)
+    agents = rarity.facet_rarity_from_idf({"novelty": 4, "pivot": 19, "debate": 22, "ai": 582, "team": 262}, n)
+    react = rarity.facet_rarity_from_idf({"flask": 21, "frontend": 74, "react": 92, "web": 1500}, n)
+    chatbot = rarity.facet_rarity_from_idf({"chatbot": 105, "large": 275, "language": 417, "model": 900}, n)
+    study = rarity.facet_rarity_from_idf({"study": 160, "effectively": 275, "student": 329}, n)
+    assert varroa == 1.0  # three terms the corpus has never seen
+    assert varroa > agents > react > chatbot > study
+    assert round(agents, 2) == 0.71  # was 0.089 under the document-count rule
+    assert study < 0.45 and chatbot < 0.45  # cliches land where rarity.py's own comment says they should
+
+
+def test_facet_rarity_from_idf_guards():
+    assert rarity.facet_rarity_from_idf({}, 100) is None
+    assert rarity.facet_rarity_from_idf({"a": 1}, 0) is None
+    assert 0.0 <= rarity.facet_rarity_from_idf({"a": 5, "b": 9000}, 8110) <= 1.0
+
+
+def test_term_df_body_is_one_bucket_per_term():
+    body = rarity.build_term_df_body(["flask", "react", "flask"])  # duplicates collapse
+    filters = body["aggs"]["term_df"]["filters"]["filters"]
+    assert set(filters) == {"flask", "react"}
+    assert filters["flask"] == {"match": {"pitch": "flask"}}
+    assert body["size"] == 0 and body["query"]["bool"]["must_not"] == [rarity.excluded_flags_clause()]
+    with pytest.raises(ValueError):
+        rarity.build_term_df_body([])
+
+
+def test_parse_term_df_response():
+    resp = {"aggregations": {"term_df": {"buckets": {"flask": {"doc_count": 21}, "react": {"doc_count": 92}}}}}
+    assert rarity.parse_term_df_response(resp) == {"flask": 21, "react": 92}
+    assert rarity.parse_term_df_response({}) == {}
+
+
 def test_npmi_separates_a_cliche_pairing_from_an_unusual_one():
     n = 200_000
     # "help students study" x "flashcards": 3,000 together, but independence predicts only 800 -> a cliche pairing
@@ -165,7 +228,10 @@ def test_placeholder_cdf_is_labelled_and_monotone():
     assert cdf.is_placeholder is True and "PLACEHOLDER" in cdf.meta["note"] and len(cdf.values) == 300
     assert cdf.values == sorted(cdf.values)
     pcts = [cdf.percentile(v) for v in (-1.0, 0.1, 0.3, 0.5, 0.7, 0.9, 5.0)]
-    assert pcts == sorted(pcts) and pcts[0] == 0.0 and pcts[-1] == 1.0
+    # never exactly 1.0 any more: O1 = 100*(1 - pct) feeds a logarithm, and the fitted tail keeps resolving
+    # above the largest calibration value instead of flattening onto it
+    assert pcts == sorted(pcts) and pcts[0] == 0.0 and 0.999 < pcts[-1] < 1.0
+    assert cdf.empirical(5.0) == 1.0  # the raw empirical CDF still saturates, as it must
 
 
 def test_percentile_is_mid_rank():

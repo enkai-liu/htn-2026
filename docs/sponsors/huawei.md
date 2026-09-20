@@ -1,10 +1,10 @@
-# Huawei openJiuwen track — what Whitespace shows
+# Huawei openJiuwen track — what S.L.O.P. shows
 
 Judging weights (Huawei issue #3067): collaboration 30 · scenario 25 · demo completeness 20 · implementation 15 · reusability 10.
 
 ## What runs on openJiuwen
 
-Every agent role in Whitespace is host-agnostic (`Role.handle(msg, ctx)` against a `Ctx` protocol) and runs on two hosts that are tested for event parity. With `ORCHESTRATOR=jiuwen` the run executes on **openjiuwen agent-core 0.1.18**, the SDK underneath JiuwenSwarm ([backend/app/orchestration/jiuwen_host.py](../../backend/app/orchestration/jiuwen_host.py)):
+Every agent role in S.L.O.P. is host-agnostic (`Role.handle(msg, ctx)` against a `Ctx` protocol) and runs on two hosts that are tested for event parity. With `ORCHESTRATOR=jiuwen` the run executes on **openjiuwen agent-core 0.1.18**, the SDK underneath JiuwenSwarm ([backend/app/orchestration/jiuwen_host.py](../../backend/app/orchestration/jiuwen_host.py)):
 
 - each role is a `CommunicableAgent` on a `TeamRuntime`: P2P `send` for request/response, `publish`/`subscribe` for pub/sub;
 - the run is a `BaseTeam` executed by `Runner.run_agent_team_streaming(..., base=True)`;

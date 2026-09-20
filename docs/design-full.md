@@ -2,7 +2,7 @@
 
 # Hack the North 2026 Build Plan: Multi-Agent Idea-Originality Checker
 
-Working title: **Whitespace**. Three interfaces are verified and the rest is a plan. `[V]` marks what I checked tonight against a live source. `[T]` marks what your team must test, with the hour to do it.
+Name: **S.L.O.P.** (Similarity Lookup for Originality Prediction). Three interfaces are verified and the rest is a plan. `[V]` marks what I checked tonight against a live source. `[T]` marks what your team must test, with the hour to do it.
 
 ## 0. Corrections to your brief
 
@@ -762,7 +762,7 @@ docs/{architecture.md,events.md,scoring.md,benchmarks.md,demo-script.md,devpost.
 | Honesty challenges from judges | Q&A | Voice is a separate axis. Report the placebo false-positive rate. Release anonymized data only. Label simulated items. |
 
 ## 6. Demo (5 minutes)
-- **0:00 Hook.** "Every hackathon, a thousand hackers ask an LLM for an idea and get the same one. Whitespace tells you how original yours is, with receipts, then coaches you somewhere emptier."
+- **0:00 Hook.** "Every hackathon, a thousand hackers ask an LLM for an idea and get the same one. S.L.O.P. tells you how original yours is, with receipts, then coaches you somewhere emptier."
 - **0:20 Run it on itself.**
   - The team forms and shows which scouts it skipped.
   - Cards arrive for DevSpot, HackAnalyzer and Plagia.

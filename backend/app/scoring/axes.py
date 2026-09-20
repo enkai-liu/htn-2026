@@ -5,13 +5,26 @@ Voice (GPTZero) is deliberately NOT here: AI-probability is not unoriginality, s
 from __future__ import annotations
 
 import math
+import random
 import statistics
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
+from dataclasses import dataclass, field
+from typing import Any
 
 from app.schemas import Abstain, AxisScore, Scores
+from app.scoring import stats
+from app.search.rarity import facet_rarity_from_idf as rarity_from_idf
+from app.search.rarity import npmi as npmi_value
+from app.search.rarity import pair_atypicality as _pair_atypicality
 
 WEIGHTS = {"crowding": 0.45, "facet_rarity": 0.35, "llm_predictability": 0.20}
 COLLISION = 0.80  # cosine above which an LLM-proposed idea counts as "the same idea"
+
+# Axes the RANK is taken over. A percentile rank is only meaningful against a reference population scored
+# the SAME way, and llm_predictability costs 12 model calls per document -- 3,600 for a 300-document
+# reference. Crowding and facet rarity are Elasticsearch plus one facet extraction, so those two carry the
+# rank and llm_predictability is reported as its own axis, like Voice.
+RANK_AXES = ("crowding", "facet_rarity")
 
 
 def _fallback_percentile(x: float) -> float:
@@ -84,15 +97,27 @@ def rarity_from_df(df: int, cap: int = 2000) -> float:
 
 
 def facet_rarity(facet_dfs: dict[str, int] | None, pair_df: int | None, cliche_overlap: float | None,
-                 *, pair_npmi: float | None = None, pair_expected: float | None = None) -> AxisScore:
-    """The pair term is NPMI when the corpus size is known, and the old log-df curve when it is not.
+                 *, pair_npmi: float | None = None, pair_expected: float | None = None,
+                 facet_rarities: dict[str, float] | None = None,
+                 facet_terms: dict[str, Any] | None = None) -> AxisScore:
+    """Per-facet rarity from the term-frequency profile; the pair term from NPMI.
+
+    `facet_rarities` (mean IDF of each facet's most distinctive terms) is length-invariant and is what the
+    axis uses when it is available. `facet_dfs` + `rarity_from_df` is the old single-document-count path,
+    kept as the fallback: it measured phrase length as much as rarity, scoring a 20-word mechanism 0.089
+    because any 3 of its words matched 12.6% of the corpus.
 
     NPMI asks whether purpose and mechanism co-occur more or less than independence predicts, which is the
     question the axis is for: a common purpose combined with a common mechanism in a way nobody has tried is
     the interesting case, and a raw pair df scores it the same as two rare facets. See search/rarity.py."""
-    if not facet_dfs:
+    if facet_rarities:
+        rar = {k: round(v, 3) for k, v in facet_rarities.items()}
+        measure = "idf"
+    elif facet_dfs:
+        rar = {k: round(rarity_from_df(v), 3) for k, v in facet_dfs.items()}
+        measure = "df"
+    else:
         return AxisScore(score=None, note="Needs the indexed corpus (Elasticsearch) to count how common each facet is.")
-    rar = {k: round(rarity_from_df(v), 3) for k, v in facet_dfs.items()}
     if pair_npmi is not None:
         pair = (1.0 - max(-1.0, min(1.0, pair_npmi))) / 2.0
     elif pair_df is not None:
@@ -104,7 +129,10 @@ def facet_rarity(facet_dfs: dict[str, int] | None, pair_df: int | None, cliche_o
     rarest = max(rar, key=rar.get)
     note = f"Rarest facet: {rarest}."
     detail = {"rarity": rar, "df": facet_dfs, "pair_purpose_mechanism": round(pair, 3), "pair_df": pair_df,
-              "cliche_overlap": round(cliche, 3), "pair_measure": "npmi" if pair_npmi is not None else "df"}
+              "cliche_overlap": round(cliche, 3), "pair_measure": "npmi" if pair_npmi is not None else "df",
+              "facet_measure": measure}
+    if facet_terms:
+        detail["facet_terms"] = facet_terms
     if pair_npmi is not None:
         detail["pair_npmi"] = round(pair_npmi, 3)
         detail["pair_expected"] = pair_expected
@@ -129,15 +157,172 @@ def llm_predictability(priors: list[dict], percentile: Callable[[float], float] 
                              "models": sorted({p["model"] for p in priors}), "calibrated": calibrated})
 
 
-def headline(axes: dict[str, AxisScore], jury_std: float) -> tuple[float | None, float | None]:
+def combine(scores: dict[str, float]) -> float | None:
     """Weighted geometric mean over the axes that did not abstain (weights renormalised)."""
+    if "crowding" not in scores:
+        return None
+    total = sum(WEIGHTS[k] for k in scores)
+    return 100 * math.exp(sum(WEIGHTS[k] / total * math.log(max(v, 1.0) / 100) for k, v in scores.items()))
+
+
+def rank_composite(scores: dict[str, float]) -> float | None:
+    """The raw composite restricted to RANK_AXES: the quantity the reference population is scored on."""
+    return combine({k: v for k, v in scores.items() if k in RANK_AXES})
+
+
+def percentile_rank(scores: dict[str, float], reference: Callable[[float], float] | None) -> float | None:
+    """Where this idea's composite falls among real hackathon projects scored identically, as a percentage.
+
+    63 means "63% of the reference projects scored lower" -- a statement about a named population that can
+    be checked, rather than 63 points on a scale nobody defined. The weights inside the composite still are
+    not derived from anything, but they now only have to preserve an ORDERING, which is a far weaker claim
+    than the one a raw 0-100 score was making."""
+    raw = rank_composite(scores)
+    if raw is None or reference is None:
+        return None
+    return 100.0 * reference(raw)
+
+
+def headline(axes: dict[str, AxisScore], jury_std: float) -> tuple[float | None, float | None]:
+    """Point estimate plus the legacy heuristic band. `assemble` prefers `bootstrap_headline`.
+
+    The `8 + 40*jury_std` band has no derivation, and on a geometric mean near the floor a SYMMETRIC band is
+    not even well defined: a run that read `14 +- 10.8` was claiming 3.2 to 24.8 for an estimator whose axes
+    are clamped at 1 and whose spread up there is strongly one-sided. Kept only for the no-inputs path."""
     live = {k: a.score for k, a in axes.items() if a.score is not None}
-    if "crowding" not in live:
+    point = combine(live)
+    if point is None:
         return None, None
-    total = sum(WEIGHTS[k] for k in live)
-    log_sum = sum(WEIGHTS[k] / total * math.log(max(v, 1.0) / 100) for k, v in live.items())
     band = min(30.0, 8 + 40 * jury_std + 6 * (len(WEIGHTS) - len(live)))
-    return round(100 * math.exp(log_sum), 1), round(band, 1)
+    return round(point, 1), round(band, 1)
+
+
+# --------------------------------------------------------------------------------------
+# The interval the measurement actually has
+# --------------------------------------------------------------------------------------
+@dataclass
+class BootstrapInputs:
+    """Everything the headline was computed from, kept so the spread can be resampled from it.
+
+    Nothing here costs another network call: the reranker scores, the document frequencies and the model
+    samples were all already fetched to produce the point estimate."""
+
+    sims: list[float] = field(default_factory=list)  # reranker scores of the resolved neighbours
+    percentile: Callable[[float], float] | None = None
+    dkw: float = 0.0  # calibration-set error on any percentile this CDF reports
+    rcs: float | None = None
+    rcs_pct: Callable[[float], float] | None = None
+    rcs_dkw: float = 0.0
+    facet_term_dfs: dict[str, dict[str, int]] = field(default_factory=dict)  # facet -> {term: df}
+    corpus_n: int = 0
+    pair: tuple[int, int, int] | None = None  # df_purpose, df_mechanism, df_both
+    cliche_overlap: float | None = None
+    prior_sims: list[float] = field(default_factory=list)
+    pred_percentile: Callable[[float], float] | None = None
+    rank_reference: Callable[[float], float] | None = None  # CDF of the reference population's composite
+    rank_dkw: float = 0.0
+
+    @property
+    def usable(self) -> bool:
+        return bool(self.sims)
+
+
+@dataclass(frozen=True)
+class Interval:
+    """The bootstrap's answer: an interval on the raw composite and one on the percentile rank."""
+
+    low: float
+    high: float
+    rank_low: float | None
+    rank_high: float | None
+    diagnostics: dict[str, Any]
+
+
+def _o1(sims: Sequence[float], percentile: Callable[[float], float] | None, rcs: float | None,
+        rcs_pct: Callable[[float], float] | None, jitter: float = 0.0, rcs_jitter: float = 0.0) -> float:
+    pcts = [_clip01((percentile or _fallback_percentile)(crowding_lite(list(sims))) + jitter)]
+    if rcs is not None:
+        pcts.append(_clip01((rcs_pct or _fallback_percentile)(rcs) + rcs_jitter))
+    return 100 * (1 - statistics.fmean(pcts))
+
+
+def _o2(facet_rarities: Sequence[float], pair_term: float, cliche: float) -> float:
+    return 100 * (0.5 * statistics.fmean(facet_rarities) + 0.3 * pair_term + 0.2 * (1 - cliche))
+
+
+def _o3(sims: Sequence[float], percentile: Callable[[float], float] | None) -> float:
+    mx = max(sims)
+    hit_rate = sum(s > COLLISION for s in sims) / len(sims)
+    pct = (percentile or (lambda v: min(max((v - 0.3) / 0.6, 0.0), 1.0)))(mx)
+    return max(100 * (1 - 0.6 * pct - 0.4 * hit_rate), 0.0)
+
+
+def _clip01(x: float) -> float:
+    return min(1.0, max(0.0, x))
+
+
+def bootstrap_headline(inp: BootstrapInputs, *, b: int = 1000, seed: int = 20260919,
+                       alpha: float = 0.10) -> Interval | None:
+    """Resample every input the score was built from and report the interval of the results.
+
+    Four sources of spread, each resampled the way it actually varies:
+
+      retrieved neighbours   nonparametric bootstrap over the reranker scores. `crowding_lite` leans on
+                             max(r), a single order statistic of ten selected documents, so this is large
+                             and it should be.
+      calibration set        the percentile itself is read off an empirical CDF of finite size. DKW bounds
+                             that error at sqrt(ln(40)/2n) = 0.078 for n=300; we draw uniformly inside the
+                             bound, a conservative stand-in for a simultaneous bound that is not a
+                             distribution. It does not shrink by looking harder at one query: build a
+                             bigger calibration set.
+      document frequencies   df ~ Binomial(N, df/N): the corpus is a sample of the projects that exist.
+      model samples          nonparametric bootstrap over the twelve prior-collision similarities.
+
+    Returns an Interval at the 1-alpha level, or None without enough inputs to resample."""
+    if not inp.usable:
+        return None
+    rng = random.Random(seed)
+    facets = [dfs for dfs in inp.facet_term_dfs.values() if dfs]
+    draws: list[float] = []
+    rank_draws: list[float] = []
+    for _ in range(b):
+        live: dict[str, float] = {"crowding": _o1(
+            stats.resample(inp.sims, rng), inp.percentile, inp.rcs, inp.rcs_pct,
+            jitter=rng.uniform(-inp.dkw, inp.dkw), rcs_jitter=rng.uniform(-inp.rcs_dkw, inp.rcs_dkw))}
+        if facets and inp.corpus_n > 0:
+            rarities = []
+            for dfs in facets:
+                shaken = {t: stats.resample_count(df, inp.corpus_n, rng) for t, df in dfs.items()}
+                r = rarity_from_idf(shaken, inp.corpus_n)
+                if r is not None:
+                    rarities.append(r)
+            if rarities:
+                pair_term = 0.5
+                if inp.pair is not None:
+                    a, bb, ab = (stats.resample_count(v, inp.corpus_n, rng) for v in inp.pair)
+                    pair_term = _pair_atypicality(npmi_value(a, bb, min(ab, a, bb), inp.corpus_n)) or 0.5
+                live["facet_rarity"] = _o2(rarities, pair_term, inp.cliche_overlap or 0.0)
+        if inp.prior_sims:
+            live["llm_predictability"] = _o3(stats.resample(inp.prior_sims, rng), inp.pred_percentile)
+        point = combine(live)
+        if point is not None:
+            draws.append(point)
+        if inp.rank_reference is not None:
+            r = percentile_rank(live, inp.rank_reference)
+            if r is not None:
+                # the reference CDF is itself finite, so its own DKW error rides on every rank it reports
+                rank_draws.append(_clip01((r + rng.uniform(-inp.rank_dkw, inp.rank_dkw) * 100) / 100) * 100)
+    if len(draws) < b // 2:
+        return None
+    lo, hi = stats.bootstrap_ci(draws, alpha)
+    rlo = rhi = None
+    if len(rank_draws) >= b // 2:
+        rlo, rhi = stats.bootstrap_ci(rank_draws, alpha)
+    return Interval(low=lo, high=hi, rank_low=rlo, rank_high=rhi, diagnostics={
+        "replicates": len(draws), "alpha": alpha, "dkw": round(inp.dkw, 4), "rank_dkw": round(inp.rank_dkw, 4),
+        "rank_axes": list(RANK_AXES),
+        "resampled": sorted({"neighbours"} | ({"facet_dfs"} if facets else set())
+                            | ({"model_samples"} if inp.prior_sims else set()))})
 
 
 def confidence(*, coverage: float, jury_std: float, verified_share: float, canary_pass: float) -> float:
@@ -153,8 +338,27 @@ def decide_abstain(*, coverage: float, corpus_ok: bool, conf: float, missing: li
     return Abstain(active=False)
 
 
-def assemble(crowd: AxisScore, rarity: AxisScore, pred: AxisScore, *, jury_std: float, conf: float, abstain: Abstain) -> Scores:
-    h, band = headline({"crowding": crowd, "facet_rarity": rarity, "llm_predictability": pred}, jury_std)
+def assemble(crowd: AxisScore, rarity: AxisScore, pred: AxisScore, *, jury_std: float, conf: float,
+             abstain: Abstain, boot: BootstrapInputs | None = None) -> Scores:
+    """The headline plus its interval. With `boot` the interval is the bootstrap's, and it is asymmetric
+    because the geometric mean is; without it, the legacy heuristic band."""
+    axes_now = {"crowding": crowd, "facet_rarity": rarity, "llm_predictability": pred}
+    h, band = headline(axes_now, jury_std)
+    live = {k: a.score for k, a in axes_now.items() if a.score is not None}
+    low = high = rank = rank_low = rank_high = None
+    reference = boot.rank_reference if boot is not None else None
+    r = percentile_rank(live, reference)
+    if r is not None:
+        rank = round(r, 1)
+    interval = bootstrap_headline(boot) if (boot is not None and h is not None) else None
+    if interval is not None:
+        low, high = round(interval.low, 1), round(interval.high, 1)
+        band = round((interval.high - interval.low) / 2, 1)  # one number for callers that want one
+        if interval.rank_low is not None:
+            rank_low, rank_high = round(interval.rank_low, 1), round(interval.rank_high, 1)
+        crowd.detail["interval_method"] = interval.diagnostics
     if abstain.active:
-        h, band = None, None
-    return Scores(crowding=crowd, facet_rarity=rarity, llm_predictability=pred, headline=h, band=band, confidence=conf, abstain=abstain)
+        h = band = low = high = rank = rank_low = rank_high = None
+    return Scores(crowding=crowd, facet_rarity=rarity, llm_predictability=pred, headline=h, band=band,
+                  low=low, high=high, rank=rank, rank_low=rank_low, rank_high=rank_high,
+                  rank_axes=list(RANK_AXES) if rank is not None else [], confidence=conf, abstain=abstain)

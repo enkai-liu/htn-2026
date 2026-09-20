@@ -40,12 +40,26 @@ Entity resolution happens **before** scoring on purpose: a project that appears 
 Which parts of the idea are common, and is the *combination* rare? The idea is decomposed into facets (purpose, mechanism, audience, data, twist).
 
 ```
-rarity_f = 1 − log(1 + df_f) / log(1 + 2000)            df_f = corpus documents matching facet f (all terms)
+rarity_f = mean IDF of facet f's k=3 most distinctive terms, / log(N+1)      idf(t) = log((N+1)/(df_t+1))
 npmi     = log( p(purpose, mechanism) / p(purpose)·p(mechanism) ) / −log p(purpose, mechanism)     ∈ [−1, +1]
 pair     = (1 − npmi) / 2
 cliche   = |idea terms ∩ significant_text(neighbours)| / |idea terms|
 O2       = 100 · (0.5 · mean_f rarity_f + 0.3 · pair + 0.2 · (1 − cliche))
 ```
+
+**Why per-facet rarity is not a document count.** It used to be `1 − log(1+df_f)/log(1+2000)`, where `df_f` counted documents matching the facet under a `minimum_should_match` rule. No such rule works at both ends. Requiring every word made every LLM-written phrase unique (`df=0`, so every idea scored maximally rare); the fix for that — any 3 words of a long phrase — meant a 20-word mechanism matched **1,020 of 8,110 documents, 12.6% of the corpus**, and scored 0.089. That number measured how long the planner's phrase was, not how rare the idea was.
+
+A facet is a bundle of concepts, not a phrase the corpus either contains or does not. Its rarity is how unusual its most distinctive concepts are, and taking a **fixed k** of them is length-invariant by construction: words more common than the top k cannot enter the top k, so an LLM's verbosity cannot move the score. One `filters` aggregation returns every term's whole-index `df` in a single request. Measured on the 8.1k corpus:
+
+| facet | IDF rarity | old rule |
+|---|---|---|
+| "Acoustic detection of varroa mite wingbeats" | 1.00 | — |
+| "Team of AI agents that search prior art, debate novelty, …" | 0.71 | **0.089** |
+| "A web app with a React frontend and a Flask backend" | 0.56 | — |
+| "An AI chatbot powered by a large language model" | 0.40 | — |
+| "help students study more effectively" | 0.39 | — |
+
+The NPMI pair term still uses document counts, because it is a *ratio*: a lenient match rule largely cancels between the joint and the product of the marginals, where it does not cancel in an absolute count.
 
 **Why NPMI and not a pair document count.** A raw `df(purpose AND mechanism)` only says how many projects match both, so it cannot tell a rare *combination* of two common facets — the case a hackathon idea is actually hoping for — from a pair whose halves are both rare. In a 200k corpus, "help students study" (20,000) × "flashcards" (8,000) gives 3,000 joint hits, but independence predicts 800: they co-occur **4× more** than chance, which is the definition of a cliché pairing. "help students study" × "acoustic sensing" (800) gives 3 joint hits against an expectation of 80: **26× less** than chance. The old formula scored those similarly; NPMI puts them at opposite ends. `+1` = always together, `0` = independent, `−1` = nobody has combined them, i.e. the whitespace.
 
@@ -68,11 +82,44 @@ This is about the *idea*, not the phrasing, and it is the operational version of
 ## Headline and uncertainty
 
 ```
-O    = 100 · Π_k (O_k / 100)^(w_k)          weighted geometric mean over axes that did not abstain (weights renormalised)
-band = ± min(30, 8 + 40 · mean jury std + 6 · number of abstaining axes)
+C           = 100 · Π_k (C_k / 100)^(w_k)   weighted geometric mean over RANK_AXES = {crowding, facet_rarity}
+RANK        = 100 · F_ref(C)                share of the reference population whose composite is below C
+[low, high] = 5th and 95th percentiles of RANK over 1,000 bootstrap replicates
 ```
 
+**The headline is a percentile rank, not a score.** `63%` means *63% of real hackathon projects, scored by this same pipeline, came out lower*. That is a statement about a named population which someone can go and check. The previous headline was 63 points on a scale nobody had defined, and its axis weights (0.45/0.35/0.20) had to be correct on an absolute scale for the number to mean anything. They still are not derived from anything — but a rank only needs them to preserve an **ordering**, which is a far weaker claim than the one a raw score was making.
+
+**The reference population** is N random corpus documents put through the *same code path* as a live idea: the same hybrid retrieval (self excluded), the same LLM facet-extraction prompt the planner uses, the same term profiles and the same NPMI. "Same" is the whole point; a percentile against a population scored differently means nothing. Build it with `python -m app.search.calibration build-headline --n 300`.
+
+`llm_predictability` is deliberately **not** in the rank: it costs 12 model calls per document, so 3,600 for a 300-document reference. It is reported as its own axis, like Voice. `rank_axes` on every result says which axes the rank covers, and with no reference built the rank is `null` and the UI falls back to the raw composite rather than inventing a percentile.
+
+Measured on the 8.1k corpus with a 120-document reference (quantiles: 5% → 20.4, 50% → 49.5, 95% → 75.4), the run that used to read `14 ± 10.8` now reads **1.7%, interval 0–13%** — an AI-novelty-scorer pitched into a corpus that already contains AI-novelty-scorers.
+
 A geometric mean means one crowded axis cannot be averaged away by two good ones. Crowding is mandatory: without it there is no headline.
+
+**The interval is bootstrapped, and asymmetric.** It used to be `± min(30, 8 + 40·jury_std + 6·abstains)`, a formula with no derivation. On a geometric mean near the floor a *symmetric* band is not even well defined: a real run reported `14 ± 10.8`, claiming 3.2 to 24.8 for an estimator whose axes are clamped at 1 and whose spread up there is strongly one-sided. The raw composite for that run is now **12.8, interval 9.8–26.2**, and its rank 1.7%, interval 0–13%.
+
+Each replicate resamples every input the point estimate was built from — none of which costs another network call, because all of it was already fetched:
+
+| source | how it is resampled | why |
+|---|---|---|
+| retrieved neighbours | nonparametric bootstrap over the reranker scores | `crowding_lite` leans on `max(r)`, one order statistic of ten selected documents |
+| calibration set | uniform draw inside the DKW bound | a percentile read off an empirical CDF of size *n* carries `√(ln(2/α)/2n)` of error — 0.078 at n=300, 0.043 at n=1000 |
+| document frequencies | `df′ ~ Binomial(N, df/N)` | the corpus is itself a sample of the projects that exist |
+| model samples | nonparametric bootstrap over the 12 prior-collision similarities | `hit_rate` out of 12 trials is a Bernoulli rate, not a constant |
+
+`band` is retained as `(high − low)/2` for callers that want one number, but the interval is the honest output and the UI shows both ends.
+
+**The crowding percentile is fitted in the tail.** Below the 90th percentile of the calibration set the empirical CDF has plenty of points and is used directly. Above it, counting order statistics runs out of resolution exactly where the headline is most sensitive: `crowding_lite = 0.435` had about seven of 300 calibration documents above it, and the difference between 0.977 and 0.990 is the difference between O1 = 2.3 and O1 = 1.0. Worse, *everything* past the largest calibration value read 1.0, so O1 = 0 for a wide range of genuinely different inputs. A Generalised Pareto fitted by probability-weighted moments (Hosking & Wallis 1987 — closed form, far steadier than maximum likelihood at n≈30) takes over above the threshold, joining continuously because `tail_mass = n_exceed/n_total`:
+
+| `crowding_lite` | O1 counting | O1 fitted |
+|---|---|---|
+| 0.400 | 3.33 | 3.16 |
+| 0.435 | 2.33 | 1.76 |
+| 0.500 | **0.00** | 0.50 |
+| 0.580 | **0.00** | 0.07 |
+
+The fit *replaces* the empirical value above the threshold rather than raising it. The empirical CDF is biased up there — with 300 draws the largest is not the population maximum — so the fit landing below it is correct, not a softening.
 
 ## Confidence and abstention
 

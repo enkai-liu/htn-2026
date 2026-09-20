@@ -1,6 +1,6 @@
 """Search-side primitives for AXIS 2 (facet rarity) - docs/design-full.md section 2.6.
 
-    rarity_f = 1 - log(1 + df_f) / log(1 + 2000)             df_f  = docs matching most words of one facet (FACET_MATCH)
+    rarity_f = mean IDF of the k most distinctive terms of facet f, / log(N+1)   (length-invariant)
     pair     = (1 - npmi(purpose, mechanism)) / 2            observed co-occurrence vs. what independence predicts
     cliche   = |idea_terms ∩ significant_text(neighbours)| / |idea_terms|
     O2       = 100 * (0.5 * mean_f rarity_f + 0.3 * pair + 0.2 * (1 - cliche))      (assembled in scoring/axes.py)
@@ -10,15 +10,22 @@ and so cannot distinguish a rare combination of two common facets (what a hackat
 halves are both rare. NPMI compares the joint count with the product of the marginals and does. `pair_rarity`
 remains the fallback for when the corpus size is unknown.
 
-Network functions: neighbourhood_stats (two-step significant_text), facet_df, pair_df, corpus_size, pair_stats.
-Pure functions:    rarity_from_df, pair_rarity, npmi, pair_atypicality, cliche_overlap,
-                   parse_neighbourhood_response, build_* bodies.
+Per-facet rarity no longer comes from a document count at all. A `minimum_should_match` rule has to serve
+both a three-word facet and a twenty-word one, and none does: requiring every word made every LLM-written
+phrase unique, and the fix for that (any 3 words of a long phrase) made a 20-word mechanism match 12.6% of
+the corpus and score 0.089. `facet_rarity_from_idf` reads the term-frequency profile instead, which is
+length-invariant by construction.
+
+Network functions: neighbourhood_stats, facet_term_dfs, facet_profile, facet_df, pair_df, corpus_size, pair_stats.
+Pure functions:    rarity_from_df, idf, facet_rarity_from_idf, pair_rarity, npmi, pair_atypicality,
+                   cliche_overlap, parse_neighbourhood_response, parse_term_df_response, build_* bodies.
 """
 from __future__ import annotations
 
 import math
 import re
-from typing import Any, Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
+from typing import Any
 
 from app.config import get_settings
 from app.search.es import excluded_flags_clause, get_async_es, require_elastic
@@ -37,11 +44,72 @@ FACET_MATCH = "2<-50% 6<3"
 # Pure maths
 # --------------------------------------------------------------------------------------
 def rarity_from_df(df: int | float, cap: int = FACET_DF_CAP) -> float:
-    """1.0 = nobody has this facet, 0.0 = at least `cap` documents do. Log-scaled, clamped to [0, 1]."""
+    """1.0 = nobody has this facet, 0.0 = at least `cap` documents do. Log-scaled, clamped to [0, 1].
+
+    Still used for the NPMI marginals, where a lenient match rule largely cancels between the joint and the
+    product of the marginals. NOT used for per-facet rarity any more: see `facet_rarity_from_idf`."""
     df = max(0.0, float(df))
     if cap <= 0:
         raise ValueError("cap must be positive")
     return max(0.0, min(1.0, 1.0 - math.log1p(df) / math.log1p(cap)))
+
+
+# --------------------------------------------------------------------------------------
+# Per-facet rarity from the term-frequency profile (replaces a single FACET_MATCH document count)
+# --------------------------------------------------------------------------------------
+IDF_TOP_K = 3
+
+
+def idf(df: int, n: int) -> float:
+    """Smoothed inverse document frequency in nats: log((N+1)/(df+1)). 0 for a term in every document,
+    log(N+1) for one the corpus has never seen."""
+    if n <= 0:
+        return 0.0
+    return math.log((n + 1) / (max(0, int(df)) + 1))
+
+
+def facet_rarity_from_idf(term_dfs: Mapping[str, int], n: int, k: int = IDF_TOP_K) -> float | None:
+    """Rarity of ONE facet from the corpus frequency of its words: the mean IDF of its k most distinctive
+    terms, divided by log(N+1) so the result lands in [0, 1].
+
+    A facet is not a phrase the corpus either contains or does not; it is a bundle of concepts, and its
+    rarity is how unusual the most distinctive of those concepts are. Counting documents that "match the
+    facet" needed a `minimum_should_match` rule, and no such rule survives both ends: requiring every word
+    made every LLM-written phrase unique (df=0, everything maximally rare), while the fix for that -- any 3
+    words of a long phrase -- made a 20-word mechanism match 1,020 of 8,110 documents (12.6% of the corpus)
+    for rarity 0.089. That number measured the length of the phrase, not the rarity of the idea.
+
+    Taking a FIXED k most-distinctive terms is length-invariant by construction: a one-word facet and a
+    twenty-word facet are scored on the same scale. Measured on the 8.1k corpus:
+
+        'Acoustic detection of varroa mite wingbeats'                       1.00   (beehive/mite/varroa unseen)
+        'Team of AI agents that search prior art, debate novelty, ...'      0.71   (was 0.089)
+        'A web app with a React frontend and a Flask backend'               0.56
+        'An AI chatbot powered by a large language model'                   0.40
+        'help students study more effectively'                              0.39
+    """
+    if n <= 0 or not term_dfs:
+        return None
+    top = sorted((idf(df, n) for df in term_dfs.values()), reverse=True)[: max(1, k)]
+    return max(0.0, min(1.0, (sum(top) / len(top)) / math.log(n + 1)))
+
+
+def build_term_df_body(terms: Sequence[str], sources: Iterable[str] | None = None) -> dict[str, Any]:
+    """One `filters` aggregation with a bucket per term: exact whole-index document frequencies in a single
+    request. (`_termvectors` also reports doc_freq, but its statistics are shard-local.)"""
+    terms = [t for t in dict.fromkeys(t.strip() for t in terms) if t]
+    if not terms:
+        raise ValueError("at least one term is required")
+    bool_q: dict[str, Any] = {"must_not": [excluded_flags_clause()]}
+    if sources:
+        bool_q["filter"] = [{"terms": {"source": list(sources)}}]
+    return {"size": 0, "query": {"bool": bool_q},
+            "aggs": {"term_df": {"filters": {"filters": {t: {"match": {"pitch": t}} for t in terms}}}}}
+
+
+def parse_term_df_response(resp: dict[str, Any]) -> dict[str, int]:
+    buckets = ((resp.get("aggregations") or {}).get("term_df") or {}).get("buckets") or {}
+    return {t: int(b.get("doc_count", 0)) for t, b in buckets.items()} if isinstance(buckets, dict) else {}
 
 
 def pair_rarity(df: int | float, cap: int = PAIR_DF_CAP) -> float:
@@ -209,6 +277,28 @@ async def facet_df(facet_text: str, *, sources: Iterable[str] | None = None, es:
 async def pair_df(a: str, b: str, *, sources: Iterable[str] | None = None, es: Any = None, index: str | None = None) -> int:
     """Document frequency of a facet combination: pitches matching `a` AND `b` (each by FACET_MATCH)."""
     return await _count(build_facet_count_body(a, b, sources=sources), es=es, index=index)
+
+
+async def facet_term_dfs(facet_text: str, *, sources: Iterable[str] | None = None, es: Any = None,
+                         index: str | None = None) -> dict[str, int]:
+    """Whole-index document frequency of every content word of a facet, in one request."""
+    terms = sorted(idea_terms(facet_text))
+    if not terms:
+        return {}
+    settings = get_settings() if es is not None else require_elastic()
+    client = es if es is not None else get_async_es()
+    resp = await client.search(index=index or settings.es_index, body=build_term_df_body(terms, sources))
+    return parse_term_df_response(dict(resp))
+
+
+async def facet_profile(facet_text: str, n: int, *, k: int = IDF_TOP_K, sources: Iterable[str] | None = None,
+                        es: Any = None, index: str | None = None) -> dict[str, Any]:
+    """One facet's rarity plus the evidence for it: the terms that drove it and how common each one is."""
+    dfs = await facet_term_dfs(facet_text, sources=sources, es=es, index=index)
+    rarity = facet_rarity_from_idf(dfs, n, k)
+    top = sorted(dfs.items(), key=lambda kv: kv[1])[:k]
+    return {"rarity": rarity, "term_dfs": dfs, "top_terms": [{"term": t, "df": df} for t, df in top],
+            "unseen": sorted(t for t, df in dfs.items() if df == 0), "n_terms": len(dfs)}
 
 
 def build_corpus_count_body(sources: Iterable[str] | None = None) -> dict[str, Any]:

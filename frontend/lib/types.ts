@@ -177,7 +177,16 @@ export interface Scores {
   facet_rarity: AxisScore;
   llm_predictability: AxisScore;
   headline: number | null;
-  band: number | null;
+  band: number | null;            // symmetric half-width; kept for callers that want one number
+  // Bootstrap interval. Asymmetric on purpose: a weighted geometric mean near the floor is not symmetric,
+  // so `headline ± band` overstates the low end and understates the high one.
+  low?: number | null;
+  high?: number | null;
+  // The headline the chip shows: % of reference hackathon projects scoring lower, over `rank_axes`.
+  rank?: number | null;
+  rank_low?: number | null;
+  rank_high?: number | null;
+  rank_axes?: string[];
   confidence: number;
   abstain: { active: boolean; reason: string };
 }

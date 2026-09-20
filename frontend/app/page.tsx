@@ -12,7 +12,11 @@ export default function Home() {
       <main className="landing-main relative z-10 flex shrink-0 grow items-center overflow-hidden">
         <div className="mx-auto grid w-full max-w-[1320px] grid-cols-[minmax(0,1fr)] items-center gap-10 px-5 py-10 sm:px-10 lg:grid-cols-[minmax(0,520px)_minmax(0,1fr)]">
           <div className="landing-content mx-auto w-full max-w-[520px]">
-            <h1 className="animate-rise font-display text-[46px] leading-[1.04] tracking-[-0.045em] text-bone sm:text-[64px]" style={{ animationDelay: "0.08s" }}>
+            {/* what the mark in the corner stands for: rises just before the headline, so it reads as the byline to it */}
+            <p className="label animate-rise text-mute" style={{ animationDelay: "0.04s" }}>
+              Similarity Lookup for Originality Prediction
+            </p>
+            <h1 className="mt-3 animate-rise font-display text-[46px] leading-[1.04] tracking-[-0.045em] text-bone sm:text-[64px]" style={{ animationDelay: "0.08s" }}>
               How original<br />is your idea?
             </h1>
             <div className="landing-pitch mt-7">

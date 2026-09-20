@@ -25,10 +25,12 @@ import json
 import math
 import sys
 from dataclasses import dataclass, field
+from functools import cached_property
 from pathlib import Path
 from typing import Any, Callable, Sequence
 
 from app.config import FIXTURES_DIR, get_settings
+from app.scoring.stats import GPD, dkw_epsilon, fit_tail, tail_percentile
 
 CALIBRATION_DIR = FIXTURES_DIR / "calibration"
 CALIBRATION_FILE = CALIBRATION_DIR / "crowding_cdf.json"
@@ -47,7 +49,7 @@ def crowding_lite(scores: Sequence[float | None]) -> float:
     return 0.6 * rs[0] + 0.4 * (sum(top5) / len(top5))
 
 
-@dataclass
+@dataclass(eq=False)
 class CrowdingCDF:
     values: list[float]  # sorted ascending
     is_placeholder: bool = False
@@ -58,11 +60,28 @@ class CrowdingCDF:
         if not self.values:
             raise ValueError("a calibration CDF needs at least one value")
 
-    def percentile(self, value: float) -> float:
+    def empirical(self, value: float) -> float:
         """Mid-rank empirical CDF in [0, 1]: 0 = less crowded than everything we calibrated on."""
         lo = bisect.bisect_left(self.values, value)
         hi = bisect.bisect_right(self.values, value)
         return (lo + hi) / (2 * len(self.values))
+
+    @cached_property
+    def tail(self) -> "GPD | None":
+        """Generalised Pareto fitted to the top decile, or None when there are too few points to fit."""
+        return fit_tail(self.values)
+
+    def percentile(self, value: float) -> float:
+        """Empirical below the top decile, fitted-tail above it.
+
+        Counting order statistics runs out of resolution exactly where the headline is most sensitive: a
+        crowding value at the 97.7th percentile of 300 documents has about seven above it, and 0.977 vs
+        0.990 is the difference between O1 = 2.3 and O1 = 1.0. The fitted tail interpolates there."""
+        return tail_percentile(value, self.values, self.tail, self.empirical(value))
+
+    def epsilon(self, alpha: float = 0.05) -> float:
+        """DKW bound: how far any percentile from this CDF can be from the truth, at 1-alpha."""
+        return dkw_epsilon(len(self.values), alpha)
 
     def to_json(self) -> dict[str, Any]:
         return {"version": 1, "is_placeholder": self.is_placeholder, **self.meta, "n": len(self.values), "values": self.values}
@@ -159,6 +178,37 @@ def curvature_percentile(value: float) -> float:
 
 def rcs_is_placeholder() -> bool:
     return get_rcs_cdf().is_placeholder
+
+
+# --------------------------------------------------------------------------------------
+# The reference population the headline PERCENTILE RANK is read against
+# --------------------------------------------------------------------------------------
+HEADLINE_FILE = CALIBRATION_DIR / "headline_cdf.json"
+
+
+def placeholder_headline_cdf(n: int = 300) -> CrowdingCDF:
+    """Stand-in spread of composite scores over [0, 100]. Flagged, so the UI shows the raw score instead."""
+    values = [round(100 * ((i + 0.5) / n) ** 1.1, 4) for i in range(n)]
+    return CrowdingCDF(values, is_placeholder=True, meta={"note": PLACEHOLDER_NOTE, "axes": ["crowding", "facet_rarity"]})
+
+
+_headline_cdf: CrowdingCDF | None = None
+
+
+def get_headline_cdf(*, reload: bool = False) -> CrowdingCDF:
+    global _headline_cdf
+    if _headline_cdf is None or reload:
+        _headline_cdf = load_cdf(HEADLINE_FILE, placeholder_headline_cdf)
+    return _headline_cdf
+
+
+def headline_percentile(value: float) -> float:
+    """Share of the reference projects whose composite is below this one. 0.63 -> "more original than 63%"."""
+    return get_headline_cdf().percentile(value)
+
+
+def headline_is_placeholder() -> bool:
+    return get_headline_cdf().is_placeholder
 
 
 def curvature_is_placeholder() -> bool:
@@ -338,12 +388,101 @@ async def build_curvature_calibration(n: int = 300, *, seed: int = 42, before_ye
     return cdf
 
 
+async def score_reference_document(pitch: str, doc_id: str, *, neighbours: int = 10) -> float | None:
+    """Score ONE corpus document exactly the way a live idea is scored, over RANK_AXES.
+
+    "Exactly" is the whole point: a percentile rank is meaningless unless the reference population went
+    through the same pipeline. So the facets come from the same LLM prompt the planner uses, the rarity
+    from the same term profiles, and the pair term from the same NPMI -- self excluded throughout."""
+    from app.llm.router import get_router
+    from app.schemas import FACET_KEYS, Facets
+    from app.scoring import axes
+    from app.search import rarity as rar
+    from app.search.hybrid import search
+
+    recs = await search(pitch[:1500], pitch, size=neighbours, exclude_ids=[doc_id])
+    if not recs or recs[0].retrieval.get("uncalibrated"):
+        return None
+    crowd = axes.crowding([r.retrieval.get("rerank_score") or 0.0 for r in recs], percentile, calibrated=True)
+    if crowd.score is None:
+        return None
+
+    facets, _ = await get_router().structured(role="conductor", system=FACET_SYSTEM, user=f"IDEA: {pitch}", schema=Facets)
+    n = await rar.corpus_size()
+    names = [k for k in FACET_KEYS if getattr(facets, k, "")]
+    profiles = {k: await rar.facet_profile(getattr(facets, k), n) for k in names if k in ("purpose", "mechanism", "audience", "twist")}
+    rarities = {k: p["rarity"] for k, p in profiles.items() if p["rarity"] is not None}
+    if not rarities:
+        return None
+    pair = await rar.pair_stats(facets.purpose, facets.mechanism) if (facets.purpose and facets.mechanism) else {}
+    nb = await rar.neighbourhood_stats([r.rid for r in recs])
+    overlap = rar.cliche_overlap(pitch, [c["term"] for c in nb.get("cliche_terms", [])])
+    rarity_axis = axes.facet_rarity(None, pair.get("df_ab"), overlap, pair_npmi=pair.get("npmi"),
+                                    facet_rarities=rarities)
+    if rarity_axis.score is None:
+        return None
+    return axes.rank_composite({"crowding": crowd.score, "facet_rarity": rarity_axis.score})
+
+
+FACET_SYSTEM = ("Role: planner. Decompose the idea into facets: purpose (the goal, for whom), mechanism (how it works), "
+                "audience, data (what it consumes), twist (what the author thinks is new), domain (2-3 words), keywords. "
+                "Facet values are short noun phrases in plain words.")
+
+
+async def build_headline_calibration(n: int = 300, *, seed: int = 42, concurrency: int = 4, save: bool = True,
+                                     path: Path | None = None) -> CrowdingCDF:
+    """The reference population for the percentile rank: N random corpus documents, each scored over
+    RANK_AXES by the same code a live idea goes through. Costs N facet-extraction calls plus Elasticsearch."""
+    from app.search.es import get_async_es, require_elastic
+
+    settings = require_elastic()
+    resp = await get_async_es().search(index=settings.es_index, body=build_sample_body(n, seed))
+    docs = (resp.get("hits") or {}).get("hits", [])
+    if not docs:
+        raise RuntimeError(f"no documents with has_semantic=true in {settings.es_index}; ingest Tier 0/1 first")
+    sem = asyncio.Semaphore(concurrency)
+    values: list[float] = []
+    skipped = 0
+
+    async def one(doc: dict[str, Any]) -> None:
+        nonlocal skipped
+        pitch = (doc.get("_source") or {}).get("pitch") or ""
+        async with sem:
+            try:
+                v = await score_reference_document(pitch, doc["_id"])
+            except Exception:
+                v = None
+        if v is None:
+            skipped += 1
+        else:
+            values.append(v)
+
+    await asyncio.gather(*(one(d) for d in docs))
+    if len(values) < max(20, n // 10):
+        raise RuntimeError(f"only {len(values)} of {len(docs)} reference documents scored ({skipped} skipped); "
+                           "not overwriting the existing CDF.")
+    from app.scoring.axes import RANK_AXES
+
+    cdf = CrowdingCDF(values, is_placeholder=False, meta={
+        "built_at": dt.datetime.now(dt.timezone.utc).isoformat(), "index": settings.es_index, "seed": seed,
+        "skipped": skipped, "axes": list(RANK_AXES),
+        "formula": "weighted geometric mean over RANK_AXES, self excluded; same code path as a live run",
+    })
+    if save:
+        target = path or HEADLINE_FILE
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(json.dumps(cdf.to_json(), indent=1))
+        get_headline_cdf(reload=True)
+    return cdf
+
+
 def _cli(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Calibration CDFs: crowding, RCS, Fast-DetectGPT curvature")
     sub = ap.add_subparsers(dest="cmd", required=True)
     for name, help_text in (("build", "crowding: sample N docs, query each, store the sorted crowding_lite values"),
                             ("build-rcs", "RCS: same sample, store the sorted nats/token the neighbours save"),
-                            ("build-curvature", "Voice: store the curvature of N pre-ChatGPT (human) pitches")):
+                            ("build-curvature", "Voice: store the curvature of N pre-ChatGPT (human) pitches"),
+                            ("build-headline", "RANK: score N corpus documents the way a live idea is scored")):
         b = sub.add_parser(name, help=help_text)
         b.add_argument("--n", type=int, default=300)
         b.add_argument("--seed", type=int, default=42)
@@ -352,11 +491,13 @@ def _cli(argv: list[str] | None = None) -> int:
             b.add_argument("--before-year", type=int, default=2022, help="ChatGPT launched 2022-11-30")
     sub.add_parser("show", help="print every CDF in use (placeholder or measured)")
     args = ap.parse_args(argv)
-    targets = {"build": CALIBRATION_FILE, "build-rcs": RCS_FILE, "build-curvature": CURVATURE_FILE}
+    targets = {"build": CALIBRATION_FILE, "build-rcs": RCS_FILE, "build-curvature": CURVATURE_FILE,
+               "build-headline": HEADLINE_FILE}
     if args.cmd == "show":
         for label, cdf, file in (("crowding", get_cdf(reload=True), CALIBRATION_FILE),
                                  ("rcs", get_rcs_cdf(reload=True), RCS_FILE),
-                                 ("curvature", get_curvature_cdf(reload=True), CURVATURE_FILE)):
+                                 ("curvature", get_curvature_cdf(reload=True), CURVATURE_FILE),
+                                 ("headline-rank", get_headline_cdf(reload=True), HEADLINE_FILE)):
             qs = {q: cdf.values[min(len(cdf.values) - 1, int(q / 100 * len(cdf.values)))] for q in (5, 25, 50, 75, 95)}
             print(json.dumps({"cdf": label, "file": str(file), "is_placeholder": cdf.is_placeholder,
                               "n": len(cdf.values), "quantiles": qs, **cdf.meta}, indent=1))
@@ -368,6 +509,8 @@ def _cli(argv: list[str] | None = None) -> int:
         try:
             if args.cmd == "build-rcs":
                 return await build_rcs_calibration(args.n, seed=args.seed, concurrency=args.concurrency)
+            if args.cmd == "build-headline":
+                return await build_headline_calibration(args.n, seed=args.seed, concurrency=args.concurrency)
             if args.cmd == "build-curvature":
                 return await build_curvature_calibration(args.n, seed=args.seed, concurrency=args.concurrency,
                                                          before_year=args.before_year)

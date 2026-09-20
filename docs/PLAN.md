@@ -1,4 +1,4 @@
-# Whitespace (working title) — Hack the North 2026 build plan
+# S.L.O.P. — Similarity Lookup for Originality Prediction — Hack the North 2026 build plan
 
 ## Context
 

@@ -25,7 +25,21 @@ export function ScoreChip({ scores }: { scores: Scores | null }) {
   }, [visible]);
 
   const abstain = !!scores?.abstain?.active;
-  const headline = abstain ? null : scores?.headline ?? null;
+  // Prefer the percentile rank: "63" means 63% of reference hackathon projects scored lower, which is a
+  // statement about a named population. The raw composite is the fallback when no reference exists yet.
+  const rank = abstain ? null : scores?.rank ?? null;
+  const headline = abstain ? null : rank ?? scores?.headline ?? null;
+  const suffix = rank != null ? "%" : "";
+  // Intervals are asymmetric (a geometric mean near the floor is), so show both ends rather than a ± that
+  // claims a symmetry the estimator does not have.
+  const interval =
+    abstain || headline == null ? null
+    : rank != null && scores?.rank_low != null && scores?.rank_high != null
+      ? `${Math.round(scores.rank_low)}–${Math.round(scores.rank_high)}% more original than typical`
+    : rank != null ? "more original than typical"
+    : scores?.low != null && scores?.high != null ? `${Math.round(scores.low)}–${Math.round(scores.high)} original`
+    : scores?.band != null ? `± ${scores.band} original`
+    : "original";
 
   return (
     <div ref={ref} className="relative flex-none">
@@ -34,10 +48,10 @@ export function ScoreChip({ scores }: { scores: Scores | null }) {
         onClick={() => { setOpenedAt(pathname); setOpen(!visible); }}
         aria-expanded={visible}
         className={clsx("flex h-9 items-center gap-1.5 rounded-full border bg-ink-900 px-3.5 transition-colors", visible ? "border-line-strong" : "border-line hover:border-line-strong")}
-        title="Originality: crowding, facet rarity and LLM-predictability"
+        title="Percentile rank against real hackathon projects scored the same way. Click for the axes behind it."
       >
-        <span className={clsx("font-display text-[24px] leading-none tabular-nums", headline == null ? "text-faint" : "text-bone")}>{headline == null ? "–" : Math.round(headline)}</span>
-        <span className="text-[12.5px] leading-none text-mute">{abstain ? "abstained" : headline != null && scores?.band != null ? `± ${scores.band} original` : "original"}</span>
+        <span className={clsx("font-display text-[24px] leading-none tabular-nums", headline == null ? "text-faint" : "text-bone")}>{headline == null ? "–" : `${Math.round(headline)}${suffix}`}</span>
+        <span className="text-[12.5px] leading-none text-mute">{abstain ? "abstained" : interval}</span>
       </button>
       {visible && (
         <div className="absolute right-0 top-[calc(100%+8px)] z-40 w-[min(660px,calc(100vw-32px))] animate-rise overflow-hidden rounded-2xl border border-line bg-ink-900 shadow-[0_18px_50px_rgb(0_0_0/0.12)]">

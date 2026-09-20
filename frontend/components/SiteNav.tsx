@@ -15,10 +15,10 @@ export function StarGlyph({ size = 18, className }: { size?: number; className?:
 /** `pill`: on the water the mark sits in the same white pill as the spend and the score, so it reads the same on every page. */
 export function Wordmark({ className, pill }: { className?: string; pill?: boolean }) {
   return (
-    <Link href="/" className={clsx("group inline-flex items-center gap-2 text-bone", pill && "h-9 rounded-full border border-line bg-ink-900 pl-3 pr-4 transition-colors hover:border-line-strong", className)} aria-label="Whitespace home">
+    <Link href="/" className={clsx("group inline-flex items-center gap-2 text-bone", pill && "h-9 rounded-full border border-line bg-ink-900 pl-3 pr-4 transition-colors hover:border-line-strong", className)} aria-label="S.L.O.P. home">
       <StarGlyph className="text-accent transition-transform duration-500 group-hover:-translate-y-0.5" />
       <span className="font-display text-[22px] leading-none">
-        White<span className="text-bone-dim">space</span>
+        S.L.O.<span className="text-bone-dim">P.</span>
       </span>
     </Link>
   );
