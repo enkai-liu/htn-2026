@@ -1,5 +1,5 @@
 "use client";
-// The floating-islands map: shapes the graph + layout into what the scene draws, and owns everything that is not
+// The islands map: shapes the graph + layout into what the scene draws, and owns everything that is not
 // WebGL: the text alternative, the loading state, and the fallback to the 2D chart when WebGL is not available.
 import dynamic from "next/dynamic";
 import { useMemo, useState } from "react";
@@ -45,16 +45,18 @@ export function shapeIslands(graph: GraphState, layout: LayoutState): { islands:
   return { islands, links };
 }
 
-export interface IslandMapProps extends Pick<IslandMapCanvasProps, "selectedId" | "onSelect" | "onHover" | "seen" | "cameraMemo" | "recenterTick" | "ambient"> {
+export interface IslandMapProps extends Pick<IslandMapCanvasProps, "selectedId" | "onSelect" | "onHover" | "seen" | "cameraMemo" | "recenterTick" | "ambient" | "anchorX"> {
   graph: GraphState;
   layout: LayoutState;
   /** rendered instead of the islands when WebGL is missing or its context is lost */
   fallback?: React.ReactNode;
   /** the data is still on its way: keep the loader up even though the scene itself is ready */
   pending?: boolean;
+  /** the box the map fills, in place of its parent: the run page hands it the whole window. Never applied to the fallback */
+  frameClassName?: string;
 }
 
-export function IslandMap({ graph, layout, fallback, pending, ...rest }: IslandMapProps) {
+export function IslandMap({ graph, layout, fallback, pending, frameClassName = "absolute inset-0", ...rest }: IslandMapProps) {
   const [lost, setLost] = useState(false);
   const [ready, setReady] = useState(false);
   const [supported] = useState(hasWebGL);
@@ -70,7 +72,7 @@ export function IslandMap({ graph, layout, fallback, pending, ...rest }: IslandM
   if (rest.ambient) return <div className="absolute inset-0" aria-hidden>{canvas}{loader}</div>;
 
   return (
-    <figure className="absolute inset-0 m-0" aria-label={`Map of the idea-space: your idea at the centre, ${entities} prior-art projects placed by similarity, closer means more similar.`}>
+    <figure className={`${frameClassName} m-0`} aria-label={`Map of the idea-space: your idea at the centre, ${entities} prior-art projects placed by similarity, closer means more similar.`}>
       {canvas}
       {loader}
       {/* the same islands as a list: the keyboard and screen-reader path into the map */}

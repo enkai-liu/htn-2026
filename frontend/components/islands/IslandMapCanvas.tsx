@@ -20,9 +20,11 @@ export interface IslandMapCanvasProps {
   /** bumped by the "re-centre" button */
   recenterTick?: number;
   ambient?: boolean;
+  /** where across a wide canvas the middle of the map sits, 0..1 */
+  anchorX?: number;
 }
 
-export default function IslandMapCanvas({ islands, links, layout, selectedId, onSelect, onHover, onContextLost, onReady, seen, cameraMemo, recenterTick = 0, ambient }: IslandMapCanvasProps) {
+export default function IslandMapCanvas({ islands, links, layout, selectedId, onSelect, onHover, onContextLost, onReady, seen, cameraMemo, recenterTick = 0, ambient, anchorX }: IslandMapCanvasProps) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const labelRef = useRef<HTMLDivElement>(null);
@@ -43,7 +45,7 @@ export default function IslandMapCanvas({ islands, links, layout, selectedId, on
         onReady: () => cb.current.onReady?.(),
       }, {
         reducedMotion: window.matchMedia("(prefers-reduced-motion: reduce)").matches,
-        ambient, seen, camera: cameraMemo?.current ?? null, labelLayer: labelRef.current,
+        ambient, anchorX, seen, camera: cameraMemo?.current ?? null, labelLayer: labelRef.current,
       });
     } catch {
       cb.current.onContextLost();

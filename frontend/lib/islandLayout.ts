@@ -1,4 +1,4 @@
-// Pure layout for the floating-islands map. No three.js in here, so it runs under Vitest's node environment.
+// Pure layout for the islands map. No three.js in here, so it runs under Vitest's node environment.
 //
 // The law is the same as the 2D chart: distance from your idea = 1 - similarity. The angle is free (the data has
 // no embedding coordinates), so it is spent on grouping: every source owns a fixed wedge of the circle and its
@@ -30,7 +30,7 @@ export interface IslandPlacement {
   nudge: number;
   x: number;
   z: number;
-  /** resting height */
+  /** how far the turf stands out of the sea: everything sits in the water, so this is a little freeboard, not an altitude */
   y: number;
   /** footprint radius */
   size: number;
@@ -73,6 +73,8 @@ const SECTORS: { key: string; width: number }[] = [
 ];
 const SECTOR_START = 35 * DEG;
 const SECTOR_PAD = 4 * DEG;
+/** how far off its facet's bearing a boat may berth to find clear water */
+const MUTATION_HALF = 40 * DEG;
 
 const SECTOR_BY_KEY: Record<string, { centre: number; half: number }> = (() => {
   const out: Record<string, { centre: number; half: number }> = {};
@@ -177,21 +179,23 @@ export function foldLayout(prev: LayoutState, graph: GraphState, ctx: LayoutCtx)
     let p: IslandPlacement;
 
     if (node.kind === "idea") {
-      p = { id, kind: "idea", angle: 0, radius: 0, nudge: 0, x: 0, z: 0, y: 0.35, size, seed };
+      p = { id, kind: "idea", angle: 0, radius: 0, nudge: 0, x: 0, z: 0, y: 0.06, size, seed };
     } else if (node.kind === "mutation") {
-      // a mutation floats above the bearing of the facet it changes, so it never fights the archipelagos for room
+      // a mutation is a boat on the bearing of the facet it changes. It shares the water with the islands now,
+      // so it looks for a free berth the same way they do instead of hovering over them.
       const facet = ctx.mutationFacet[id.slice("mut:".length)];
       const fi = FACET_KEYS.indexOf(facet as (typeof FACET_KEYS)[number]);
       const base = fi >= 0 ? -Math.PI / 2 + (fi * TAU) / FACET_KEYS.length : rnd() * TAU;
       const siblings = placed.filter((o) => o.kind === "mutation" && Math.abs(o.angle - base) < 0.5).length;
-      p = withPosition({ id, kind: "mutation", angle: base + siblings * 0.34, radius: ringRadius(node.similarity), nudge: 0, y: 1.9 + rnd() * 0.5, size, seed });
+      const target = ringRadius(node.similarity);
+      const berth = place(target, size, base + siblings * 0.34, base, MUTATION_HALF, placed);
+      p = withPosition({ id, kind: "mutation", angle: berth.angle, radius: target + berth.nudge, nudge: berth.nudge, y: 0, size, seed });
     } else {
       const { centre, half } = sectorFor(node.kind, node.source);
       const start = centre + (rnd() * 2 - 1) * half * 0.8;
       const target = ringRadius(node.similarity);
-      const ground = placed.filter((o) => o.kind !== "mutation");
-      const spot = place(target, size, start, centre, half, ground);
-      p = withPosition({ id, kind: node.kind, angle: spot.angle, radius: target + spot.nudge, nudge: spot.nudge, y: (rnd() * 2 - 1) * 0.6, size, seed });
+      const spot = place(target, size, start, centre, half, placed);
+      p = withPosition({ id, kind: node.kind, angle: spot.angle, radius: target + spot.nudge, nudge: spot.nudge, y: rnd() * 0.05, size, seed });
     }
     byId[id] = p;
     order.push(id);
