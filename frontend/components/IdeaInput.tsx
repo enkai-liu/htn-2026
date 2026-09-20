@@ -2,8 +2,8 @@
 import { ArrowRight, Link2, LoaderCircle, Shuffle, TriangleAlert } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, type FormEvent } from "react";
-import { ApiError, createRun } from "@/lib/api";
+import { useEffect, useState, type FormEvent } from "react";
+import { ApiError, createRun, wakeBackend } from "@/lib/api";
 
 export const VOICE_MIN_CHARS = 250;
 const SEARCH_MIN_CHARS = 1; // backend RunRequest.idea_text min_length
@@ -26,6 +26,12 @@ export function IdeaInput() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [nextPitch, setNextPitch] = useState(0);
+
+  // A free host puts an idle backend to sleep and takes about a minute to wake it: start that on arrival, so it is
+  // up by the time a pitch has been typed rather than when Investigate is pressed.
+  useEffect(() => {
+    if (!REPLAY_ONLY) wakeBackend();
+  }, []);
 
   const chars = text.trim().length;
   const voiceReady = chars >= VOICE_MIN_CHARS;

@@ -44,6 +44,19 @@ class RunLimitExceeded(RuntimeError):
 
 
 _RUNS: dict[str, Run] = {}
+_ADMITTED: dict[str, int] = {}  # UTC date -> runs started that day; only today's key is ever kept
+
+
+def _admit_today(cap: int) -> None:
+    """Count one more run against today's cap, or refuse it. cap <= 0 means uncapped."""
+    if cap <= 0:
+        return
+    today = time.strftime("%Y-%m-%d", time.gmtime())
+    used = _ADMITTED.get(today, 0)
+    if used >= cap:
+        raise RunLimitExceeded(f"today's {cap} live runs are used up; watch the recorded run, or come back tomorrow (UTC)")
+    _ADMITTED.clear()
+    _ADMITTED[today] = used + 1
 
 
 def get_run(run_id: str) -> Run | None:
@@ -74,6 +87,7 @@ def create_run(idea_text: str, url: str | None = None) -> Run:
     s = get_settings()
     if len(live_runs()) >= s.max_live_runs:
         raise RunLimitExceeded(f"{s.max_live_runs} runs are already in progress; try again in a minute")
+    _admit_today(s.max_runs_per_day)  # after the concurrency check: a run refused for being busy costs nothing
     run_id = "r" + uuid.uuid4().hex[:8]
     bus = EventBus(run_id)
     board = Blackboard(idea_text, url)

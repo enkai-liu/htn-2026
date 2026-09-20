@@ -46,6 +46,30 @@ async def test_api_answers_429_when_full(no_llm, monkeypatch):
     await runstore.get_run(ok.json()["run_id"]).task
 
 
+async def test_a_public_deploy_admits_only_so_many_runs_a_day(no_llm, monkeypatch):
+    monkeypatch.setattr(no_llm, "max_runs_per_day", 2)
+    monkeypatch.setattr(runstore, "_ADMITTED", {"1999-12-31": 2})  # yesterday's spent allowance does not carry over
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://t") as c:
+        for _ in range(2):
+            ok = await c.post("/api/runs", json={"idea_text": IDEA})
+            assert ok.status_code == 200
+            await runstore.get_run(ok.json()["run_id"]).task  # finished: the daily cap counts starts, not runs in flight
+        spent = await c.post("/api/runs", json={"idea_text": IDEA})
+    assert spent.status_code == 429 and "used up" in spent.json()["detail"]
+    assert list(runstore._ADMITTED.values()) == [2]  # one key, today's
+
+
+async def test_a_run_refused_for_being_busy_does_not_spend_the_daily_allowance(no_llm, monkeypatch):
+    monkeypatch.setattr(no_llm, "max_live_runs", 1)
+    monkeypatch.setattr(no_llm, "max_runs_per_day", 5)
+    monkeypatch.setattr(runstore, "_ADMITTED", {})
+    first = runstore.create_run(IDEA)
+    with pytest.raises(runstore.RunLimitExceeded, match="in progress"):
+        runstore.create_run(IDEA)
+    await first.task
+    assert list(runstore._ADMITTED.values()) == [1]
+
+
 async def test_finished_run_is_retained_then_evicted_and_served_from_disk(no_llm, monkeypatch):
     monkeypatch.setattr(no_llm, "run_retention_s", 0.2)
     run = runstore.create_run(IDEA)

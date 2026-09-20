@@ -30,6 +30,12 @@ make backend                # http://localhost:8000
 make frontend               # http://localhost:3000
 ```
 
+## Deploy (free tiers)
+
+- **Backend on Render**: `render.yaml` is a Blueprint. Open <https://render.com/deploy?repo=https://github.com/enkai-liu/htn-2026>, paste the keys it asks for (the same names as `.env`; blank = that feature is off). It sleeps when idle and takes about a minute to wake. `MAX_RUNS_PER_DAY` is the only thing between the public URL and the keys: there is no auth.
+- **Frontend on Vercel**: import the repo with Root Directory `frontend` and `NEXT_PUBLIC_API_BASE=https://<the Render service>.onrender.com`. It has to be a Next.js server, not a static host: `/runs/<id>` is rendered on demand.
+- **Replay-only on GitHub Pages**: `.github/workflows/pages.yml` publishes the static export to <https://enkai-liu.github.io/htn-2026/> on every push. No backend, plays the recorded run, never sleeps: the fallback if the other two are down.
+
 ## Layout
 
 `backend/` FastAPI + agents · `frontend/` Next.js · `ingest/` corpus loaders · `elastic/` mappings, pipeline, Agent Builder tools, Workflows · `swarm-skill/` reusable openJiuwen Swarm Skill · `baseten/` bake-off + surprisal deployment · `scripts/` smokes and benchmarks

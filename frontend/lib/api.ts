@@ -41,7 +41,13 @@ async function request<T>(path: string, init?: RequestInit, timeoutMs = 15000): 
 export function createRun(ideaText: string, url?: string): Promise<{ run_id: string }> {
   const body: { idea_text: string; url?: string } = { idea_text: ideaText };
   if (url) body.url = url;
-  return request("/api/runs", { method: "POST", body: JSON.stringify(body) });
+  // long enough to outlast a sleeping free-tier backend waking up, if wakeBackend() has not finished the job
+  return request("/api/runs", { method: "POST", body: JSON.stringify(body) }, 75000);
+}
+
+/** Fire-and-forget: the first request to a slept backend is what wakes it. Failure is the submit's problem, not this one's. */
+export function wakeBackend(): void {
+  void fetch(`${API_BASE}/api/health`, { cache: "no-store" }).catch(() => undefined);
 }
 
 export type ActionName = "arm_watch" | "draft_pitch" | "writeback";

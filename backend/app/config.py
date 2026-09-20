@@ -72,6 +72,9 @@ class Settings(BaseSettings):
     # in memory (re-scores, actions, late SSE clients) for this long before it is evicted and served from its JSONL.
     max_live_runs: int = 4
     run_retention_s: float = 600.0
+    # A public deploy has no auth, so every new run spends the keys above. This many runs are admitted per UTC day
+    # (counted in memory: a restart resets it, which errs toward letting a demo through). 0 = no cap, the local default.
+    max_runs_per_day: int = 0
 
     @property
     def has_elastic(self) -> bool:

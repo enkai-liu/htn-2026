@@ -1,0 +1,51 @@
+# Render Blueprint: the FastAPI backend on the free plan. https://render.com/deploy?repo=https://github.com/enkai-liu/htn-2026
+# The frontend is not here: it is a Next.js server on Vercel (root directory `frontend`, NEXT_PUBLIC_API_BASE = this
+# service's URL). The free plan sleeps after ~15 idle minutes and takes about a minute to wake; the landing page pings
+# /api/health on load for that reason (frontend/lib/api.ts: wakeBackend).
+services:
+  - type: web
+    name: slop-api
+    runtime: python
+    plan: free
+    region: ohio
+    rootDir: backend
+    # editable on purpose: app/config.py finds fixtures/ and runs/ relative to the source tree, not site-packages
+    buildCommand: pip install -e .
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.7
+      # No auth in front of this API, so this is what stands between the URL and the keys below. Raise it for demo day.
+      - key: MAX_RUNS_PER_DAY
+        value: "40"
+      # 512 MB and a fraction of a CPU: two investigations at once is what it carries.
+      - key: MAX_LIVE_RUNS
+        value: "2"
+      - key: GPTZERO_MODE
+        value: live
+      - key: ORCHESTRATOR
+        value: asyncio
+      # Secrets: `sync: false` means Render asks for the value when the Blueprint is created and never stores it in git.
+      # Anything left blank switches its feature off and the run says so (see .env.example).
+      - key: ES_URL
+        sync: false
+      - key: ES_API_KEY
+        sync: false
+      - key: KIBANA_URL
+        sync: false
+      - key: BASETEN_API_KEY
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: GPTZERO_API_KEY
+        sync: false
+      - key: EXA_API_KEY
+        sync: false
+      - key: BROWSERBASE_API_KEY
+        sync: false
+      - key: BROWSERBASE_PROJECT_ID
+        sync: false
+      - key: GITHUB_TOKEN
+        sync: false
