@@ -32,9 +32,7 @@ Headline `O = 100·(O1/100)^0.45·(O2/100)^0.35·(O3/100)^0.20`, band `±min(30,
 
 **Actions:** arm a recurring watch (Elastic Workflow re-searches and Slack-pings when new similar work appears), write the analyzed idea back into the corpus, draft a differentiated pitch.
 
-**Investigation ("Slop Index" page):** GPTZero scan of a year-stratified, length-controlled sample of Devpost pitches 2018→2026: AI share by subclass over time, placebo-year false-positive rate (2018–2021), and the tie-in test — *are AI-flagged pitches measurably closer to their nearest neighbours (less original)?* Publish aggregates + anonymized CSV only (no project URLs; no student is named).
-
-**Hero demo:** run it on itself ("how original is an originality checker?" → finds DevSpot/HackAnalyzer/Plagia → click the mutation that became our design), then a generic "AI study buddy" pitch, then arm a watch, then the Slop Index.
+**Hero demo:** run it on itself ("how original is an originality checker?" → finds DevSpot/HackAnalyzer/Plagia → click the mutation that became our design), then a generic "AI study buddy" pitch, then arm a watch.
 
 ---
 
@@ -44,7 +42,7 @@ Headline `O = 100·(O1/100)^0.45·(O2/100)^0.35·(O3/100)^0.20`, band `±min(30,
 |---|---|---|---|
 | **Elastic** | ES is the context layer for every agent: messy write-ups → ingest pipeline (`html_strip`, `fingerprint`, `lang_ident`, quarantine index) → `semantic_text` with **Jina v3 on EIS** → BM25 + semantic via **RRF** → **Jina reranker**; originality maths native (`significant_text`, agg whitespace finder); **ES\|QL tools in Agent Builder served over MCP**; scheduled **Workflow** with `ai.agent` closes the loop | hybrid+rerank, significant_text, ≥3 Agent Builder tools | MCP flaky → scouts hit ES directly, tools stay for Kibana chat + workflow |
 | **Rox** ($10k) | Data-wrangling agent in the taxonomy of their cofounder's paper (*Can Foundation Models Wrangle Your Data?*): **schema matching** (6 sources → 1 schema, mapping table shown), **entity matching** (Devpost↔GitHub↔HN↔YC → one entity; verdict `same/different/insufficient_evidence`), **error detection** (quarantine), **imputation** (visibly marked), conflicts resolved with source-reliability priors *and shown*, calibrated abstention, kill-a-source degradation, confidence-gated **actions**. Report ER precision/recall using `twangodev` Devpost→GitHub links as free ground truth | resolver + conflicts + abstention + 1 action | resolver = URL-xref + name rules, LLM only for top-5 pairs |
-| **GPTZero** | Both prize bullets: (1) NeurIPS/ICLR-style **investigation** on a corpus they haven't scanned, with placebo FPR and subclass split; (2) product with three integrations — sentence-level Voice, neighbourhood slop share, and **bibliography-scan with veto power over our own agents' claims** (+ "fire drill": inject a labelled fake competitor, watch it get struck). Spec discipline: no deprecated fields, honour `should_mask`, 250-char gate, show `result_message` not raw probabilities | pitch scan + pilot investigation + verifier layer 1 | bibliography-scan gated → local quote-in-source check gates claims; ask booth |
+| **GPTZero** | Three integrations in the product — sentence-level Voice, neighbourhood slop share, and **bibliography-scan with veto power over our own agents' claims** (+ "fire drill": inject a labelled fake competitor, watch it get struck). Spec discipline: no deprecated fields, honour `should_mask`, 250-char gate, show `result_message` not raw probabilities | pitch scan + verifier layer 1 | bibliography-scan gated → local quote-in-source check gates claims; ask booth |
 | **Baseten** | Inference as a **measurement instrument**: LLM-predictability across 4 model families; **jury whose disagreement drives re-planning**; committed **bake-off table** right-sizing a model per role; cost/latency meter; prefix caching + `x-session-affinity`; (P2) true surprisal from a base model we deploy with **Truss + vLLM** because shared Model APIs don't expose prompt logprobs | all LLM calls via Baseten router, bake-off, jury | 429s → token bucket + OpenRouter overflow |
 | **Huawei openJiuwen** | Roles run on **`openjiuwen` agent-core** (their SDK under JiuwenSwarm): `TeamRuntime` P2P + pub/sub, `BaseTeam` streaming, MCP tools. Genuine collaboration: critic sends scouts back out, cross-family critic vs advocate, verifier veto enforced in code, jury split → targeted re-query, dynamic team formation (UI shows skipped scouts + why), failure reassignment. Reusability: validated **Swarm Skill** `prior-art-swarm/` | asyncio host running all roles; openjiuwen spike decided | jiuwen host not at parity by Sat 21:00 → demo on asyncio, show jiuwen on golden idea/recording |
 
@@ -100,10 +98,10 @@ Workflow (scheduled) ─▶ idea-alerts-v1 ─▶ backend poller ─▶ SSE toas
 - Index `prior-art-v1`: `rid, source, url, title, tagline, description, pitch, semantic_pitch(semantic_text → .jina-embeddings-v3), year, date, hackathon, tags, tech, is_winner, status, traction, field_provenance, lang, dedupe_key, quality_flags, gptzero.*, nn_sim, first_seen_at`. `pitch` = title + tagline + "What it does" (Devpost's standard headings parsed client-side), capped 1,500 chars — one short field bounds EIS cost and feeds BM25, rerank, `significant_text`, and the embedding.
 - Hybrid query: `text_similarity_reranker(.jina-reranker-v3, field=pitch, inference_text=<full idea>, window 40)` ⟵ `rrf(window 100, k=20)` ⟵ [`multi_match(title^3, tagline^2, pitch)`, `semantic(semantic_pitch)`], filter out `too_short`/`non_english`.
 - Two-step `significant_text`: collect top-50 neighbour `_id`s → `ids` query + `significant_text(pitch, filter_duplicate_text)` + `significant_terms(tags)` + `terms(year)`; background = whole index.
-- Agent Builder ES|QL tools: `hybrid_prior_art` (FORK/FUSE/RERANK, with plain-semantic fallback), `crowding_by_year`, `cliche_tags`, `combination_rarity`, `slop_by_year`; `index_search` tool; workflow tool `arm_watch`. Agents: `prior-art-analyst`, `watch-analyst`. All applied idempotently by `elastic/apply.py`.
+- Agent Builder ES|QL tools: `hybrid_prior_art` (FORK/FUSE/RERANK, with plain-semantic fallback), `crowding_by_year`, `cliche_tags`, `combination_rarity`; `index_search` tool; workflow tool `arm_watch`. Agents: `prior-art-analyst`, `watch-analyst`. All applied idempotently by `elastic/apply.py`.
 - **Corpus tiers** (EIS throughput unknown → measure first): Tier 0 by ~03:30 = `twangodev/devpost-hacks` (2.2k, 2024–26, with READMEs) + YC 6.2k + seeded DevSpot/HackAnalyzer/Plagia. Measure EIS on 1k docs. Tier 1 overnight = ≤40k `alvanlii` rows with semantic (winners first, newest first; `_id=rid`, checkpointed, `caffeinate`). Tier 2 = remaining ~215k BM25-only (minutes), then semantic backfill. Ladder if slow: shorter pitch → own Jina key → BM25 + rerank only.
 
-**GPTZero word budget** (~500k assumed; read `/v3/usage-stats` in hour 0, ask booth for a bump): interactive 120k · investigation 230k · reserve 50k. *Measured after building the sampler:* a write-up truncated to 1,800 chars is ~290 words (not 200), so 8 yrs × 150 ≈ 350k words — over the cap. The scan interleaves years and stops cleanly at the cap (~95 per year). To get 150/yr: get the word bump and raise `GPTZERO_INVESTIGATION_WORD_CAP`, or `scan --per-year 95`, or re-sample with `sample --max-chars 1200`. The pilot (4 yrs × 50) costs ~60k words. Ledger enforces caps; `GPTZERO_MODE=replay` by default so dev burns nothing; results cached by sha256 and written back to ES docs as `gptzero.*`.
+**GPTZero word budget** (~500k assumed; read `/v3/usage-stats` in hour 0): interactive 120k. Ledger enforces the cap; `GPTZERO_MODE=replay` by default so dev burns nothing; results cached by sha256 and written back to ES docs as `gptzero.*`.
 
 ---
 
@@ -113,7 +111,7 @@ Workflow (scheduled) ─▶ idea-alerts-v1 ─▶ backend poller ─▶ SSE toas
 README.md  Makefile  .env.example  .gitignore  .python-version (3.12)
 backend/pyproject.toml            # fastapi uvicorn sse-starlette httpx openai elasticsearch>=9 pydantic>=2 tenacity json-repair numpy pyarrow openjiuwen==0.1.18
 backend/app/{main,config}.py
-backend/app/api/{runs,investigation,replay,admin}.py
+backend/app/api/{runs,replay,admin}.py
 backend/app/schemas/{records,entities,claims,messages,events,report}.py
 backend/app/core/{blackboard,eventbus,budget,runstore}.py
 backend/app/llm/{router,models,structured,cost}.py  + prompts/*.md
@@ -124,13 +122,12 @@ backend/app/sources/{hn,github,arxiv,devpost_page,browserbase}.py
 backend/app/wrangle/{schema_map,blocking,adjudicate,fuse,reliability,impute}.py
 backend/app/signals/{gptzero,gptzero_budget,biblio,quote_check,prior_collision,jury,surprisal}.py
 backend/app/{scoring,actions,graph}/…     backend/tests/…     backend/fixtures/{mock_run.jsonl,golden/,gptzero/,calibration/}
-frontend/app/{page,runs/[id]/page,slop-index/page,about/page}.tsx
-frontend/components/{IdeaInput,SwarmTimeline,DebateThread,EvidenceCard,EvidenceLedger,AxisGauges,PitchHighlighter,IdeaGraph,MutationPanel,ActionBar,CostMeter,SlopCharts}.tsx
+frontend/app/{page,runs/[id]/page,about/page}.tsx
+frontend/components/{IdeaInput,SwarmTimeline,DebateThread,EvidenceCard,EvidenceLedger,AxisGauges,PitchHighlighter,IdeaGraph,MutationPanel,ActionBar,CostMeter}.tsx
 frontend/lib/{sse,types,graphReducer,replay}.ts
 ingest/{download_hf,parse_sections,load_devpost_hf,load_devpost_recent,load_yc,scrape_galleries,seed_known_prior_art,measure_eis,backfill_semantic}.py
 elastic/{mappings/,pipelines/,queries/,agent-builder/{tools,agents}/,workflows/{arm-watch,watch-recheck}.yaml,apply.py}
 swarm-skill/prior-art-swarm/{SKILL.md (kind: swarm-skill, per the official validator),roles/*.md,workflow.md,bind.md,dependencies.yaml,scripts/workflow.py}
-investigation/{sample,scan,neighbours,analyze,export_public}.py
 baseten/{bakeoff.py,reference_distribution.py,surprisal-truss/config.yaml}
 scripts/{smoke_all,smoke_elastic,smoke_baseten,smoke_gptzero,secret_scan}.sh  scripts/{bench_ideas,record_golden}.py
 docs/{PLAN,design-full,architecture,events,scoring,benchmarks,demo-script,devpost}.md  docs/sponsors/*.md  docs/research/*.md
@@ -141,7 +138,7 @@ Frontend: Next.js App Router + Tailwind + shadcn/ui + `react-force-graph-2d` + R
 
 ## 5. Lanes, schedule, cut lines
 
-**Lanes:** **P1 Spine** (Elastic, ingest, search, Agent Builder, Workflows) · **P2 Swarm** (hosts, roles, resolver, debate, Huawei) · **P3 Face** (all UI, replay, deploy, domain) · **P4 Signals** (GPTZero, investigation, Baseten instruments, booths, Devpost text, Browserbase).
+**Lanes:** **P1 Spine** (Elastic, ingest, search, Agent Builder, Workflows) · **P2 Swarm** (hosts, roles, resolver, debate, Huawei) · **P3 Face** (all UI, replay, deploy, domain) · **P4 Signals** (GPTZero, Baseten instruments, booths, Devpost text, Browserbase).
 
 | Time (EDT) | P1 Spine | P2 Swarm | P3 Face | P4 Signals |
 |---|---|---|---|---|
@@ -151,9 +148,9 @@ Frontend: Next.js App Router + Tailwind + shadcn/ui + `react-force-graph-2d` + R
 | 05:00–08:45 | **Sleep.** Ingest + capped scan run under `caffeinate` | | | |
 | 09:00–13:30 | seeds, devpost/yc scouts, calibration, `significant_text`, **Elastic booth** | planner, HN/GitHub scouts, minimal synthesizer with citations, `/api/runs` SSE, **Huawei booth** | evidence cards, gauges, highlighter on the real stream | **GPTZero, Baseten, Rox, Browserbase booths**, bake-off, scan phase 1 |
 | **13:30 M1** | one real end-to-end run on 2 ideas → **13:30–14:00 Devpost initial submission, lock prizes** | | | |
-| 14:00–18:00 | ES\|QL tools + agents, MCP G4 by 16:00, whitespace finder, `apply.py` | resolver, critic/advocate + re-query, judge, blackboard perms, jiuwen host parity | IdeaGraph + `graphReducer`, DebateThread, EvidenceLedger | two-layer verifier, slop share + write-back, `neighbours.py`, `analyze.py` |
+| 14:00–18:00 | ES\|QL tools + agents, MCP G4 by 16:00, whitespace finder, `apply.py` | resolver, critic/advocate + re-query, judge, blackboard perms, jiuwen host parity | IdeaGraph + `graphReducer`, DebateThread, EvidenceLedger | two-layer verifier, slop share + write-back |
 | **18:00 M2** | dinner → run the benchmark ideas, fix ordering | | | |
-| 19:00–23:00 | Workflows + Slack + poller, gallery scraper, combination rarity | mutator + re-score, actuator, budget degradation, **jiuwen parity check 21:00** | MutationPanel + graph animation, ActionBar, CostMeter, `/slop-index` | prior-collision + cloud nodes, fire drill, Browserbase evidence browser (2.5 h cap), Devpost draft |
+| 19:00–23:00 | Workflows + Slack + poller, gallery scraper, combination rarity | mutator + re-score, actuator, budget degradation, **jiuwen parity check 21:00** | MutationPanel + graph animation, ActionBar, CostMeter | prior-collision + cloud nodes, fire drill, Browserbase evidence browser (2.5 h cap), Devpost draft |
 | **23:00 M3** | **FEATURE FREEZE** | | | |
 | 23:00–02:00 | latency/caching, `/about` with live corpus count, README | Swarm Skill + official validator, JiuwenSwarm recording (90 min cap) | replay mode + golden runs, polish, replay-only Vercel build + GoDaddy domain | Truss surprisal (cut at 01:00), public CSV, sponsor docs |
 | **02:00 M4** | record backup video 02:00–03:00 while everything works | | | |
@@ -184,7 +181,7 @@ Frontend: Next.js App Router + Tailwind + shadcn/ui + `react-force-graph-2d` + R
 4. **Elastic:** Cloud **Serverless** Elasticsearch trial (no card) → API key → `GET _inference/_all` (real Jina endpoint IDs) → enable `workflows:ui:enabled` → confirm Agent Builder visible.
 5. OpenRouter account (fallback), `GITHUB_TOKEN` from `gh auth token`, Slack incoming webhook, Browserbase key.
 
-**Booths Sat 09:00–10:30** — **Rox:** separate write-up/submission channel and deadline? (TreeHacks required an emailed write-up within 2 h.) **Huawei:** does "openjiuwen agent-core + validated Swarm Skill" count as "on top of JiuwenSwarm/WorkSwarm"? **GPTZero:** word bump for a "NeurIPS-style investigation", bibliography-scan entitlement/billing, AI-patterns allow-listing, does it verify non-academic URLs? **Baseten:** training access, `prompt_logprobs`, rate-limit form. **Elastic:** workshop/starter, EIS limits on trial, recommended reranker ID, FORK/FUSE/RERANK on Serverless, workflow-tool JSON. **Browserbase:** hackathon credits.
+**Booths Sat 09:00–10:30** — **Rox:** separate write-up/submission channel and deadline? (TreeHacks required an emailed write-up within 2 h.) **Huawei:** does "openjiuwen agent-core + validated Swarm Skill" count as "on top of JiuwenSwarm/WorkSwarm"? **GPTZero:** bibliography-scan entitlement/billing, AI-patterns allow-listing, does it verify non-academic URLs? **Baseten:** training access, `prompt_logprobs`, rate-limit form. **Elastic:** workshop/starter, EIS limits on trial, recommended reranker ID, FORK/FUSE/RERANK on Serverless, workflow-tool JSON. **Browserbase:** hackathon credits.
 
 **Before 14:00:** smokes green · orchestration decision settled · Rox + Huawei answers written down · Devpost draft with all badge IDs · opt into: Rox, GPTZero, Elastic, Huawei, Baseten, Browserbase, GoDaddy (+RBC only if you decide so at 13:30).
 

@@ -1,4 +1,4 @@
-"""GPTZero client: AI detection (`/v2/predict/text`) for the Voice axis, evidence badges and the Slop Index.
+"""GPTZero client: AI detection (`/v2/predict/text`) for the Voice axis and evidence badges.
 
 Spec discipline (verified against GPTZero's docs backend, see docs/research/02-gptzero-baseten.md A1/A4):
   * We read `predicted_class`, `confidence_category`, `class_probabilities`, `subclass`, `result_message` and the

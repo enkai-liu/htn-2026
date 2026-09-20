@@ -1,4 +1,4 @@
-"""Single settings object for backend, ingest, investigation and scripts. Reads the repo-root .env."""
+"""Single settings object for backend, ingest and scripts. Reads the repo-root .env."""
 from __future__ import annotations
 
 from functools import lru_cache
@@ -41,7 +41,6 @@ class Settings(BaseSettings):
     gptzero_base_url: str = "https://api.gptzero.me"
     gptzero_mode: Literal["replay", "live"] = "replay"
     gptzero_interactive_word_cap: int = 120_000
-    gptzero_investigation_word_cap: int = 230_000
 
     # Surprisal (a base model we deploy ourselves: shared Model APIs do not return prompt-token logprobs).
     # Powers retrieval-conditioned surprisal (AXIS 1, second instrument) and Fast-DetectGPT curvature (Voice).

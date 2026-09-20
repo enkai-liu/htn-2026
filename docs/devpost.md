@@ -34,7 +34,6 @@ Every hackathon produces the same twenty projects, and this year a language mode
 - **Voice is its own panel.** GPTZero's sentence-level read of your pitch is shown separately and never enters the originality score: an AI can phrase a novel idea, and a human can phrase a cliché.
 - **Coaching that is measured.** The whitespace finder surfaces terms common across the corpus but absent near your idea; the coach swaps one facet at a time, and every variation is re-scored by re-running retrieval. Its node visibly moves away from the cluster in the idea-space graph.
 - **Actions.** Arm a recurring watch that re-searches and pings you when similar work appears, draft a differentiated pitch, or write the idea back into the corpus. Anything that touches the outside world waits for your click.
-- **The Slop Index.** A year-stratified scan of Devpost write-ups from 2018 to 2026 with GPTZero, reported with a placebo-year false-positive rate, asking one question: are AI-flagged pitches measurably closer to their nearest neighbours? Aggregates only; no project or student is named. `TODO(measure)`: results.
 
 ## How we built it
 
@@ -42,7 +41,7 @@ Every hackathon produces the same twenty projects, and this year a language mode
 - **Baseten** runs every model call through one router with a token bucket and an OpenRouter overflow. Inference is used as a measurement instrument (the predictability probe and a jury whose disagreement triggers re-planning), with a bake-off table that right-sizes a model per role. `TODO(measure)`: bake-off table, cost per run.
 - **Huawei openJiuwen.** Roles are host-agnostic and run on openjiuwen agent-core (`TeamRuntime` P2P plus pub/sub, `BaseTeam` streaming), with an asyncio host tested for event parity. The team is also packaged as a reusable Swarm Skill, `prior-art-swarm`, which passes the official validator with 0 errors and 0 warnings.
 - **Rox.** The resolver is a data-wrangling agent: schema matching from every source into one schema with provenance (`TODO`: state the real source count), entity matching with a calibrated `insufficient_evidence` verdict, field fusion with source-reliability priors, visible conflicts and visibly imputed fields, and confidence-gated actions. `TODO(measure)`: entity-resolution precision and recall on Devpost-to-GitHub links.
-- **GPTZero** in three places: Voice, the share of AI-written work in your idea's neighbourhood, and veto power over our own agents' citations, plus the Slop Index investigation. We show GPTZero's result message and confidence category, never raw probabilities.
+- **GPTZero** in three places: Voice, the share of AI-written work in your idea's neighbourhood, and veto power over our own agents' citations. We show GPTZero's result message and confidence category, never raw probabilities.
 - **Browserbase** renders the live sites of the closest prior work (many are JavaScript apps a plain fetch cannot read) to report whether each is alive, parked, dead or pivoted. A site that shows a bot challenge is reported as blocked; we never try to get around one. `TODO`: only if built.
 - FastAPI streams every agent event over SSE; each run is a JSONL file that doubles as the replay format. Next.js renders the swarm timeline, the idea-space graph, the debate and the evidence ledger.
 

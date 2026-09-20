@@ -26,7 +26,6 @@ logs/
 backend/runs/
 *.parquet
 ingest/.checkpoints/
-investigation/results/raw/
 
 # os / editors
 .DS_Store

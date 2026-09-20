@@ -25,8 +25,6 @@ export function Wordmark({ className }: { className?: string }) {
 
 const LINKS = [
   { href: "/", label: "Investigate" },
-  { href: "/runs/mock", label: "Recorded run" },
-  { href: "/slop-index", label: "Slop Index" },
 ];
 
 export function SiteNav({ active }: { active?: string }) {

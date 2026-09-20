@@ -1,4 +1,4 @@
-"""Small text helpers shared by the GPTZero client, the quote check and the investigation."""
+"""Small text helpers shared by the GPTZero client and the quote check."""
 from __future__ import annotations
 
 import re
@@ -119,7 +119,7 @@ def _push(spans: list[tuple[int, int]], body: str, offset: int, start: int, end:
 
 
 def truncate_at_sentence(text: str, max_chars: int, *, min_keep: float = 0.5) -> str:
-    """Cut to <= max_chars at the last sentence boundary (length control for the investigation and evidence scans).
+    """Cut to <= max_chars at the last sentence boundary (length control for evidence scans).
     Falls back to the last whitespace when no boundary lies beyond `min_keep * max_chars`."""
     text = text.strip()
     if len(text) <= max_chars:

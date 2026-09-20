@@ -43,7 +43,7 @@ class NoNetwork(httpx.AsyncBaseTransport):
 
 
 def make_client(tmp_path, *, mode: str, handler=None) -> GPTZeroClient:
-    ledger = WordLedger(tmp_path / "ledger.json", caps={"interactive": 5_000, "investigation": 5_000})
+    ledger = WordLedger(tmp_path / "ledger.json", caps={"interactive": 5_000})
     transport = httpx.MockTransport(handler) if handler is not None else NoNetwork()
     return GPTZeroClient(mode=mode, api_key="test-key", ledger=ledger, cache_dir=tmp_path / "cache", transport=transport,
                          retry_wait=wait_none())

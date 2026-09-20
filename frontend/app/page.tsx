@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { HeroIslands } from "@/components/HeroIslands";
 import { IdeaInput } from "@/components/IdeaInput";
 import { SiteNav } from "@/components/SiteNav";
@@ -30,7 +29,6 @@ export default function Home() {
 
       <footer className="mt-auto flex flex-none flex-wrap items-center justify-between gap-3 border-t border-line px-5 py-4 text-[12.5px] text-mute sm:px-8">
         <span>Built at Hack the North 2026</span>
-        <Link href="/slop-index" className="hover:text-bone">The Slop Index</Link>
       </footer>
     </>
   );

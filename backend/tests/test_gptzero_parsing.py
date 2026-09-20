@@ -70,7 +70,7 @@ class NoNetwork(httpx.AsyncBaseTransport):
 
 
 def make_client(tmp_path: Path, *, mode: str, handler=None, api_key: str = "test-key", cap: int = 10_000, attempts: int = 4) -> GPTZeroClient:
-    ledger = WordLedger(tmp_path / "ledger.json", caps={"interactive": cap, "investigation": cap})
+    ledger = WordLedger(tmp_path / "ledger.json", caps={"interactive": cap})
     transport = httpx.MockTransport(handler) if handler is not None else NoNetwork()
     return GPTZeroClient(mode=mode, api_key=api_key, ledger=ledger, cache_dir=tmp_path / "cache", transport=transport,
                          retry_wait=wait_none(), max_attempts=attempts)
@@ -355,18 +355,18 @@ async def test_live_retries_429_then_caches_and_charges_once(tmp_path):
         return httpx.Response(200, json=_live_payload())
 
     client = make_client(tmp_path, mode="live", handler=handler)
-    doc = await client.predict_text(PITCH, bucket="investigation")
+    doc = await client.predict_text(PITCH)
     assert len(calls) == 2
     req = calls[-1]
     assert req.url.path == "/v2/predict/text" and req.headers["x-api-key"] == "test-key"
     assert json.loads(req.content) == {"document": PITCH}
     assert doc.predicted_class == "ai" and not doc.cached and not doc.replayed
-    assert client.ledger.used("investigation") == len(PITCH.split()) and client.ledger.used("interactive") == 0
-    assert client.ledger.snapshot()["investigation"]["reserved"] == 0
+    assert client.ledger.used("interactive") == len(PITCH.split())
+    assert client.ledger.snapshot()["interactive"]["reserved"] == 0
 
-    again = await client.predict_text(PITCH, bucket="investigation")
+    again = await client.predict_text(PITCH)
     assert len(calls) == 2 and again.cached
-    assert client.ledger.used("investigation") == len(PITCH.split()), "a cache hit must not be charged"
+    assert client.ledger.used("interactive") == len(PITCH.split()), "a cache hit must not be charged"
 
     cached_files = list((tmp_path / "cache" / "predict").glob("*.json"))
     assert len(cached_files) == 1 and cached_files[0].stem == gz.text_sha256(PITCH)

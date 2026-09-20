@@ -44,7 +44,7 @@ def test_plan_order_and_completeness(plan):
     names = {s.name for s in plan}
     assert {"prior-art-clean", "prior-art-v1", "prior-art-quarantine", "idea-watches-v1", "idea-alerts-v1",
             "originality.hybrid_prior_art", "originality.semantic_prior_art", "originality.crowding_by_year",
-            "originality.cliche_tags", "originality.combination_rarity", "originality.slop_by_year", "originality.search_nl",
+            "originality.cliche_tags", "originality.combination_rarity", "originality.search_nl",
             "prior-art-analyst", "watch-analyst", "originality-arm-watch", "originality-watch-recheck"} <= names
     for s in plan:
         blob = s.body if isinstance(s.body, str) else json.dumps(s.body)
@@ -130,9 +130,6 @@ def test_esql_tools(plan):
     assert hybrid["params"]["k"]["type"] == "integer" and hybrid["params"]["q"]["type"] == "string"
     fallback = tools["originality.semantic_prior_art"]["configuration"]["query"]
     assert "FORK" not in fallback and "RERANK" not in fallback and "MATCH(semantic_pitch, ?q)" in fallback
-    slop = tools["originality.slop_by_year"]["configuration"]["query"]
-    assert 'gptzero.confidence_category == "high"' in slop and 'gptzero.predicted_class != "human"' in slop
-    assert "gptzero.class" not in slop and "gptzero.confidence " not in slop and "gptzero.confidence=" not in slop
     assert '{"operator": "AND"}' in tools["originality.combination_rarity"]["configuration"]["query"]
     assert tools["originality.search_nl"]["configuration"] == {"pattern": "prior-art-v*"}
     text = apply.build_plan(settings(), string_param_type="text")

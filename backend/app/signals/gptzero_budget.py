@@ -1,11 +1,10 @@
 """Word ledger for GPTZero. Billing is per WORD, not per request, so every live call reserves words first.
 
-Two buckets with separate caps (settings: GPTZERO_INTERACTIVE_WORD_CAP / GPTZERO_INVESTIGATION_WORD_CAP):
+One bucket with its own cap (setting: GPTZERO_INTERACTIVE_WORD_CAP):
   interactive    pitch voice, evidence badges, report verification (the live product)
-  investigation  the Slop Index corpus scan
 
-Persisted at RUNS_DIR/gptzero_ledger.json so the cap survives restarts and is shared by the backend and the
-investigation scripts. Safe across threads, asyncio tasks and processes: a process-local RLock plus an exclusive
+Persisted at RUNS_DIR/gptzero_ledger.json so the cap survives restarts and is shared by every process that
+scans. Safe across threads, asyncio tasks and processes: a process-local RLock plus an exclusive
 flock (a bounded msvcrt lock on Windows) on a sidecar lock file around every read-modify-write, and atomic
 replace on write. Calls are sub-millisecond file operations, so they are fine to make directly from async code.
 
@@ -81,7 +80,7 @@ def _unlock_file(f: Any) -> None:
             log.warning("GPTZero ledger unlock failed (%s); the lock is released when the handle closes", exc)
 
 
-BUCKETS = ("interactive", "investigation")
+BUCKETS = ("interactive",)
 LEDGER_FILENAME = "gptzero_ledger.json"
 # A reservation whose process died before commit/release is dropped after this long.
 STALE_RESERVATION_S = 15 * 60
@@ -113,7 +112,7 @@ class WordLedger:
         self.path = Path(path) if path is not None else RUNS_DIR / LEDGER_FILENAME
         if caps is None:
             s = get_settings()
-            caps = {"interactive": s.gptzero_interactive_word_cap, "investigation": s.gptzero_investigation_word_cap}
+            caps = {"interactive": s.gptzero_interactive_word_cap}
         unknown = set(caps) - set(BUCKETS)
         if unknown:
             raise ValueError(f"unknown bucket(s) {sorted(unknown)}; expected {BUCKETS}")

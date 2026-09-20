@@ -36,8 +36,6 @@ Copy `.env.example` to `.env.local`.
 - `/` : hero + pitch input. 250-character gate for the GPTZero voice read (with a "run anyway" escape hatch from 20 characters, the
   backend minimum). `POST {API}/api/runs` then routes to `/runs/{run_id}`. If the POST fails you get an inline error (on a replay-only deploy it also links to the recorded run).
 - `/runs/[id]` : the live view.
-- `/slop-index` : the investigation page. Fetches `{API}/api/investigation/slop-index`, falls back to
-  `public/slop-index.sample.json` and then shows a **SAMPLE DATA** ribbon, banner and per-card stamps.
 
 ## Transports: live vs replay
 
@@ -86,7 +84,7 @@ components/run/       the multi-page run shell: RunProvider (one stream, many pa
                       DetailCard (islands + their listings) · screens (Debate / Coach / Report / Swarm+Ledger)
 components/           SwarmTimeline · IdeaGraph(+Canvas) · islands/* · AxisGauges · PitchHighlighter
                       EvidenceDetail (listings + fused fields, shared) · EvidenceLedger · DebateThread · MutationPanel
-                      ReportPanel · ActionBar · CostMeter · ReplayControls · SlopCharts · RunView + EvidenceCard (/classic only)
+                      ReportPanel · ActionBar · CostMeter · ReplayControls · RunView + EvidenceCard (/classic only)
 tests/reducers.test.ts
 ```
 

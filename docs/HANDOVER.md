@@ -27,8 +27,8 @@ No docker, no uv. Node 23 + pnpm. Do not add attribution lines to commits. Commi
 RULES THAT MUST HOLD: never build anything that defeats bot detection (Devpost's /software/search is behind an AWS WAF
 challenge - leave it alone; galleries/project pages are fine at <=1 req/s; a blocked site is reported as blocked).
 GPTZero "Voice" stays a separate axis, never folded into the originality score; never show raw probabilities; replay/
-fixture GPTZero data must never be presented as a real reading. Mock/simulated data is always labelled. Publish only
-aggregated/anonymised investigation results. I cannot create accounts or enter credentials - the user does that.
+fixture GPTZero data must never be presented as a real reading. Mock/simulated data is always labelled.
+I cannot create accounts or enter credentials - the user does that.
 Dataset downloads need the user's explicit go-ahead (Tier 0 ~15 MB, Tier 1 372 MB from Hugging Face).
 
 FIRST TASKS:
@@ -45,20 +45,20 @@ FIRST TASKS:
 | Area | State | Where |
 |---|---|---|
 | Contracts | Pydantic schemas, event protocol, TS mirror, 125-event fictional mock run (generator + fixture) | `backend/app/schemas/`, `docs/events.md`, `frontend/lib/types.ts`, `backend/fixtures/make_mock_run.py` |
-| Backend API | FastAPI: `POST /api/runs`, SSE `/api/runs/{id}/events` with `Last-Event-ID` resume, JSONL persistence = replay format, `/api/replay/{name}/events`, report, rescore, actions, health, slop-index | `backend/app/api/runs.py`, `app/main.py`, `app/core/` |
+| Backend API | FastAPI: `POST /api/runs`, SSE `/api/runs/{id}/events` with `Last-Event-ID` resume, JSONL persistence = replay format, `/api/replay/{name}/events`, report, rescore, actions, health | `backend/app/api/runs.py`, `app/main.py`, `app/core/` |
 | Agents | conductor, 4 scouts (devpost, yc via Elasticsearch; github, hn live), resolver, critic, advocate, judge (jury + LLM-predictability), verifier (veto in code), synthesizer, mutator (re-scores), actuator | `backend/app/roles/` |
 | Hosts | asyncio host **and** openjiuwen agent-core host (TeamRuntime P2P + session streaming). Same roles, event-parity tested. `ORCHESTRATOR=asyncio\|jiuwen` | `backend/app/orchestration/` |
 | Messy-data (Rox) | live-source schema matching with provenance, blocking (URL xref + name trigrams), LLM adjudication with `insufficient_evidence`, union-find merge, field fusion with reliability priors, visible conflicts + imputed fields | `backend/app/wrangle/`, `roles/resolver.py` |
 | Scoring | 3 axes + headline (weighted geometric mean), confidence, abstention rules; one similarity scale via the Jina reranker on EIS (lexical fallback labelled uncalibrated) | `backend/app/scoring/`, `docs/scoring.md` |
 | LLM router | Baseten → OpenRouter fallback, token bucket, JSON-schema structured output with repair + one re-ask, cost table, `x-session-affinity` | `backend/app/llm/` |
-| Elastic | mappings, ingest pipeline, 8 Agent Builder tools + 2 agents, 2 workflows, idempotent `apply.py` (`--check`, `--dry-run`) | `elastic/` |
+| Elastic | mappings, ingest pipeline, 7 Agent Builder tools + 2 agents, 2 workflows, idempotent `apply.py` (`--check`, `--dry-run`) | `elastic/` |
 | Ingest + search | tiered loaders (twangodev, alvanlii, YC), Devpost write-up parser, polite fetcher, EIS throughput measurer; hybrid search with degradation ladder, facet/pair rarity, whitespace finder, calibration CDF | `ingest/`, `backend/app/search/` |
-| GPTZero + investigation | client with word ledger/cache/replay, bibliography-scan mapping, quote check, Slop Index pipeline (sample → scan → analyze → export) | `backend/app/signals/`, `investigation/` |
+| GPTZero | client with word ledger/cache/replay, bibliography-scan mapping, quote check, neighbourhood slop share | `backend/app/signals/` |
 | Scripts | smokes for Elastic/Baseten/GPTZero (`--live` needed to spend GPTZero words), secret scan, benchmark ideas (Spearman), golden-run recorder, Baseten bake-off | `scripts/`, `baseten/bakeoff.py` |
-| Frontend | Next.js 16 app, redesigned Sat evening: light minimal theme; landing (ambient islands hero); a run is six pages behind a bottom tab bar, `/runs/<id>` Map (3D floating-islands map in plain three.js: your idea at the centre, distance = 1 - similarity, one wedge per source, pop-in / merge / re-score drift, click for a detail card), `/evidence`, `/debate` (a hand-off strip critic → advocate → jury → verifier → report with the two back-edges to the scouts, then one case file per prior-art project with its jury bench per facet and the verifier's ruling; grouping lives in `lib/debate.ts`, `/classic` still uses the flat `DebateThread`), `/coach` (mutations + the three actions), `/report` (+ Voice as its own section), `/swarm` (roster, timeline, cost per model). One `RunProvider` in `app/runs/[id]/(tabs)/layout.tsx` streams the run once for all tabs; every in-run link must go through `hrefFor()` or `?replay=`/`?speed=` is lost and the run restarts. The old one-page dark dashboard is kept as the demo fallback at `/runs/<id>/classic`; `?map=2d` swaps the islands for the old 2D chart. Slop Index page (sample data labelled), About. Static replay works with no backend | `frontend/` (`components/run/`, `components/islands/`, `components/debate/`, `lib/islandLayout.ts`, `lib/debate.ts`) |
+| Frontend | Next.js 16 app, redesigned Sat evening: light minimal theme; landing (ambient islands hero); a run is six pages behind a bottom tab bar, `/runs/<id>` Map (3D floating-islands map in plain three.js: your idea at the centre, distance = 1 - similarity, one wedge per source, pop-in / merge / re-score drift, click for a detail card), `/evidence`, `/debate` (a hand-off strip critic → advocate → jury → verifier → report with the two back-edges to the scouts, then one case file per prior-art project with its jury bench per facet and the verifier's ruling; grouping lives in `lib/debate.ts`, `/classic` still uses the flat `DebateThread`), `/coach` (mutations + the three actions), `/report` (+ Voice as its own section), `/swarm` (roster, timeline, cost per model). One `RunProvider` in `app/runs/[id]/(tabs)/layout.tsx` streams the run once for all tabs; every in-run link must go through `hrefFor()` or `?replay=`/`?speed=` is lost and the run restarts. The old one-page dark dashboard is kept as the demo fallback at `/runs/<id>/classic`; `?map=2d` swaps the islands for the old 2D chart. Static replay works with no backend | `frontend/` (`components/run/`, `components/islands/`, `components/debate/`, `lib/islandLayout.ts`, `lib/debate.ts`) |
 
 **Elastic is LIVE (set up Sat ~16:00).** `.env` holds every key. A serverless 9.6.0 project on GCP `us-east4`
-(general-purpose Elasticsearch, NOT the new "Vector Database" project type) has all 17 artifacts applied and
+(general-purpose Elasticsearch, NOT the new "Vector Database" project type) has all 16 artifacts applied and
 8,462 Tier 0 docs indexed; `bash scripts/smoke_elastic.sh` is 9/9 and hybrid retrieval returns HackAnalyzer /
 Plagia / DevSpot in the top 5 in ~0.8s. **FORK/FUSE/RERANK works here**, so `originality.hybrid_prior_art` is
 live and the `semantic_prior_art` fallback is not needed. **Still not run against a real LLM or GPTZero.**
@@ -102,10 +102,10 @@ Dev servers: `.claude/launch.json` defines `frontend` (:3000) and `backend` (:80
 2. ~~`make ingest-tier0`~~ **DONE.** 8,462 docs (6,237 YC + 2,222 Devpost + 3 seeds), 0 failed / 0 quarantined / 0 429s, EIS at 97-145 docs/s. Canary returns DevSpot/HackAnalyzer/Plagia in the top 5. Still to do: `make measure` (EIS docs/s decides Tier 1 size) and `make search Q="..."` through the backend's own search path.
 3. Start the backend, run a real idea end to end, fix prompt/latency issues, then `python scripts/bench_ideas.py --out docs/benchmarks.md` (pass = Spearman ≥ 0.8).
 4. Overnight: `make ingest-tier1` (372 MB download, resumable, `caffeinate`), then `make ingest-tier2`, then `make calibrate`.
-5. GPTZero: `bash scripts/smoke_gptzero.sh --live` (learn bibliography-scan entitlement + billing) → investigation pilot.
+5. GPTZero: `bash scripts/smoke_gptzero.sh --live` (learn bibliography-scan entitlement + billing).
 6. Baseten: verify the account (15 → 120 RPM), `python baseten/bakeoff.py`, then edit `backend/app/llm/models.py` from the results. OpenRouter slugs in `models.py` are a guess (`openai/gpt-oss-120b` for everything) — confirm.
 7. Record golden runs early: `python scripts/record_golden.py <run_id> self` → replay at `/runs/self?replay=self`.
 
 ## Things only the user can do (unchanged)
 
-Huawei credits (luma.com/mc7lijgs, first-come) · Baseten account + verification + promo code from Slack `#spons-baseten-2026` · ~~Elastic Cloud **Serverless** trial~~ (DONE) · GPTZero key · OpenRouter key · Browserbase key · Slack webhook · booth visits Sat 09:00–10:30 (Rox: separate write-up/deadline? Huawei: does agent-core + Swarm Skill count? GPTZero: word bump, bibliography-scan access; Baseten: training access, prompt logprobs; Elastic: EIS limits, reranker ID) · Devpost initial submission by 14:00 with all badge IDs.
+Huawei credits (luma.com/mc7lijgs, first-come) · Baseten account + verification + promo code from Slack `#spons-baseten-2026` · ~~Elastic Cloud **Serverless** trial~~ (DONE) · GPTZero key · OpenRouter key · Browserbase key · Slack webhook · booth visits Sat 09:00–10:30 (Rox: separate write-up/deadline? Huawei: does agent-core + Swarm Skill count? GPTZero: bibliography-scan access; Baseten: training access, prompt logprobs; Elastic: EIS limits, reranker ID) · Devpost initial submission by 14:00 with all badge IDs.

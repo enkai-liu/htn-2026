@@ -30,8 +30,8 @@ make frontend               # http://localhost:3000
 
 ## Layout
 
-`backend/` FastAPI + agents · `frontend/` Next.js · `ingest/` corpus loaders · `elastic/` mappings, pipeline, Agent Builder tools, Workflows · `investigation/` the Slop Index study · `swarm-skill/` reusable openJiuwen Swarm Skill · `baseten/` bake-off + surprisal deployment · `scripts/` smokes and benchmarks
+`backend/` FastAPI + agents · `frontend/` Next.js · `ingest/` corpus loaders · `elastic/` mappings, pipeline, Agent Builder tools, Workflows · `swarm-skill/` reusable openJiuwen Swarm Skill · `baseten/` bake-off + surprisal deployment · `scripts/` smokes and benchmarks
 
 ## Data and attribution
 
-Corpus: [`alvanlii/devpost-hackathon-projects`](https://huggingface.co/datasets/alvanlii/devpost-hackathon-projects), [`twangodev/devpost-hacks`](https://huggingface.co/datasets/twangodev/devpost-hacks) (research use), [`yc-oss/api`](https://github.com/yc-oss/api), plus live Hacker News (Algolia) and GitHub search. Used for a non-commercial hackathon demo. The Slop Index publishes aggregates and an anonymised CSV only — no project URLs, no individuals named.
+Corpus: [`alvanlii/devpost-hackathon-projects`](https://huggingface.co/datasets/alvanlii/devpost-hackathon-projects), [`twangodev/devpost-hacks`](https://huggingface.co/datasets/twangodev/devpost-hacks) (research use), [`yc-oss/api`](https://github.com/yc-oss/api), plus live Hacker News (Algolia) and GitHub search. Used for a non-commercial hackathon demo.

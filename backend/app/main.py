@@ -1,14 +1,13 @@
 from __future__ import annotations
 
-import json
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import runs
-from app.config import REPO_ROOT, get_settings
+from app.config import get_settings
 from app.search.es import close_async_es
 from app.sources.http import close_client
 
@@ -39,10 +38,3 @@ async def health() -> dict:
         },
     }
 
-
-@app.get("/api/investigation/slop-index")
-async def slop_index() -> dict:
-    path = REPO_ROOT / "investigation" / "results" / "slop_index.json"
-    if not path.exists():
-        raise HTTPException(404, "investigation has not been run yet")
-    return json.loads(path.read_text(encoding="utf-8"))
