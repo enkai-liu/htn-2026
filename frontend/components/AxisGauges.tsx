@@ -79,7 +79,8 @@ function Axis({ label, low, high, axis, extra, color }: { label: string; low: st
   );
 }
 
-export function AxisGauges({ scores }: { scores: Scores | null }) {
+/** `headline=false` renders only the three axes: the report states the number itself, far bigger. */
+export function AxisGauges({ scores, headline: showHeadline = true }: { scores: Scores | null; headline?: boolean }) {
   const abstain = !!scores?.abstain?.active;
   const headline = useTween(abstain ? null : scores?.headline ?? null);
   const confidence = scores?.confidence ?? null;
@@ -88,7 +89,8 @@ export function AxisGauges({ scores }: { scores: Scores | null }) {
   const pred = scores?.llm_predictability?.detail as { n_samples?: number; max_similarity?: number } | undefined;
 
   return (
-    <div className="grid h-full grid-cols-[200px_minmax(0,1fr)]">
+    <div className={clsx("grid h-full", showHeadline ? "grid-cols-[200px_minmax(0,1fr)]" : "grid-cols-[minmax(0,1fr)]")}>
+      {showHeadline && (
       <div className="flex min-w-0 flex-col justify-center border-r border-line px-3 py-1.5">
         <span className="label">Originality</span>
 
@@ -116,6 +118,7 @@ export function AxisGauges({ scores }: { scores: Scores | null }) {
           </>
         )}
       </div>
+      )}
 
       <div className="flex min-w-0 flex-col">
         <Axis label="Crowding" low="crowded" high="open" axis={scores?.crowding ?? null} color="var(--color-src-devpost)" />

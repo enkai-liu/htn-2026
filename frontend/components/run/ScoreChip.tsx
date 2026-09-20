@@ -4,6 +4,7 @@
 import clsx from "clsx";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { headlineParts } from "@/lib/headline";
 import type { Scores } from "@/lib/types";
 import { AxisGauges } from "../AxisGauges";
 
@@ -24,22 +25,8 @@ export function ScoreChip({ scores }: { scores: Scores | null }) {
     return () => { window.removeEventListener("pointerdown", onDown); window.removeEventListener("keydown", onKey); };
   }, [visible]);
 
-  const abstain = !!scores?.abstain?.active;
-  // Prefer the percentile rank: "63" means 63% of reference hackathon projects scored lower, which is a
-  // statement about a named population. The raw composite is the fallback when no reference exists yet.
-  const rank = abstain ? null : scores?.rank ?? null;
-  const headline = abstain ? null : rank ?? scores?.headline ?? null;
-  const suffix = rank != null ? "%" : "";
-  // Intervals are asymmetric (a geometric mean near the floor is), so show both ends rather than a ± that
-  // claims a symmetry the estimator does not have.
-  const interval =
-    abstain || headline == null ? null
-    : rank != null && scores?.rank_low != null && scores?.rank_high != null
-      ? `${Math.round(scores.rank_low)}–${Math.round(scores.rank_high)}% more original than typical`
-    : rank != null ? "more original than typical"
-    : scores?.low != null && scores?.high != null ? `${Math.round(scores.low)}–${Math.round(scores.high)} original`
-    : scores?.band != null ? `± ${scores.band} original`
-    : "original";
+  // one reading of the headline for the whole app: see lib/headline.ts
+  const { value: headline, suffix, interval, abstain } = headlineParts(scores);
 
   return (
     <div ref={ref} className="relative flex-none">
