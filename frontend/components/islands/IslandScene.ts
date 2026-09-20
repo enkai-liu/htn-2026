@@ -103,7 +103,10 @@ function glowTexture(): CanvasTexture {
  */
 function beamShell(halfAngle: number, alpha: number): Mesh {
   const LEN = 1; // scaled to the map's reach every frame
-  const g = new CylinderGeometry(Math.tan(halfAngle) * LEN, 0.018, LEN, 26, 14, true);
+  // The whole cone is scaled by the beam's length each frame, so the near radius is scaled too: at 0.018 and
+  // a 20-unit reach the shaft started 0.36 across -- wider than the lamp it is supposed to leave, which is
+  // what made it read as a disc parked on the tower rather than light coming out of it. 0.004 lands near 0.08.
+  const g = new CylinderGeometry(Math.tan(halfAngle) * LEN, 0.004, LEN, 20, 8, true);
   g.translate(0, LEN / 2, 0); // lantern end at the origin, beam runs up +Y
   g.rotateZ(-Math.PI / 2); // ...then lay it along +X, so a group rotation about Y sweeps it
 
@@ -129,6 +132,10 @@ export class IslandScene {
   private arcs = new Map<string, Arc>();
   private ripples: Ripple[] = [];
   private labels = new Map<string, HTMLElement>();
+  /** ids that currently deserve a label; rebuilt on data/selection/hover, not per frame */
+  private labelWant: string[] = [];
+  /** hit meshes for picking, rebuilt with the island set rather than on every pointer move */
+  private pickMeshes: Mesh[] = [];
   private material = new MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.92, metalness: 0 });
   private shadowMat: MeshBasicMaterial;
   private shadowGeo = new CircleGeometry(1, 28);
@@ -154,6 +161,9 @@ export class IslandScene {
   private zoomTarget: number | null = null;
   /** an explicit camera fly toward a focused island; overrides the passive follow, cancelled if you grab the camera */
   private flyTo: Vector3 | null = null;
+  /** live render scale and a rolling frame time, for the adaptive-resolution step in tick() */
+  private dpr = 1;
+  private frameAvg = 0;
   private raf = 0;
   private running = false;
   private visible = true;
@@ -180,7 +190,8 @@ export class IslandScene {
 
   constructor(private canvas: HTMLCanvasElement, private cb: SceneCallbacks, private opts: SceneOptions) {
     this.renderer = new WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: "high-performance" });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    this.dpr = Math.min(window.devicePixelRatio || 1, 2);
+    this.renderer.setPixelRatio(this.dpr);
     this.renderer.setClearColor(0x000000, 0);
 
     this.camera = new OrthographicCamera(-VIEW, VIEW, VIEW, -VIEW, 0.1, 400);
@@ -197,7 +208,7 @@ export class IslandScene {
     this.buildRings();
 
     this.halo = new Sprite(new SpriteMaterial({ map: glowTexture(), transparent: true, depthWrite: false, opacity: 0 }));
-    this.halo.scale.setScalar(7);
+    this.halo.scale.setScalar(2.5); // a glow around the lamp, not a disc laid over the whole island
     this.scene.add(this.halo);
 
     // three nested shells stand in for radial falloff: a tight bright core, a haze, and a faint outer bloom.
@@ -325,6 +336,8 @@ export class IslandScene {
     this.focus.set((minX + maxX) / 4, 0, (minZ + maxZ) / 4);
     this.extent = Math.max(layoutExtent(layout) * 0.62, ...layout.order.map((id) => Math.hypot(layout.byId[id].x - this.focus.x, layout.byId[id].z - this.focus.z) + layout.byId[id].size));
     this.syncArcs(now);
+    this.rebuildLabelSet();
+    this.rebuildPickList();
     if (!this.userMoved) this.fit(false);
     this.sync();
   }
@@ -342,6 +355,7 @@ export class IslandScene {
       if (!this.opts.reducedMotion) this.fit(false);
     }
     this.syncArcs(performance.now());
+    this.rebuildLabelSet();
     this.sync();
   }
 
@@ -523,6 +537,10 @@ export class IslandScene {
 
   /** One frame of work. Also called directly while the loop is paused (hidden tab), so new data still gets drawn. */
   private tick(now: number) {
+    if (this.running && this.lastNow && now > this.lastNow) {
+      const d = now - this.lastNow;
+      if (d < 200) this.frameAvg = this.frameAvg ? this.frameAvg * 0.9 + d * 0.1 : d;
+    }
 
     if (this.zoomTarget != null) {
       this.camera.zoom += (this.zoomTarget - this.camera.zoom) * 0.06;
@@ -602,7 +620,8 @@ export class IslandScene {
       this.halo.position.copy(idea.group.position).y += idea.datum.p.size * LANTERN_AT * idea.group.scale.y;
       const born = idea.bornAt === -Infinity ? 1 : clamp01((now - idea.bornAt) / POP_MS);
       // the beam leaves the lantern and reaches the furthest island, so it lights the neighbourhood searched
-      const reach = Math.max(6, ...[...this.islands.values()].map((i) => Math.hypot(i.group.position.x, i.group.position.z) + i.datum.p.size));
+      let reach = 6;
+      for (const i of this.islands.values()) reach = Math.max(reach, Math.hypot(i.group.position.x, i.group.position.z) + i.datum.p.size);
       const lantern = idea.datum.p.size * LANTERN_AT * idea.group.scale.y;
       this.beacon.position.copy(idea.group.position).y += lantern;
       this.beacon.visible = !still && born > 0.25;
@@ -662,7 +681,7 @@ export class IslandScene {
         this.shells.forEach((m, n) => { (m.material as MeshBasicMaterial).opacity = born * (0.7 + flash * 0.28 + locked * BOOST[n]); });
       }
       (this.halo.material as SpriteMaterial).opacity = born * (still ? 0.6 : 0.46 + Math.sin(now * 0.0016) * 0.08 + flash * 0.5);
-      this.halo.scale.setScalar(7 * (1 + flash * 0.22));
+      this.halo.scale.setScalar(2.5 * (1 + flash * 0.3));
     } else {
       (this.halo.material as SpriteMaterial).opacity = 0;
       this.beacon.visible = false;
@@ -678,6 +697,19 @@ export class IslandScene {
     }
 
     for (const arc of this.arcs.values()) this.updateArc(arc, now);
+    // Adaptive resolution. This scene is fill-bound, not draw-call bound: three double-sided transparent beam
+    // shells and a shadow blob under every island mean a lot of overdraw, and on a 2x display that is four
+    // times the pixels. When frames are consistently over budget, render fewer of them rather than dropping
+    // the effects. Steps down only -- stepping back up on a brief calm patch just oscillates.
+    if (this.running && this.frameAvg > 0) {
+      // Floor at 1.25: below that the low-poly edges and the island labels visibly soften, and a blurry map
+      // at 60fps is a worse trade than a crisp one at 45. A real GPU should rarely step at all.
+      if (this.frameAvg > 24 && this.dpr > 1.3) {
+        this.dpr = Math.max(1.25, this.dpr - 0.25);
+        this.renderer.setPixelRatio(this.dpr);
+        this.frameAvg = 0; // let it settle before judging again
+      }
+    }
     this.renderer.render(this.scene, this.camera);
     // the first render is the slow one (it compiles the shaders), so this is when the loader may go
     if (!this.drawn && this.w > 1) { this.drawn = true; this.cb.onReady?.(); }
@@ -718,7 +750,7 @@ export class IslandScene {
     let id: string | null = null;
     if (this.pointerInside) {
       this.raycaster.setFromCamera(this.pointer, this.camera);
-      const meshes = [...this.islands.values()].filter((i) => !i.dying).map((i) => i.hit);
+      const meshes = this.pickMeshes;
       const hit = this.raycaster.intersectObjects(meshes, false)[0];
       id = (hit?.object.userData.id as string | undefined) ?? null;
     }
@@ -726,8 +758,14 @@ export class IslandScene {
     this.hoverId = id;
     this.canvas.style.cursor = id ? "pointer" : "grab";
     this.syncArcs(performance.now());
+    this.rebuildLabelSet();
     this.sync();
     this.cb.onHover(id);
+  }
+
+  private rebuildPickList() {
+    this.pickMeshes.length = 0;
+    for (const i of this.islands.values()) if (!i.dying) this.pickMeshes.push(i.hit);
   }
 
   // --- labels ---------------------------------------------------------------------------------------------------------
@@ -737,14 +775,33 @@ export class IslandScene {
     this.labels.delete(id);
   }
 
+  /**
+   * Which islands get a label. Ranking the whole map and de-duplicating is not frame work -- the answer only
+   * changes when the data, the selection or the hover changes -- but it used to run every frame: six arrays,
+   * a sort over every island and an O(n^2) dedupe, sixty times a second. Cached here and rebuilt on those
+   * three events instead.
+   */
+  private rebuildLabelSet() {
+    const ranked: Island[] = [];
+    for (const i of this.islands.values()) if (!i.dying && i.datum.p.kind === "entity") ranked.push(i);
+    ranked.sort((a, b) => (b.datum.similarity ?? 0) - (a.datum.similarity ?? 0));
+
+    const want = this.labelWant;
+    want.length = 0;
+    const add = (id: string | null) => { if (id && this.islands.has(id) && !want.includes(id)) want.push(id); };
+    add("idea");
+    add(this.selectedId);
+    add(this.hoverId);
+    for (const i of this.islands.values()) if (i.datum.p.kind === "mutation") add(i.datum.id);
+    for (let n = 0; n < ranked.length && n < 5; n++) add(ranked[n].datum.id);
+
+    for (const id of [...this.labels.keys()]) if (!want.includes(id)) this.removeLabel(id);
+  }
+
   private placeLabels() {
     const layer = this.opts.labelLayer;
     if (!layer) return;
-    const ranked = [...this.islands.values()].filter((i) => !i.dying && i.datum.p.kind === "entity").sort((a, b) => (b.datum.similarity ?? 0) - (a.datum.similarity ?? 0)).slice(0, 5).map((i) => i.datum.id);
-    const want: string[] = ["idea", this.selectedId, this.hoverId, ...[...this.islands.values()].filter((i) => i.datum.p.kind === "mutation").map((i) => i.datum.id), ...ranked]
-      .filter((id, n, all): id is string => !!id && this.islands.has(id) && all.indexOf(id) === n);
-
-    for (const id of [...this.labels.keys()]) if (!want.includes(id)) this.removeLabel(id);
+    const want = this.labelWant;
 
     const boxes: { x: number; y: number; w: number; h: number }[] = [];
     for (const id of want) {
