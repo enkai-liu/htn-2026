@@ -37,7 +37,18 @@ class Scores(BaseModel):
     facet_rarity: AxisScore
     llm_predictability: AxisScore
     headline: float | None = None
-    band: float | None = None
+    band: float | None = None  # symmetric half-width, for callers that want one number
+    # The bootstrap interval. Asymmetric on purpose: a weighted geometric mean near the floor is not
+    # symmetric, so `headline +- band` overstates the low end and understates the high one.
+    low: float | None = None
+    high: float | None = None
+    # THE headline the UI shows: where this idea's composite falls among real hackathon projects scored the
+    # same way. `rank = 63` means 63% of the reference population scored lower -- a checkable statement
+    # about a named population, unlike 63 points on an undefined scale. None until the reference is built.
+    rank: float | None = None
+    rank_low: float | None = None
+    rank_high: float | None = None
+    rank_axes: list[str] = Field(default_factory=list)  # which axes the rank is taken over
     confidence: float = 0.0
     abstain: Abstain = Field(default_factory=Abstain)
 

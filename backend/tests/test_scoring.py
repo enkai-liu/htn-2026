@@ -1,7 +1,7 @@
 """Scoring invariants from docs/scoring.md: monotonicity, renormalised weights, abstention rules."""
 import pytest
 
-from app.schemas import AxisScore
+from app.schemas import Abstain, AxisScore
 from app.scoring import axes
 from app.scoring.similarity import lexical_cosine
 from app.wrangle.blocking import candidate_pairs, name_sim, norm_name, norm_url
@@ -16,6 +16,132 @@ def test_crowding_is_monotone_in_similarity():
 
 def test_one_close_neighbour_matters_more_than_many_distant_ones():
     assert axes.crowding([0.95, 0.1, 0.1, 0.1, 0.1]).score < axes.crowding([0.4] * 5).score
+
+
+def _boot(**kw) -> axes.BootstrapInputs:
+    base = dict(sims=[0.62, 0.55, 0.51, 0.48, 0.44, 0.40, 0.38, 0.35, 0.31, 0.28],
+                corpus_n=8110,
+                facet_term_dfs={"purpose": {"originality": 40, "idea": 900, "assess": 300},
+                                "mechanism": {"novelty": 4, "pivot": 19, "debate": 22, "ai": 582}},
+                pair=(22, 1020, 9), cliche_overlap=0.1,
+                prior_sims=[0.59, 0.52, 0.48, 0.44, 0.41, 0.39, 0.37, 0.35, 0.33, 0.31, 0.29, 0.27])
+    base.update(kw)
+    return axes.BootstrapInputs(**base)
+
+
+def _reference(values):
+    """A CDF over a reference population's composite scores, as `calibration.headline_percentile` is."""
+    import bisect
+
+    vs = sorted(values)
+    return lambda x: (bisect.bisect_left(vs, x) + bisect.bisect_right(vs, x)) / (2 * len(vs))
+
+
+def test_percentile_rank_is_a_share_of_the_reference_population():
+    ref = _reference([float(i) for i in range(100)])  # composites 0..99
+    live = {"crowding": 40.0, "facet_rarity": 80.0, "llm_predictability": 60.0}
+    raw = axes.rank_composite(live)
+    assert axes.percentile_rank(live, ref) == pytest.approx(100 * ref(raw))
+    # llm_predictability is NOT in the rank: the reference population is not scored on it
+    assert axes.rank_composite(live) == axes.rank_composite({k: v for k, v in live.items() if k in axes.RANK_AXES})
+    assert axes.percentile_rank(live, None) is None  # no reference -> no rank, never a guess
+    assert axes.rank_composite({"facet_rarity": 50.0}) is None  # crowding is still mandatory
+
+
+def test_percentile_rank_is_monotone_and_bounded():
+    ref = _reference([float(i) for i in range(100)])
+    ranks = [axes.percentile_rank({"crowding": c, "facet_rarity": 50.0}, ref) for c in (5, 20, 40, 70, 95)]
+    assert ranks == sorted(ranks)
+    assert all(0.0 <= r <= 100.0 for r in ranks)
+
+
+def test_bootstrap_band_replaces_the_invented_formula():
+    out = axes.bootstrap_headline(_boot(), b=400)
+    assert out is not None
+    assert 0 < out.low < out.high < 100
+    assert out.diagnostics["replicates"] == 400
+    assert set(out.diagnostics["resampled"]) == {"neighbours", "facet_dfs", "model_samples"}
+    assert out.rank_low is None and out.rank_high is None  # no reference population supplied
+
+
+def test_bootstrap_reports_a_rank_interval_when_a_reference_exists():
+    ref = _reference([float(i) for i in range(100)])
+    out = axes.bootstrap_headline(_boot(rank_reference=ref), b=400)
+    assert out.rank_low is not None and out.rank_low < out.rank_high
+    assert 0 <= out.rank_low and out.rank_high <= 100
+
+
+def test_rank_interval_widens_with_the_reference_populations_own_dkw_error():
+    ref = _reference([float(i) for i in range(100)])
+    tight = axes.bootstrap_headline(_boot(rank_reference=ref, rank_dkw=0.0), b=400)
+    loose = axes.bootstrap_headline(_boot(rank_reference=ref, rank_dkw=0.078), b=400)
+    assert (loose.rank_high - loose.rank_low) > (tight.rank_high - tight.rank_low)
+
+
+def test_bootstrap_band_is_deterministic_for_a_given_seed():
+    a = axes.bootstrap_headline(_boot(), b=200, seed=5)
+    b = axes.bootstrap_headline(_boot(), b=200, seed=5)
+    assert (a.low, a.high) == (b.low, b.high)
+
+
+def test_bootstrap_band_widens_with_calibration_error():
+    """DKW says a 300-point CDF is worth +-0.078 on ANY percentile; that has to reach the interval."""
+    tight = axes.bootstrap_headline(_boot(dkw=0.0), b=400)
+    loose = axes.bootstrap_headline(_boot(dkw=0.078), b=400)
+    assert (loose.high - loose.low) > (tight.high - tight.low)
+
+
+def test_bootstrap_band_widens_with_a_noisier_neighbourhood():
+    """crowding_lite leans on max(r) over ten retrieved documents, so a spread-out neighbourhood is
+    genuinely less certain than a tight one, and the interval should say so."""
+    tight = axes.bootstrap_headline(_boot(sims=[0.50] * 10), b=400)
+    spread = axes.bootstrap_headline(_boot(sims=[0.95, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2]), b=400)
+    assert (spread.high - spread.low) > (tight.high - tight.low)
+
+
+def test_bootstrap_band_needs_a_neighbourhood():
+    assert axes.bootstrap_headline(_boot(sims=[])) is None
+    assert not axes.BootstrapInputs().usable
+
+
+def test_assemble_reports_an_asymmetric_interval_when_it_can():
+    crowd, rar, pred = AxisScore(score=3.0), AxisScore(score=56.0), AxisScore(score=71.0)
+    s = axes.assemble(crowd, rar, pred, jury_std=0.05, conf=0.8, abstain=Abstain(active=False), boot=_boot())
+    assert s.low is not None and s.high is not None
+    assert s.low < s.high
+    # the geometric mean is not symmetric down here, which is exactly why `headline +- band` was wrong
+    assert abs((s.high - s.headline) - (s.headline - s.low)) > 0.5
+    assert s.band == pytest.approx((s.high - s.low) / 2, abs=0.05)
+
+
+def test_assemble_without_bootstrap_inputs_keeps_the_legacy_band():
+    crowd, rar, pred = AxisScore(score=40.0), AxisScore(score=80.0), AxisScore(score=60.0)
+    s = axes.assemble(crowd, rar, pred, jury_std=0.05, conf=0.8, abstain=Abstain(active=False))
+    assert s.low is None and s.high is None and s.band == 10.0
+
+
+def test_assemble_reports_the_rank_when_a_reference_exists():
+    ref = _reference([float(i) for i in range(100)])
+    crowd, rar, pred = AxisScore(score=3.0), AxisScore(score=56.0), AxisScore(score=71.0)
+    s = axes.assemble(crowd, rar, pred, jury_std=0.05, conf=0.8, abstain=Abstain(active=False),
+                      boot=_boot(rank_reference=ref, rank_dkw=0.078))
+    assert s.rank is not None and 0 <= s.rank <= 100
+    assert s.rank_low is not None and s.rank_low <= s.rank_high
+    assert s.rank_axes == list(axes.RANK_AXES)  # the rank says which axes it is over
+    assert s.headline is not None  # the raw composite is still there underneath
+
+
+def test_assemble_has_no_rank_without_a_reference_population():
+    crowd, rar, pred = AxisScore(score=3.0), AxisScore(score=56.0), AxisScore(score=71.0)
+    s = axes.assemble(crowd, rar, pred, jury_std=0.05, conf=0.8, abstain=Abstain(active=False), boot=_boot())
+    assert s.rank is None and s.rank_axes == []  # abstain rather than invent a percentile
+
+
+def test_assemble_drops_the_interval_when_it_abstains():
+    crowd, rar, pred = AxisScore(score=3.0), AxisScore(score=56.0), AxisScore(score=71.0)
+    s = axes.assemble(crowd, rar, pred, jury_std=0.05, conf=0.2,
+                      abstain=Abstain(active=True, reason="thin"), boot=_boot())
+    assert (s.headline, s.band, s.low, s.high, s.rank, s.rank_low) == (None,) * 6
 
 
 def test_crowding_fuses_the_two_instruments_on_the_percentile_scale():

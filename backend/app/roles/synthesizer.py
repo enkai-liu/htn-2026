@@ -45,7 +45,8 @@ class Synthesizer(BaseRole):
         overlap = (len(idea_terms & {t for c in cliches for t in tokens(c.term)}) / len(idea_terms)) if (cliches and idea_terms) else None
         pair = stats.get("pair") or {}
         rarity = axes.facet_rarity(stats.get("facet_dfs"), pair.get("df_ab", stats.get("pair_df")), overlap,
-                                   pair_npmi=pair.get("npmi"), pair_expected=pair.get("expected"))
+                                   pair_npmi=pair.get("npmi"), pair_expected=pair.get("expected"),
+                                   facet_rarities=stats.get("facet_rarities"), facet_terms=stats.get("facet_terms"))
         pred = axes.llm_predictability(board.priors)
 
         latest = {(v["eid"], v["facet"]): v for v in board.jury}  # re-votes replace earlier votes on the same subject
@@ -63,7 +64,8 @@ class Synthesizer(BaseRole):
         if not corpus_ok:
             missing.insert(0, "the hackathon/startup corpus was not searched")
         scores = axes.assemble(crowd, rarity, pred, jury_std=jury_std, conf=conf,
-                               abstain=axes.decide_abstain(coverage=coverage, corpus_ok=corpus_ok, conf=conf, missing=missing))
+                               abstain=axes.decide_abstain(coverage=coverage, corpus_ok=corpus_ok, conf=conf, missing=missing),
+                               boot=self._bootstrap_inputs(board, ents, stats, pair, overlap, rcs))
         board.set("scores", self.id, scores)
         board.put("stats", self.id, "corpus", stats)
         await ctx.emit("score.updated", scores)
@@ -115,6 +117,31 @@ class Synthesizer(BaseRole):
             await ctx.emit("error", {"message": f"summary unavailable: {exc}", "recoverable": True})
             return "\n".join(f"- {c.text}" for c in allowed), {}
 
+    @staticmethod
+    def _bootstrap_inputs(board, ents: list[Entity], stats: dict, pair: dict, overlap: float | None,
+                          rcs: RCSResult | None) -> axes.BootstrapInputs:
+        """Hand the scorer everything the point estimate was built from, so the band is the spread those
+        inputs actually have rather than `8 + 40*jury_std`. No extra network calls: all of it is already here."""
+        from app.search import calibration
+
+        n = int(stats.get("corpus_n") or 0)
+        p = pair or {}
+        return axes.BootstrapInputs(
+            sims=[e.similarity for e in ents],
+            percentile=axes.corpus_percentile(),
+            dkw=0.0 if calibration.is_placeholder() else calibration.get_cdf().epsilon(),
+            rcs=rcs.nats_per_token if rcs else None,
+            rcs_pct=axes.rcs_percentile(),
+            rcs_dkw=0.0 if calibration.rcs_is_placeholder() else calibration.get_rcs_cdf().epsilon(),
+            facet_term_dfs=stats.get("facet_term_dfs") or {},
+            corpus_n=n,
+            pair=(p["df_a"], p["df_b"], p["df_ab"]) if {"df_a", "df_b", "df_ab"} <= p.keys() else None,
+            cliche_overlap=overlap,
+            prior_sims=[float(x["similarity"]) for x in board.priors],
+            rank_reference=None if calibration.headline_is_placeholder() else calibration.headline_percentile,
+            rank_dkw=0.0 if calibration.headline_is_placeholder() else calibration.get_headline_cdf().epsilon(),
+        )
+
     async def _surprisal(self, ctx: Ctx, ents: list[Entity]) -> RCSResult | None:
         """AXIS 1's second instrument: how many nats/token the nearest existing projects save when predicting
         this pitch. Returns None (and the axis says so) whenever the base model is not deployed or not well."""
@@ -156,13 +183,20 @@ class Synthesizer(BaseRole):
 
             nb = await rarity.neighbourhood_stats(ids[:50])
             f = board.facets
-            facet_dfs = {k: await rarity.facet_df(getattr(f, k)) for k in ("purpose", "mechanism", "audience", "twist") if getattr(f, k)}
+            n = await rarity.corpus_size()
+            names = [k for k in ("purpose", "mechanism", "audience", "twist") if getattr(f, k)]
+            # One `filters` aggregation per facet gives every term's whole-index df; rarity then comes from the
+            # term profile, not from one document count whose value tracked how long the phrase was.
+            profiles = {k: await rarity.facet_profile(getattr(f, k), n) for k in names}
             return {
                 "cliches": [TermStat(term=str(b.get("term") or b.get("key")), score=b.get("score"), neighbourhood_count=b.get("doc_count"),
                                      global_count=b.get("bg_count")) for b in nb.get("cliche_terms", [])],
                 "by_year": [YearCount(year=int(y["year"]), count=int(y["count"])) for y in nb.get("by_year", []) if y.get("year") is not None],
                 "neighbourhood_winners": nb.get("winners", 0),
-                "facet_dfs": facet_dfs,
+                "corpus_n": n,
+                "facet_rarities": {k: p["rarity"] for k, p in profiles.items() if p["rarity"] is not None},
+                "facet_terms": {k: {"top": p["top_terms"], "unseen": p["unseen"], "n_terms": p["n_terms"]} for k, p in profiles.items()},
+                "facet_term_dfs": {k: p["term_dfs"] for k, p in profiles.items()},
                 # Both marginals, the joint and N in one place: NPMI needs the expectation, not just the joint.
                 "pair": await rarity.pair_stats(f.purpose, f.mechanism) if (f.purpose and f.mechanism) else {},
             }
