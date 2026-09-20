@@ -175,6 +175,12 @@ export interface Voice {
   ai_sentence_share?: number | null;
   sentences: VoiceSentence[];
   neighbourhood_slop_share?: number | null;
+  // Second opinion: Fast-DetectGPT on our own base model. All null when no surprisal deployment.
+  // agreement === "disagree" means the panel reports both readings and calls neither.
+  curvature?: number | null;
+  curvature_percentile?: number | null;
+  curvature_class?: "human" | "ai" | null;
+  agreement?: "agree" | "disagree" | "unknown";
 }
 
 export type NodeKind = "idea" | "facet" | "entity" | "theme" | "prior" | "mutation";

@@ -50,7 +50,11 @@ class VoiceSentence(BaseModel):
 
 
 class Voice(BaseModel):
-    """GPTZero on the pitch. A separate channel: never folded into the headline score."""
+    """Two detectors on the pitch. A separate channel: never folded into the headline score.
+
+    GPTZero is the primary read. `curvature` is Fast-DetectGPT on our own base model, whose only job is to be
+    able to disagree: one detector can never tell you it is wrong. `agreement == "disagree"` means the panel
+    reports both and calls neither, per docs/scoring.md rule 3."""
 
     too_short: bool = False
     predicted_class: Literal["human", "ai", "mixed"] | None = None
@@ -59,6 +63,11 @@ class Voice(BaseModel):
     ai_sentence_share: float | None = None
     sentences: list[VoiceSentence] = Field(default_factory=list)
     neighbourhood_slop_share: float | None = None
+    # Second opinion (signals/surprisal.py); all None when no base model is deployed.
+    curvature: float | None = None
+    curvature_percentile: float | None = None  # against pre-ChatGPT human pitches: 0.95 = a 5% false-positive point
+    curvature_class: Literal["human", "ai"] | None = None
+    agreement: Literal["agree", "disagree", "unknown"] = "unknown"
 
 
 NodeKind = Literal["idea", "facet", "entity", "theme", "prior", "mutation"]

@@ -60,6 +60,7 @@ type AgentEvent = {
 | `verify.result` | `{cid, layer: "quote"\|"gptzero", status, detail}` | claim badge flips live |
 | `voice.result` | `Voice` | PitchHighlighter (separate axis) |
 | `prior.sample` | `{model, text, similarity}` | grey "LLM prior" cloud nodes |
+| `surprisal.measured` | `{rcs_nats_per_token, n_tokens, cold_surprisal, primed_surprisal, n_neighbours, explained_spans[]}` | pitch highlighting: `explained_spans` are the sentences prior art predicts |
 | `score.updated` | `Scores` | AxisGauges |
 | `graph.patch` | `GraphPatch` | IdeaGraph via `graphReducer` |
 | `mutation.proposed` | `{mutation: Mutation}` | MutationPanel |

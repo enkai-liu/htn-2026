@@ -18,6 +18,46 @@ def test_one_close_neighbour_matters_more_than_many_distant_ones():
     assert axes.crowding([0.95, 0.1, 0.1, 0.1, 0.1]).score < axes.crowding([0.4] * 5).score
 
 
+def test_crowding_fuses_the_two_instruments_on_the_percentile_scale():
+    sims = [0.5] * 5
+    rerank_only = axes.crowding(sims)
+    both = axes.crowding(sims, rcs=1.2)
+    assert rerank_only.detail["instruments"] == ["rerank"] and both.detail["instruments"] == ["rcs", "rerank"]
+    assert "Single instrument" in rerank_only.note and "Single instrument" not in both.note
+    assert both.detail["rcs_nats_per_token"] == 1.2
+    # the fused percentile is the mean of the two
+    assert both.detail["percentile"] == pytest.approx(
+        (rerank_only.detail["percentile"] + both.detail["percentiles"]["rcs"]) / 2, abs=5e-4)
+
+
+def test_crowding_falls_when_the_prior_art_explains_more_of_the_pitch():
+    sims = [0.5] * 5
+    scores = [axes.crowding(sims, rcs=r).score for r in (0.1, 0.5, 1.0, 1.5)]
+    assert scores == sorted(scores, reverse=True)  # more nats saved by the neighbours -> less original
+
+
+def test_crowding_still_abstains_with_no_prior_art_even_if_surprisal_answered():
+    assert axes.crowding([], rcs=1.4).score is None
+
+
+def test_facet_rarity_prefers_npmi_and_falls_back_to_the_pair_df():
+    dfs = {"purpose": 20_000, "mechanism": 8_000}
+    cliche_pair = axes.facet_rarity(dfs, pair_df=3_000, cliche_overlap=0.2, pair_npmi=0.31, pair_expected=800)
+    unusual_pair = axes.facet_rarity(dfs, pair_df=3, cliche_overlap=0.2, pair_npmi=-0.72, pair_expected=80)
+    assert unusual_pair.score > cliche_pair.score
+    assert cliche_pair.detail["pair_measure"] == "npmi" and cliche_pair.detail["pair_npmi"] == 0.31
+    assert "independence predicts 800" in cliche_pair.note
+    fallback = axes.facet_rarity(dfs, pair_df=3_000, cliche_overlap=0.2)
+    assert fallback.detail["pair_measure"] == "df" and "pair_npmi" not in fallback.detail
+
+
+def test_facet_rarity_pair_term_is_monotone_in_npmi():
+    dfs = {"purpose": 500, "mechanism": 500}
+    scores = [axes.facet_rarity(dfs, pair_df=10, cliche_overlap=0.0, pair_npmi=v).score
+              for v in (1.0, 0.5, 0.0, -0.5, -1.0)]
+    assert scores == sorted(scores) and len(set(scores)) == 5
+
+
 def test_facet_rarity_monotone_and_abstains_without_corpus():
     common = axes.facet_rarity({"purpose": 1500, "mechanism": 1200}, pair_df=150, cliche_overlap=0.5).score
     rare = axes.facet_rarity({"purpose": 1500, "mechanism": 3}, pair_df=0, cliche_overlap=0.1).score

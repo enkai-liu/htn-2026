@@ -1,12 +1,18 @@
 """Search-side primitives for AXIS 2 (facet rarity) - docs/design-full.md section 2.6.
 
     rarity_f = 1 - log(1 + df_f) / log(1 + 2000)             df_f  = docs matching most words of one facet (FACET_MATCH)
-    pair     = 1 - log(1 + df(purpose AND mechanism)) / log(1 + 200)
+    pair     = (1 - npmi(purpose, mechanism)) / 2            observed co-occurrence vs. what independence predicts
     cliche   = |idea_terms ∩ significant_text(neighbours)| / |idea_terms|
     O2       = 100 * (0.5 * mean_f rarity_f + 0.3 * pair + 0.2 * (1 - cliche))      (assembled in scoring/axes.py)
 
-Network functions: neighbourhood_stats (two-step significant_text), facet_df, pair_df (`_count`).
-Pure functions:    rarity_from_df, pair_rarity, cliche_overlap, parse_neighbourhood_response, build_* bodies.
+The pair term used to be `1 - log(1+df_ab)/log(1+200)`, which only counts how many documents match both facets
+and so cannot distinguish a rare combination of two common facets (what a hackathon idea wants) from a pair whose
+halves are both rare. NPMI compares the joint count with the product of the marginals and does. `pair_rarity`
+remains the fallback for when the corpus size is unknown.
+
+Network functions: neighbourhood_stats (two-step significant_text), facet_df, pair_df, corpus_size, pair_stats.
+Pure functions:    rarity_from_df, pair_rarity, npmi, pair_atypicality, cliche_overlap,
+                   parse_neighbourhood_response, build_* bodies.
 """
 from __future__ import annotations
 
@@ -39,8 +45,52 @@ def rarity_from_df(df: int | float, cap: int = FACET_DF_CAP) -> float:
 
 
 def pair_rarity(df: int | float, cap: int = PAIR_DF_CAP) -> float:
-    """Rarity of a facet *combination* (purpose AND mechanism); saturates much earlier than a single facet."""
+    """Rarity of a facet *combination* (purpose AND mechanism); saturates much earlier than a single facet.
+
+    Kept as the fallback for when the corpus size is unknown. Prefer `npmi` + `pair_atypicality`: a raw pair df
+    cannot tell "rare combination of two common facets" (the interesting case) from "both facets are rare"."""
     return rarity_from_df(df, cap)
+
+
+def npmi(df_a: int, df_b: int, df_ab: int, n: int) -> float | None:
+    """Normalised pointwise mutual information of two facets co-occurring in the corpus, in [-1, +1].
+
+        pmi  = log( p(a,b) / (p(a) p(b)) )          p(x) = df_x / n
+        npmi = pmi / -log p(a,b)                    (Bouma normalisation)
+
+    +1  the two facets ALWAYS appear together: a fixed phrase ("machine learning" + "neural network")
+     0  independent: they co-occur exactly as often as chance predicts
+    -1  they never appear together: nobody has combined them -> this is the whitespace
+
+    This is the quantity AXIS 2 actually wants. `1 - log(1+df_ab)/log(1+200)` only sees how many documents match
+    both, so "help students study" + "flashcards" (3,000 hits, but ~4x MORE than independence predicts: a cliche
+    pairing) and "help students study" + "acoustic sensing" (3 hits, ~26x LESS than chance: genuinely unusual)
+    score alike. NPMI separates them, and it is the same observed-vs-expected comparison as the z-score in
+    Uzzi et al., *Atypical Combinations and Scientific Impact* (Science, 2013).
+
+    Returns None when the corpus size is unknown (n <= 0); the caller then falls back to `pair_rarity`.
+    """
+    if n <= 0:
+        return None
+    df_a, df_b, df_ab = max(0, int(df_a)), max(0, int(df_b)), max(0, int(df_ab))
+    df_ab = min(df_ab, df_a, df_b, n)  # a co-occurrence count cannot exceed either marginal
+    if df_ab == 0:
+        return -1.0  # never observed together; the limit of the formula, and the convention
+    p_ab = df_ab / n
+    if p_ab >= 1.0:
+        return 1.0  # every document matches both: perfect association, and -log p(a,b) = 0
+    pmi = math.log(p_ab / ((df_a / n) * (df_b / n)))
+    return max(-1.0, min(1.0, pmi / -math.log(p_ab)))
+
+
+def pair_atypicality(npmi_value: float | None) -> float | None:
+    """Map NPMI in [-1, +1] onto the [0, 1] rarity scale the other AXIS 2 terms use (1 = most original).
+
+    npmi = -1 (never combined) -> 1.0     npmi = 0 (independent) -> 0.5     npmi = +1 (always together) -> 0.0
+    """
+    if npmi_value is None:
+        return None
+    return (1.0 - max(-1.0, min(1.0, float(npmi_value)))) / 2.0
 
 
 _WORD = re.compile(r"[a-z0-9][a-z0-9+#.-]*[a-z0-9+#]|[a-z0-9]")
@@ -159,3 +209,36 @@ async def facet_df(facet_text: str, *, sources: Iterable[str] | None = None, es:
 async def pair_df(a: str, b: str, *, sources: Iterable[str] | None = None, es: Any = None, index: str | None = None) -> int:
     """Document frequency of a facet combination: pitches matching `a` AND `b` (each by FACET_MATCH)."""
     return await _count(build_facet_count_body(a, b, sources=sources), es=es, index=index)
+
+
+def build_corpus_count_body(sources: Iterable[str] | None = None) -> dict[str, Any]:
+    """Every scoreable document: the denominator N in the NPMI expectation."""
+    bool_q: dict[str, Any] = {"must_not": [excluded_flags_clause()]}
+    if sources:
+        bool_q["filter"] = [{"terms": {"source": list(sources)}}]
+    return {"query": {"bool": bool_q}}
+
+
+async def corpus_size(*, sources: Iterable[str] | None = None, es: Any = None, index: str | None = None) -> int:
+    """N for the NPMI expectation: how many documents the df counts were drawn from."""
+    return await _count(build_corpus_count_body(sources), es=es, index=index)
+
+
+async def pair_stats(a: str, b: str, *, sources: Iterable[str] | None = None, es: Any = None,
+                     index: str | None = None) -> dict[str, Any]:
+    """Everything AXIS 2 needs about one facet pair: both marginals, the joint, N, and the resulting NPMI.
+
+    Four `_count` calls in parallel. `expected` is what independence would predict, so the report can say
+    "3 projects combine these; chance predicts 80" instead of only "3 projects"."""
+    import asyncio
+
+    df_a, df_b, df_ab, n = await asyncio.gather(
+        facet_df(a, sources=sources, es=es, index=index),
+        facet_df(b, sources=sources, es=es, index=index),
+        pair_df(a, b, sources=sources, es=es, index=index),
+        corpus_size(sources=sources, es=es, index=index),
+    )
+    value = npmi(df_a, df_b, df_ab, n)
+    return {"df_a": df_a, "df_b": df_b, "df_ab": df_ab, "n": n, "npmi": value,
+            "expected": round(df_a * df_b / n, 2) if n > 0 else None,
+            "atypicality": pair_atypicality(value)}

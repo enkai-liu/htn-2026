@@ -65,9 +65,36 @@ class Verifier(BaseRole):
         except Exception as exc:  # ImportError, budget exceeded, network, auth
             await ctx.emit("error", {"message": f"voice analysis unavailable: {type(exc).__name__}: {exc}"[:200], "recoverable": True})
             return result(summary="voice analysis unavailable")
+        voice = await self._second_opinion(text, voice)
         ctx.board.set("voice", self.id, voice)
         await ctx.emit("voice.result", voice)
         return result(summary=voice.result_message or "voice analysed")
+
+    async def _second_opinion(self, text: str, voice: Voice) -> Voice:
+        """Fast-DetectGPT on our own base model, so the panel has a detector that can contradict GPTZero.
+
+        Silent no-op without a surprisal deployment, and without the human reference CDF it reports the raw
+        statistic but refuses to turn it into a verdict."""
+        try:
+            from app.search import calibration
+            from app.signals import surprisal
+
+            if not surprisal.available():
+                return voice
+            curv = await surprisal.measure_curvature(text)
+            if curv is None:
+                return voice
+            pct = None if calibration.curvature_is_placeholder() else calibration.curvature_percentile(curv.d)
+            cls = surprisal.classify_curvature(pct)
+            agreement = surprisal.detector_agreement(voice.predicted_class, cls)
+            message = voice.result_message
+            if agreement == "disagree":
+                message = ("Our two detectors disagree on this pitch, so we are not calling it. "
+                           f"GPTZero reads it as {voice.predicted_class}; our own base model reads it as {cls}.")
+            return voice.model_copy(update={"curvature": round(curv.d, 4), "curvature_percentile": pct,
+                                            "curvature_class": cls, "agreement": agreement, "result_message": message})
+        except Exception:
+            return voice  # a second opinion must never take the first one down
 
     # -- Claims ------------------------------------------------------------------------------------------
     async def _claims(self, ctx: Ctx) -> dict:

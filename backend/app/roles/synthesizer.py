@@ -11,9 +11,10 @@ from app.llm.router import LLMUnavailable
 from app.orchestration.host import Ctx, result
 from app.orchestration.registry import register
 from app.roles.base import HOUSE_RULES, BaseRole
-from app.schemas import FacetOverlap, JurorVote, Report, TermStat, YearCount
+from app.schemas import Entity, FacetOverlap, JurorVote, Report, TermStat, YearCount
 from app.scoring import axes
 from app.scoring.similarity import tokens
+from app.signals.surprisal import RCSResult
 
 SOURCE_WEIGHT = {"devpost": 0.40, "github": 0.20, "yc": 0.15, "hn": 0.15, "arxiv": 0.05, "web": 0.05}
 CORPUS = ("devpost", "yc")
@@ -32,12 +33,19 @@ class Synthesizer(BaseRole):
         stats = await self._corpus_stats(ctx)
         ents = board.top_entities(10)
         calibrated = not any(r.retrieval.get("uncalibrated") for r in board.records.values())
-        crowd = axes.crowding([e.similarity for e in ents], axes.corpus_percentile(), calibrated=calibrated, names=[e.canonical_name for e in ents])
+        rcs = await self._surprisal(ctx, ents)
+        crowd = axes.crowding([e.similarity for e in ents], axes.corpus_percentile(), calibrated=calibrated,
+                              names=[e.canonical_name for e in ents],
+                              rcs=rcs.nats_per_token if rcs else None, rcs_pct=axes.rcs_percentile())
+        if rcs is not None:
+            crowd.detail.update(rcs.as_detail())
 
         cliches = stats.get("cliches") or []
         idea_terms = set(tokens(board.idea_text))
         overlap = (len(idea_terms & {t for c in cliches for t in tokens(c.term)}) / len(idea_terms)) if (cliches and idea_terms) else None
-        rarity = axes.facet_rarity(stats.get("facet_dfs"), stats.get("pair_df"), overlap)
+        pair = stats.get("pair") or {}
+        rarity = axes.facet_rarity(stats.get("facet_dfs"), pair.get("df_ab", stats.get("pair_df")), overlap,
+                                   pair_npmi=pair.get("npmi"), pair_expected=pair.get("expected"))
         pred = axes.llm_predictability(board.priors)
 
         latest = {(v["eid"], v["facet"]): v for v in board.jury}  # re-votes replace earlier votes on the same subject
@@ -107,6 +115,36 @@ class Synthesizer(BaseRole):
             await ctx.emit("error", {"message": f"summary unavailable: {exc}", "recoverable": True})
             return "\n".join(f"- {c.text}" for c in allowed), {}
 
+    async def _surprisal(self, ctx: Ctx, ents: list[Entity]) -> RCSResult | None:
+        """AXIS 1's second instrument: how many nats/token the nearest existing projects save when predicting
+        this pitch. Returns None (and the axis says so) whenever the base model is not deployed or not well."""
+        board = ctx.board
+        if not ents:
+            return None
+        pitches, seen = [], set()
+        for e in ents:
+            for rid in e.records:
+                rec = board.records.get(rid)
+                text = (rec.pitch or rec.tagline or "") if rec else ""
+                if text and rid not in seen:
+                    seen.add(rid)
+                    pitches.append(text)
+                    break  # one write-up per resolved entity: a project on three sites is one neighbour
+        if not pitches:
+            return None
+        try:
+            from app.signals import surprisal
+
+            if not surprisal.available():
+                return None
+            rcs = await surprisal.measure_rcs(board.idea_text, pitches)
+        except Exception as exc:
+            await ctx.emit("error", {"message": f"surprisal unavailable: {type(exc).__name__}: {exc}"[:200], "recoverable": True})
+            return None
+        if rcs is not None:
+            await ctx.emit("surprisal.measured", rcs.as_detail())
+        return rcs
+
     async def _corpus_stats(self, ctx: Ctx) -> dict:
         """Corpus-native maths from Elasticsearch: cliche terms (significant_text), crowding by year, facet frequencies."""
         board = ctx.board
@@ -125,7 +163,8 @@ class Synthesizer(BaseRole):
                 "by_year": [YearCount(year=int(y["year"]), count=int(y["count"])) for y in nb.get("by_year", []) if y.get("year") is not None],
                 "neighbourhood_winners": nb.get("winners", 0),
                 "facet_dfs": facet_dfs,
-                "pair_df": await rarity.pair_df(f.purpose, f.mechanism),
+                # Both marginals, the joint and N in one place: NPMI needs the expectation, not just the joint.
+                "pair": await rarity.pair_stats(f.purpose, f.mechanism) if (f.purpose and f.mechanism) else {},
             }
         except Exception as exc:
             await ctx.emit("error", {"message": f"corpus statistics unavailable: {type(exc).__name__}: {exc}"[:200], "recoverable": True})

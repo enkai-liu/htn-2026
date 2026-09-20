@@ -43,6 +43,14 @@ class Settings(BaseSettings):
     gptzero_interactive_word_cap: int = 120_000
     gptzero_investigation_word_cap: int = 230_000
 
+    # Surprisal (a base model we deploy ourselves: shared Model APIs do not return prompt-token logprobs).
+    # Powers retrieval-conditioned surprisal (AXIS 1, second instrument) and Fast-DetectGPT curvature (Voice).
+    surprisal_base_url: str = ""
+    surprisal_api_key: str = ""
+    surprisal_model: str = "surprisal"
+    surprisal_timeout_s: float = 20.0
+    surprisal_max_chars: int = 6000  # pitch + neighbour context sent to the base model
+
     # Live sources
     github_token: str = ""
     exa_api_key: str = ""
@@ -73,6 +81,10 @@ class Settings(BaseSettings):
     @property
     def has_llm(self) -> bool:
         return bool(self.baseten_api_key or self.openrouter_api_key)
+
+    @property
+    def has_surprisal(self) -> bool:
+        return bool(self.surprisal_base_url)
 
 
 @lru_cache

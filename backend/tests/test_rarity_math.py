@@ -29,6 +29,60 @@ def test_pair_rarity_saturates_earlier_than_a_single_facet():
     assert rarity.pair_rarity(50) < rarity.rarity_from_df(50)
 
 
+def test_npmi_separates_a_cliche_pairing_from_an_unusual_one():
+    n = 200_000
+    # "help students study" x "flashcards": 3,000 together, but independence predicts only 800 -> a cliche pairing
+    cliche = rarity.npmi(df_a=20_000, df_b=8_000, df_ab=3_000, n=n)
+    # "help students study" x "acoustic sensing": 3 together, independence predicts 80 -> genuinely unusual
+    unusual = rarity.npmi(df_a=20_000, df_b=800, df_ab=3, n=n)
+    assert cliche > 0 > unusual
+    # the raw pair df cannot tell them apart in the same direction: it calls the rarer-than-chance pair
+    # "rarer" only because 3 < 3000, and would say the same if the pair were 100x MORE common than chance
+    assert rarity.pair_atypicality(unusual) > rarity.pair_atypicality(cliche)
+
+
+def test_npmi_matches_the_formula():
+    n, df_a, df_b, df_ab = 1000, 100, 200, 50
+    p_ab = df_ab / n
+    expected = math.log(p_ab / ((df_a / n) * (df_b / n))) / -math.log(p_ab)
+    assert rarity.npmi(df_a, df_b, df_ab, n) == pytest.approx(expected)
+
+
+def test_npmi_endpoints_and_degenerate_inputs():
+    assert rarity.npmi(100, 200, 0, 1000) == -1.0  # never observed together
+    assert rarity.npmi(1000, 1000, 1000, 1000) == 1.0  # every document matches both
+    assert rarity.npmi(0, 0, 0, 1000) == -1.0  # neither facet exists in the corpus
+    assert rarity.npmi(100, 200, 50, 0) is None  # corpus size unknown -> caller falls back to pair_rarity
+    assert rarity.npmi(100, 200, 999, 1000) == rarity.npmi(100, 200, 100, 1000)  # joint clamped to the marginals
+    assert -1.0 <= rarity.npmi(5, 7, 1, 10_000) <= 1.0
+
+
+def test_npmi_is_zero_at_independence():
+    # df_ab exactly equal to df_a * df_b / n
+    assert rarity.npmi(df_a=100, df_b=200, df_ab=20, n=1000) == pytest.approx(0.0, abs=1e-12)
+
+
+def test_npmi_is_monotone_in_the_joint_count():
+    values = [rarity.npmi(1000, 1000, df, 100_000) for df in (1, 5, 20, 100, 500, 1000)]
+    assert values == sorted(values) and len(set(values)) == len(values)
+
+
+def test_pair_atypicality_maps_npmi_onto_the_rarity_scale():
+    assert rarity.pair_atypicality(-1.0) == 1.0
+    assert rarity.pair_atypicality(0.0) == 0.5
+    assert rarity.pair_atypicality(1.0) == 0.0
+    assert rarity.pair_atypicality(None) is None
+    assert rarity.pair_atypicality(-7.0) == 1.0  # clamped
+
+
+def test_corpus_count_body_excludes_the_same_documents_as_a_facet_count():
+    body = rarity.build_corpus_count_body()
+    assert body["query"]["bool"]["must_not"] == [rarity.excluded_flags_clause()]
+    assert "must" not in body["query"]["bool"]  # no facet constraint: this is the denominator N
+    scoped = rarity.build_corpus_count_body(["devpost", "yc"])
+    assert scoped["query"]["bool"]["filter"] == [{"terms": {"source": ["devpost", "yc"]}}]
+
+
 def test_cliche_overlap():
     idea = "AI flashcards for students studying from PDFs"
     assert rarity.idea_terms(idea) == {"flashcard", "student", "studying", "pdf"}

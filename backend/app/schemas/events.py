@@ -37,6 +37,7 @@ EVENT_TYPES: frozenset[str] = frozenset(
         # signals
         "voice.result",
         "prior.sample",
+        "surprisal.measured",
         # scoring and graph
         "score.updated",
         "graph.patch",
